@@ -11,9 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('job_titles', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id(); // Primary key
+            $table->string('jobTitle', 255); // Job title or position (e.g., "Software Engineer")
+            $table->text('description')->nullable(); // Description of the job
+            $table->unsignedBigInteger('departmentId')->nullable(); // Links to a department table if needed
+            $table->float('defaultPayRate', 8, 2)->nullable(); // Default hourly or salary rate
+            $table->boolean('isActive')->default(true); // Soft deletion flag
+            $table->unsignedBigInteger('createdBy')->nullable(); // Admin/system who created
+            $table->unsignedBigInteger('updatedBy')->nullable(); // Admin/system who updated
+            $table->timestamps(); // Created and updated timestamps
+
+            // Foreign key constraints
+            $table->foreign('createdBy')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('updatedBy')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('departmentId')->references('id')->on('departments')->onDelete('set null');
         });
     }
 
@@ -22,6 +34,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('job_titles');
+        Schema::dropIfExists('jobs');
     }
 };

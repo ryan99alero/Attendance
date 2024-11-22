@@ -11,9 +11,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('overtime_rules', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::create('overtime', function (Blueprint $table) {
+            $table->id(); // Primary key
+            $table->unsignedBigInteger('employeeId'); // Links to the employee
+            $table->date('overtimeDate'); // Date overtime was worked
+            $table->float('hours', 5, 2); // Number of overtime hours worked
+            $table->string('reason', 255)->nullable(); // Optional reason for overtime
+            $table->boolean('isApproved')->default(false); // Whether the overtime was approved
+            $table->unsignedBigInteger('approvedBy')->nullable(); // Who approved the overtime
+            $table->unsignedBigInteger('createdBy')->nullable(); // Who created the record
+            $table->unsignedBigInteger('updatedBy')->nullable(); // Who updated the record
+            $table->boolean('isActive')->default(true); // Soft deletion flag
+            $table->timestamps(); // Created and updated timestamps
+
+            // Foreign key constraints
+            $table->foreign('employeeId')->references('id')->on('employees')->onDelete('cascade');
+            $table->foreign('approvedBy')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('createdBy')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('updatedBy')->references('id')->on('users')->onDelete('set null');
         });
     }
 
@@ -22,6 +37,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('overtime_rules');
+        Schema::dropIfExists('overtime');
     }
 };

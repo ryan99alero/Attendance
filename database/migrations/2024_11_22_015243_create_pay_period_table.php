@@ -11,9 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('pay_period', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::create('payPeriods', function (Blueprint $table) {
+            $table->id(); // Primary key
+            $table->date('startDate'); // Start date of the pay period
+            $table->date('endDate'); // End date of the pay period
+            $table->boolean('isClosed')->default(false); // Indicates if the pay period is closed
+            $table->unsignedBigInteger('createdBy')->nullable(); // Admin/system who created
+            $table->unsignedBigInteger('updatedBy')->nullable(); // Admin/system who updated
+            $table->timestamps(); // Created and updated timestamps
+
+            // Foreign key constraints
+            $table->foreign('createdBy')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('updatedBy')->references('id')->on('users')->onDelete('set null');
         });
     }
 
@@ -22,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('pay_period');
+        Schema::dropIfExists('payPeriods');
     }
 };
