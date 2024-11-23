@@ -1,0 +1,272 @@
+Attendance Table
+
+| **Field Name**        | **Type**     | **Size**  | **Comment**                                                |
+|------------------------|--------------|-----------|------------------------------------------------------------|
+| id                    | BIGINT       |           | Primary key, unique identifier for the attendance record    |
+| employee_id           | BIGINT       |           | Foreign key to the `Employee` table                        |
+| device_id             | BIGINT       |           | Foreign key to the `Device` table                          |
+| entry_method          | ENUM         |           | Specifies the method of entry (`kiosk`, `admin`, `vacation`, `clock`, `sick`) |
+| check_in              | TIMESTAMP    |           | Exact check-in time                                         |
+| check_in_date         | DATE         |           | Date of check-in                                            |
+| check_out             | TIMESTAMP    |           | Exact check-out time                                        |
+| rounded_check_in      | TIMESTAMP    |           | Rounded check-in time based on rounding rules              |
+| rounded_check_out     | TIMESTAMP    |           | Rounded check-out time based on rounding rules             |
+| overtime_hours        | FLOAT        | 8, 2      | Overtime hours for the record                              |
+| sick_hours            | FLOAT        | 8, 2      | Sick hours used during the attendance record               |
+| is_active             | BOOLEAN      |           | Indicates if the record is active (soft delete support)    |
+| created_by            | BIGINT       |           | Foreign key to the `UserAccount` table for record creator  |
+| updated_by            | BIGINT       |           | Foreign key to the `UserAccount` table for last updater    |
+| created_at            | TIMESTAMP    |           | Timestamp of record creation                               |
+| updated_at            | TIMESTAMP    |           | Timestamp of last record update                           |
+
+Locked-in Table: Card
+
+| **Field Name**      | **Type**     | **Size** | **Comment**                                   |
+|----------------------|--------------|----------|-----------------------------------------------|
+| id                  | BIGINT       |          | Primary key, unique identifier for the card   |
+| employee_id         | BIGINT       |          | Foreign key to the `Employee` table           |
+| card_number         | VARCHAR      | 50       | Unique card number assigned to the employee   |
+| issued_at           | TIMESTAMP    |          | Timestamp of when the card was issued         |
+| is_active           | BOOLEAN      |          | Indicates if the card is active or revoked    |
+| created_by          | BIGINT       |          | Foreign key to the `UserAccount` table for record creator |
+| updated_by          | BIGINT       |          | Foreign key to the `UserAccount` table for last updater |
+| created_at          | TIMESTAMP    |          | Timestamp of record creation                  |
+| updated_at          | TIMESTAMP    |          | Timestamp of last record update               |
+
+Locked-in Table: Device
+
+| **Field Name**      | **Type**     | **Size**  | **Comment**                                             |
+|----------------------|--------------|-----------|---------------------------------------------------------|
+| id                  | BIGINT       |           | Primary key, unique identifier for the device           |
+| department_id       | BIGINT       |           | Foreign key to the `Department` table                  |
+| device_name         | VARCHAR      | 100       | Name of the device                                      |
+| ip_address          | VARCHAR      | 15        | IP address of the device                                |
+| connection_type     | ENUM         |           | Type of connection (`WiFi`, `Wired`)                   |
+| firmware_version    | VARCHAR      | 50        | Current firmware version of the device                 |
+| last_check_in       | TIMESTAMP    |           | Last time the device reported back                     |
+| status              | BOOLEAN      |           | Operational status of the device                       |
+| created_by          | BIGINT       |           | Foreign key to the `UserAccount` table for record creator |
+| updated_by          | BIGINT       |           | Foreign key to the `UserAccount` table for last updater |
+| created_at          | TIMESTAMP    |           | Timestamp of record creation                           |
+| updated_at          | TIMESTAMP    |           | Timestamp of last record update                        |
+
+
+Locked-in Table: Department
+
+| **Field Name**      | **Type**     | **Size**  | **Comment**                                             |
+|----------------------|--------------|-----------|---------------------------------------------------------|
+| id                  | BIGINT       |           | Primary key, unique identifier for the department       |
+| department_name     | VARCHAR      | 100       | Name of the department                                  |
+| manager_id          | BIGINT       |           | Foreign key to the `Employee` table for the department manager |
+| created_by          | BIGINT       |           | Foreign key to the `UserAccount` table for record creator |
+| updated_by          | BIGINT       |           | Foreign key to the `UserAccount` table for last updater |
+| created_at          | TIMESTAMP    |           | Timestamp of record creation                           |
+| updated_at          | TIMESTAMP    |           | Timestamp of last record update                        |
+
+Locked-in Table: Employee
+
+| **Field Name**         | **Type**     | **Size**  | **Comment**                                                  |
+|-------------------------|--------------|-----------|--------------------------------------------------------------|
+| id                     | BIGINT       |           | Primary key, unique identifier for the employee              |
+| first_name             | VARCHAR      | 100       | Employee's first name                                        |
+| last_name              | VARCHAR      | 100       | Employee's last name                                         |
+| email                  | VARCHAR      | 100       | Employee's email address                                     |
+| phone                  | VARCHAR      | 20        | Employee's phone number                                      |
+| birth_date             | DATE         |           | Employee's date of birth                                     |
+| hire_date              | DATE         |           | Date the employee was hired                                  |
+| position               | VARCHAR      | 100       | Job title or position                                        |
+| department_id          | BIGINT       |           | Foreign key to the `Department` table                       |
+| shift_id               | BIGINT       |           | Foreign key to the `Shift` table                            |
+| annual_vacation_hours  | FLOAT(8, 2)  |           | Number of vacation hours accrued annually                   |
+| temp_agency            | VARCHAR      | 255       | Name of the temp agency if the employee is a temp worker    |
+| address_line_1         | VARCHAR      | 100       | Employee's primary address line                             |
+| address_line_2         | VARCHAR      | 100       | Employee's secondary address line (optional)               |
+| city                   | VARCHAR      | 100       | Employee's city of residence                                |
+| state                  | VARCHAR      | 50        | Employee's state                                            |
+| zip_code               | VARCHAR      | 15        | Employee's ZIP code                                         |
+| rounding_method        | BIGINT       |           | Foreign key to the `RoundingRule` table for attendance rounding rules |
+| created_by             | BIGINT       |           | Foreign key to the `UserAccount` table for record creator   |
+| updated_by             | BIGINT       |           | Foreign key to the `UserAccount` table for last updater     |
+| created_at             | TIMESTAMP    |           | Timestamp of record creation                                |
+| updated_at             | TIMESTAMP    |           | Timestamp of last record update                             |
+
+Locked-in Table: EmployeeStat
+
+| **Field Name**      | **Type**     | **Size** | **Comment**                                    |
+|----------------------|--------------|----------|------------------------------------------------|
+| id                  | BIGINT       |          | Primary key, unique identifier for the record  |
+| employee_id         | BIGINT       |          | Foreign key to the `Employee` table            |
+| hours_worked_day    | FLOAT(8, 2)  |          | Total hours worked in a day                   |
+| hours_worked_week   | FLOAT(8, 2)  |          | Total hours worked in a week                  |
+| hours_worked_month  | FLOAT(8, 2)  |          | Total hours worked in a month                 |
+| hours_worked_year   | FLOAT(8, 2)  |          | Total hours worked in a year                  |
+| created_by          | BIGINT       |          | Foreign key to the `UserAccount` table for record creator |
+| updated_by          | BIGINT       |          | Foreign key to the `UserAccount` table for last updater |
+| created_at          | TIMESTAMP    |          | Timestamp of record creation                  |
+| updated_at          | TIMESTAMP    |          | Timestamp of last record update               |
+
+Locked-in Table: Holiday
+
+| **Field Name**      | **Type**      | **Size** | **Comment**                                      |
+|----------------------|---------------|----------|--------------------------------------------------|
+| id                  | BIGINT        |          | Primary key, unique identifier for the holiday   |
+| name                | VARCHAR       | 100      | Name of the holiday                              |
+| date_start          | DATE          |          | Start date of the holiday (if it spans multiple days) |
+| date_end            | DATE          |          | End date of the holiday                          |
+| created_by          | BIGINT        |          | Foreign key to the `UserAccount` table for record creator |
+| updated_by          | BIGINT        |          | Foreign key to the `UserAccount` table for last updater |
+| created_at          | TIMESTAMP     |          | Timestamp of record creation                     |
+| updated_at          | TIMESTAMP     |          | Timestamp of last record update                 |
+| is_active           | BOOLEAN       |          | Indicates if the holiday is active (soft delete) |
+
+Locked-in Table: OvertimeRule
+
+| **Field Name**      | **Type**      | **Size** | **Comment**                                      |
+|----------------------|---------------|----------|--------------------------------------------------|
+| id                  | BIGINT        |          | Primary key, unique identifier for the overtime rule |
+| name                | VARCHAR       | 100      | Name of the overtime rule                        |
+| measure             | ENUM          |          | Defines the measure: `daily`, `weekly`, `weekend`, `holiday` |
+| threshold           | FLOAT         | 8, 2    | Minimum hours required to trigger the overtime rule |
+| rate_multiplier     | FLOAT         | 8, 2    | Overtime pay multiplier for this rule            |
+| created_by          | BIGINT        |          | Foreign key to the `UserAccount` table for record creator |
+| updated_by          | BIGINT        |          | Foreign key to the `UserAccount` table for last updater |
+| created_at          | TIMESTAMP     |          | Timestamp of record creation                     |
+| updated_at          | TIMESTAMP     |          | Timestamp of last record update                 |
+| is_active           | BOOLEAN       |          | Indicates if the overtime rule is active (soft delete) |
+
+Locked-in Table: PayPeriod
+
+| **Field Name**       | **Type**      | **Size** | **Comment**                                      |
+|-----------------------|---------------|----------|--------------------------------------------------|
+| id                   | BIGINT        |          | Primary key, unique identifier for the pay period |
+| period_start_date    | DATE          |          | Start date of the pay period                     |
+| period_end_date      | DATE          |          | End date of the pay period                       |
+| processed_at         | TIMESTAMP     |          | Timestamp when the pay period was processed      |
+| processed_by         | BIGINT        |          | Foreign key to the `UserAccount` table for processor |
+| is_processed         | BOOLEAN       |          | Indicates whether the pay period is processed    |
+| comments             | VARCHAR       | 255      | Notes or comments about the pay period           |
+| regular_hours        | FLOAT         | 8, 2    | Total regular hours worked during the pay period |
+| overtime_hours       | FLOAT         | 8, 2    | Total overtime hours worked during the pay period |
+| sick_hours           | FLOAT         | 8, 2    | Total sick hours recorded for the pay period     |
+| vacation_hours       | FLOAT         | 8, 2    | Total vacation hours recorded for the pay period |
+| holiday_hours        | FLOAT         | 8, 2    | Total holiday hours recorded for the pay period  |
+| created_by           | BIGINT        |          | Foreign key to the `UserAccount` table for record creator |
+| updated_by           | BIGINT        |          | Foreign key to the `UserAccount` table for last updater |
+| created_at           | TIMESTAMP     |          | Timestamp of record creation                     |
+| updated_at           | TIMESTAMP     |          | Timestamp of last record update                 |
+
+Locked-in Table: PayrollFrequency
+
+| **Field Name**            | **Type**      | **Size** | **Comment**                                      |
+|----------------------------|---------------|----------|--------------------------------------------------|
+| id                        | BIGINT        |          | Primary key, unique identifier for payroll frequency |
+| frequency_type            | ENUM          |          | Payroll frequency type: `weekly`, `biweekly`, `semimonthly`, `monthly` |
+| weekly_day                | TINYINT       |          | Day of the week for weekly payroll (0-6, Sun-Sat) |
+| semimonthly_first_day     | TINYINT       |          | First fixed day of the month for semimonthly payroll |
+| semimonthly_second_day    | TINYINT       |          | Second fixed day of the month for semimonthly payroll |
+| monthly_day               | TINYINT       |          | Day of the month for monthly payroll            |
+| created_by                | BIGINT        |          | Foreign key to the `UserAccount` table for record creator |
+| updated_by                | BIGINT        |          | Foreign key to the `UserAccount` table for last updater |
+| created_at                | TIMESTAMP     |          | Timestamp of record creation                     |
+| updated_at                | TIMESTAMP     |          | Timestamp of last record update                 |
+
+Locked-in Table: Punch
+
+| **Field Name**     | **Type**     | **Size** | **Comment**                                             |
+|---------------------|--------------|----------|---------------------------------------------------------|
+| id                 | BIGINT       |          | Primary key, unique identifier for the punch entry      |
+| employee_id        | BIGINT       |          | Foreign key referencing `Employee(id)`                 |
+| device_id          | BIGINT       |          | Foreign key referencing `Device(id)`                   |
+| punch_type_id      | BIGINT       |          | Foreign key referencing `PunchType(id)`                |
+| time_in            | TIMESTAMP    |          | Actual punch-in time                                    |
+| time_out           | TIMESTAMP    |          | Actual punch-out time                                   |
+| is_altered         | BOOLEAN      |          | Indicates if the punch was altered post-recording       |
+| created_by         | BIGINT       |          | Foreign key referencing `UserAccount(id)` for creator  |
+| updated_by         | BIGINT       |          | Foreign key referencing `UserAccount(id)` for updater  |
+| created_at         | TIMESTAMP    |          | Timestamp of record creation                           |
+| updated_at         | TIMESTAMP    |          | Timestamp of last record update                        |
+
+Locked-in Table: PunchType
+
+| **Field Name**  | **Type**    | **Size** | **Comment**                                               |
+|------------------|-------------|----------|-----------------------------------------------------------|
+| id              | BIGINT      |          | Primary key, unique identifier for the punch type         |
+| name            | VARCHAR     | 100      | Name of the punch type (e.g., "Clock In", "Clock Out")    |
+| description     | TEXT        |          | Description of the punch type                            |
+| is_active       | BOOLEAN     |          | Indicates if the punch type is active (soft deletion support) |
+| created_by      | BIGINT      |          | Foreign key to `UserAccount`, indicating who created the record |
+| created_at      | TIMESTAMP   |          | Timestamp of record creation                              |
+| updated_by      | BIGINT      |          | Foreign key to `UserAccount`, indicating who last updated the record |
+| updated_at      | TIMESTAMP   |          | Timestamp of last record update                           |
+
+
+Locked-in Table: RoundingRule
+
+| **Field Name**            | **Type**      | **Size** | **Comment**                                      |
+|----------------------------|---------------|----------|--------------------------------------------------|
+| id                        | BIGINT        |          | Primary key, unique identifier for the rounding rule |
+| name                      | VARCHAR       | 50       | Name of the rounding rule                       |
+| rounding_type_id          | BIGINT        |          | Foreign key referencing `RoundingType(id)`      |
+| minute_min                | TINYINT       |          | Minimum minute value for the rounding range     |
+| minute_max                | TINYINT       |          | Maximum minute value for the rounding range     |
+| new_minute                | TINYINT       |          | New minute value after rounding                 |
+| created_at                | TIMESTAMP     |          | Timestamp of record creation                    |
+| updated_at                | TIMESTAMP     |          | Timestamp of last record update                 |
+
+Locked-in Table: Shift
+
+| **Field Name**            | **Type**      | **Size** | **Comment**                                    |
+|----------------------------|---------------|----------|------------------------------------------------|
+| id                        | BIGINT        |          | Primary key, unique identifier for the shift   |
+| shift_name                | VARCHAR       | 100      | Name of the shift                              |
+| start_time                | TIME          |          | Scheduled start time of the shift              |
+| end_time                  | TIME          |          | Scheduled end time of the shift                |
+| base_hours_per_period     | SMALLINT      |          | Standard hours for the shift per pay period    |
+| created_at                | TIMESTAMP     |          | Timestamp of record creation                   |
+| updated_at                | TIMESTAMP     |          | Timestamp of last record update                |
+
+Locked-in Table: UserAccount
+
+| **Field Name**      | **Type**      | **Size** | **Comment**                                         |
+|----------------------|---------------|----------|-----------------------------------------------------|
+| id                  | BIGINT        |          | Primary key, unique identifier for the user account |
+| employee_id         | BIGINT        |          | Foreign key to `Employee`, links the user account to an employee |
+| username            | VARCHAR       | 50       | Username for the account                           |
+| password_hash       | VARCHAR       | 255      | Hashed password for the account                    |
+| last_login          | TIMESTAMP     |          | Timestamp of the last login                        |
+| is_manager          | BOOLEAN       |          | Flag indicating if the user is a manager           |
+| is_admin            | BOOLEAN       |          | Flag indicating if the user has admin privileges   |
+| created_by          | BIGINT        |          | Foreign key to `UserAccount`, indicating who created this record |
+| created_at          | TIMESTAMP     |          | Timestamp of record creation                       |
+| updated_by          | BIGINT        |          | Foreign key to `UserAccount`, indicating who last updated this record |
+| updated_at          | TIMESTAMP     |          | Timestamp of last record update                    |
+
+Locked-in Table: VacationBalance
+
+| **Field Name**       | **Type**      | **Size** | **Comment**                                                                 |
+|-----------------------|---------------|----------|-----------------------------------------------------------------------------|
+| id                   | BIGINT        |          | Primary key, unique identifier for the vacation balance record              |
+| employee_id          | BIGINT        |          | Foreign key to `Employee`, links to the associated employee                 |
+| accrual_rate         | FLOAT         | 8, 2     | Rate at which vacation time accrues per pay period                          |
+| accrued_hours        | FLOAT         | 8, 2     | Total vacation hours accrued                                                |
+| used_hours           | FLOAT         | 8, 2     | Total vacation hours used                                                   |
+| carry_over_hours     | FLOAT         | 8, 2     | Vacation hours carried over from the previous year                          |
+| cap_hours            | FLOAT         | 8, 2     | Maximum allowed vacation hours (cap)                                        |
+| created_by           | BIGINT        |          | Foreign key to `UserAccount`, indicating who created this record            |
+| created_at           | TIMESTAMP     |          | Timestamp of record creation                                                |
+| updated_by           | BIGINT        |          | Foreign key to `UserAccount`, indicating who last updated this record       |
+| updated_at           | TIMESTAMP     |          | Timestamp of last record update                                             |
+
+Locked-in Table: VacationCalendar
+
+| **Field Name**   | **Type**     | **Size** | **Comment**                                             |
+|-------------------|--------------|----------|---------------------------------------------------------|
+| id               | BIGINT       |          | Primary key, unique identifier for the vacation entry   |
+| employee_id      | BIGINT       |          | Foreign key referencing `Employee(id)`                 |
+| vacation_date    | DATE         |          | Date of the vacation                                    |
+| is_half_day      | BOOLEAN      |          | Indicates if the vacation is a half-day                |
+| created_by       | BIGINT       |          | Foreign key referencing `UserAccount(id)` for creator  |
+| updated_by       | BIGINT       |          | Foreign key referencing `UserAccount(id)` for updater  |
+| created_at       | TIMESTAMP    |          | Timestamp of record creation                           |
+| updated_at       | TIMESTAMP    |          | Timestamp of last record update                        |
+| is_active        | BOOLEAN      |          | Indicates if the vacation record is active (soft delete)|
