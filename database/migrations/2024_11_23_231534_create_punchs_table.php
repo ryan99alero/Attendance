@@ -11,14 +11,14 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
         Schema::create('punches', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('employee_id')->nullable()->comment('Foreign key to Employees');
-            $table->bigInteger('device_id')->nullable()->comment('Foreign key to Devices');
-            $table->bigInteger('punch_type_id')->nullable()->comment('Foreign key to Punch Types');
+            $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key to Employees');
+            $table->unsignedBigInteger('device_id')->nullable()->comment('Foreign key to Devices');
+            $table->unsignedBigInteger('punch_type_id')->nullable()->comment('Foreign key to Punch Types');
             $table->timestamp('time_in')->comment('Actual punch-in time');
             $table->timestamp('time_out')->nullable()->comment('Actual punch-out time');
             $table->boolean('is_altered')->default(false)->comment('Indicates if the punch was altered post-recording');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

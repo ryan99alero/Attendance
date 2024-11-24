@@ -11,12 +11,12 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
         Schema::create('vacation_calendars', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('employee_id')->comment('Foreign key to Employees');
+            $table->unsignedBigInteger('employee_id')->comment('Foreign key to Employees');
             $table->date('vacation_date')->comment('Date of the vacation');
             $table->boolean('is_half_day')->default(false)->comment('Indicates if the vacation is a half-day');
             $table->boolean('is_active')->default(true)->comment('Indicates if the vacation record is active');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

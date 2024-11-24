@@ -16,8 +16,8 @@ return new class extends Migration
             $table->integer('semimonthly_first_day')->nullable()->comment('First fixed day of the month for semimonthly payroll');
             $table->integer('semimonthly_second_day')->nullable()->comment('Second fixed day of the month for semimonthly payroll');
             $table->integer('monthly_day')->nullable()->comment('Day of the month for monthly payroll');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

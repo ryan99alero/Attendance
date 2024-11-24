@@ -11,11 +11,11 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
         Schema::create('cards', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('employee_id')->nullable()->comment('Foreign key to Employees');
+            $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key to Employees');
             $table->string('card_number', 50)->unique()->comment('Unique card number assigned to the employee');
             $table->boolean('is_active')->default(true)->comment('Indicates if the card is currently active');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

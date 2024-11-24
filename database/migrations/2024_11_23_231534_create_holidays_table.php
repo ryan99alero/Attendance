@@ -14,8 +14,8 @@ return new class extends Migration
             $table->string('name', 100)->comment('Name of the holiday');
             $table->date('date')->comment('Date of the holiday');
             $table->boolean('is_recurring')->default(false)->comment('Indicates if the holiday recurs annually');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

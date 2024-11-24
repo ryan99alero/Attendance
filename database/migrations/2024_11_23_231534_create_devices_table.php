@@ -14,9 +14,9 @@ return new class extends Migration
             $table->string('device_name', 100)->comment('Name of the device');
             $table->string('ip_address', 45)->nullable()->comment('IP address of the device');
             $table->boolean('is_active')->default(true)->comment('Indicates if the device is active');
-            $table->bigInteger('department_id')->nullable()->comment('Foreign key to Departments');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key to Departments');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

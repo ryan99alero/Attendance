@@ -13,12 +13,12 @@ return new class extends Migration
             $table->id();
             $table->string('first_name', 50)->comment('First name of the employee');
             $table->string('last_name', 50)->comment('Last name of the employee');
-            $table->bigInteger('department_id')->nullable()->comment('Foreign key to Departments');
-            $table->bigInteger('shift_id')->nullable()->comment('Foreign key to Shifts');
-            $table->bigInteger('rounding_method')->nullable()->comment('Foreign key to Rounding Rules');
+            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key to Departments');
+            $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key to Shifts');
+            $table->unsignedBigInteger('rounding_method')->nullable()->comment('Foreign key to Rounding Rules');
             $table->boolean('is_active')->default(true)->comment('Indicates if the employee is active');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

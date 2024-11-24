@@ -14,8 +14,8 @@ return new class extends Migration
             $table->string('rule_name', 100)->comment('Name of the overtime rule');
             $table->integer('hours_threshold')->default(40)->comment('Hours threshold for overtime calculation');
             $table->decimal('multiplier', 5, 2)->default(1.5)->comment('Overtime pay multiplier');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

@@ -15,8 +15,8 @@ return new class extends Migration
             $table->integer('minute_min')->nullable()->comment('Minimum minute value for the rounding range');
             $table->integer('minute_max')->nullable()->comment('Maximum minute value for the rounding range');
             $table->integer('new_minute')->nullable()->comment('New minute value after rounding');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

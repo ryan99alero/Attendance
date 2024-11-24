@@ -12,12 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->bigInteger('employee_id')->nullable()->after('id')->comment('Foreign key to Employee, links the user account to an employee');
+            $table->unsignedBigInteger('employee_id')->nullable()->after('id')->comment('Foreign key to Employee, links the user account to an employee');
             $table->timestamp('last_login')->nullable()->after('password')->comment('Timestamp of the last login');
             $table->tinyInteger('is_manager')->default(0)->after('last_login')->comment('Flag indicating if the user is a manager');
             $table->tinyInteger('is_admin')->default(0)->after('is_manager')->comment('Flag indicating if the user has admin privileges');
-            $table->bigInteger('created_by')->nullable()->after('updated_at')->comment('Foreign key to UserAccount, indicating the record creator');
-            $table->bigInteger('updated_by')->nullable()->after('created_by')->comment('Foreign key to UserAccount, indicating the last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->after('updated_at')->comment('Foreign key to UserAccount, indicating the record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->after('created_by')->comment('Foreign key to UserAccount, indicating the last updater');
         });
     }
 

@@ -14,8 +14,8 @@ return new class extends Migration
             $table->string('name', 100)->comment('Name of the punch type (e.g., Clock In, Clock Out)');
             $table->text('description')->nullable()->comment('Description of the punch type');
             $table->boolean('is_active')->default(true)->comment('Indicates if the punch type is active');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints

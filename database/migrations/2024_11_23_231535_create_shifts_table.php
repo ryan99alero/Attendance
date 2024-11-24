@@ -15,8 +15,8 @@ return new class extends Migration
             $table->time('start_time')->comment('Scheduled start time of the shift');
             $table->time('end_time')->comment('Scheduled end time of the shift');
             $table->smallInteger('base_hours_per_period')->nullable()->comment('Standard hours for the shift per pay period');
-            $table->bigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->bigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints
