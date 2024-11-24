@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('pay_periods', function (Blueprint $table) {
             $table->id();
             $table->date('start_date')->comment('Start date of the pay period');

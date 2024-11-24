@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('rounding_rules', function (Blueprint $table) {
             $table->id();
             $table->string('name', 50)->comment('Name of the rounding rule');

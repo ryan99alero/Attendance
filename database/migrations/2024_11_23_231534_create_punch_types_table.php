@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('punch_types', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100)->comment('Name of the punch type (e.g., Clock In, Clock Out)');

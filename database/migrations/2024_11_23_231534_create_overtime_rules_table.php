@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('overtime_rules', function (Blueprint $table) {
             $table->id();
             $table->string('rule_name', 100)->comment('Name of the overtime rule');
