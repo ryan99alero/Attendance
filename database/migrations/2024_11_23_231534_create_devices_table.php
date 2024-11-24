@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('devices', function (Blueprint $table) {
             $table->id();
             $table->string('device_name', 100)->comment('Name of the device');

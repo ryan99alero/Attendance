@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->string('first_name', 50)->comment('First name of the employee');

@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     public function up(): void
+
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('attendances', function (Blueprint $table) {
             $table->id();
             $table->bigInteger('employee_id')->nullable()->comment('Foreign key to Employees');
