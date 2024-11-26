@@ -6,8 +6,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
@@ -21,6 +23,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_admin', // Ensure is_admin is in fillable
+        'is_manager', // Ensure is_manager is in fillable
     ];
 
     /**
@@ -34,7 +38,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
      * @return array<string, string>
      */
@@ -43,6 +47,30 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean', // Cast TINYINT is_admin to boolean
+            'is_manager' => 'boolean', // Cast TINYINT is_manager to boolean
         ];
+    }
+
+    /**
+     * Determine if the user can access Filament.
+     *
+     * @return bool
+     */
+    public function canAccessFilament(): bool
+    {
+        return $this->is_admin === true; // Allow only admins access to Filament
+    }
+
+    /**
+     * Determine if the user can access a specific panel.
+     *
+     * @param  Filament\Panel  $panel
+     * @return bool
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Allow all admins to access the default panel
+        return $this->is_admin === true;
     }
 }
