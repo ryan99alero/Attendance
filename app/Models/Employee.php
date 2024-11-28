@@ -9,14 +9,29 @@ class Employee extends Model
 {
 use HasFactory;
 
-protected $fillable = [
-'first_name',
-'last_name',
-'department_id',
-'shift_id',
-'rounding_method',
-'is_active',
-];
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'department_id',
+        'shift_id',
+        'rounding_method',
+        'is_active',
+        'address',
+        'city',
+        'state',
+        'zip',
+        'country',
+        'phone',
+        'external_id',
+        'normal_hrs_per_day',
+        'paid_lunch',
+        'pay_periods_per_year',
+        'photograph',
+        'start_date',
+        'start_time',
+        'stop_time',
+        'termination_date',
+    ];
 
 public function department()
 {

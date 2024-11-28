@@ -4,14 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AttendanceResource\Pages;
 use App\Models\Attendance;
+use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Toggle;
-use Filament\Resources\Resource;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
 
 class AttendanceResource extends Resource
 {
@@ -24,12 +23,13 @@ class AttendanceResource extends Resource
     {
         return $form->schema([
             Select::make('employee_id')
-                ->relationship('employee', 'first_name')
+                ->relationship('employee', 'first_name') // Ensure this matches the `employee()` relationship in the model
                 ->label('Employee')
                 ->required(),
             Select::make('device_id')
-                ->relationship('device', 'device_name')
-                ->label('Device'),
+                ->relationship('device', 'device_name') // Ensure this matches the `device()` relationship in the model
+                ->label('Device')
+                ->nullable(),
             DateTimePicker::make('check_in')
                 ->label('Check-In Time')
                 ->required(),
@@ -52,14 +52,14 @@ class AttendanceResource extends Resource
                 ->sortable()
                 ->searchable(),
             TextColumn::make('check_in')
-                ->dateTime('M d, Y h:i A') // Custom format
+                ->dateTime('M d, Y h:i A') // Example custom format
                 ->label('Check-In'),
             TextColumn::make('check_out')
-                ->dateTime('M d, Y h:i A') // Custom format
+                ->dateTime('M d, Y h:i A') // Example custom format
                 ->label('Check-Out'),
             IconColumn::make('is_manual')
                 ->label('Manual Entry')
-                ->boolean(), // Replaces deprecated BooleanColumn
+                ->boolean(),
         ]);
     }
 
