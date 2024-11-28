@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
@@ -25,11 +26,13 @@ class AttendanceResource extends Resource
             Select::make('employee_id')
                 ->relationship('employee', 'first_name') // Ensure this matches the `employee()` relationship in the model
                 ->label('Employee')
-                ->required(),
+                ->required()
+                ->rules('exists:employees,id'),
             Select::make('device_id')
                 ->relationship('device', 'device_name') // Ensure this matches the `device()` relationship in the model
                 ->label('Device')
-                ->nullable(),
+                ->nullable()
+                ->rules('exists:devices,id'),
             DateTimePicker::make('check_in')
                 ->label('Check-In Time')
                 ->required(),

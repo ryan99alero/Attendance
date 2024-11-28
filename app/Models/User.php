@@ -65,7 +65,7 @@ class User extends Authenticatable implements FilamentUser
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function creator()
+    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
@@ -75,7 +75,7 @@ class User extends Authenticatable implements FilamentUser
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function updater()
+    public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }

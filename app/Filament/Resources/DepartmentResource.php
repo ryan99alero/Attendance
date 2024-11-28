@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DepartmentResource\Pages;
 use App\Models\Department;
+use App\Models\Employee;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
@@ -25,9 +26,17 @@ class DepartmentResource extends Resource
                 ->label('Department Name')
                 ->required(),
             Select::make('manager_id')
-                ->relationship('manager', 'first_name')
                 ->label('Manager')
-                ->nullable(),
+                ->nullable()
+                ->options(function () {
+                    return Employee::with('user') // Ensure the user relationship is loaded
+                    ->whereHas('user', function ($query) {
+                        $query->where('is_manager', true);
+                    })
+                        ->get()
+                        ->pluck('full_name', 'id'); // Ensure full_name accessor is defined
+                })
+                ->placeholder('Select a Manager'),
         ]);
     }
 
