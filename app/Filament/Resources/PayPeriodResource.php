@@ -4,50 +4,62 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PayPeriodResource\Pages;
 use App\Models\PayPeriod;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
+use Filament\Tables\Columns\BooleanColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Forms\Form;
 
 class PayPeriodResource extends Resource
 {
     protected static ?string $model = PayPeriod::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static ?string $navigationLabel = 'Pay Periods';
 
     public static function form(Form $form): Form
     {
         return $form->schema([
-            // Define the form schema as needed
+            Select::make('frequency')
+                ->label('Frequency')
+                ->options([
+                    'weekly' => 'Weekly',
+                    'bi-weekly' => 'Bi-Weekly',
+                    'monthly' => 'Monthly',
+                ])
+                ->required(),
+            DatePicker::make('start_date')
+                ->label('Start Date')
+                ->required(),
+            DatePicker::make('end_date')
+                ->label('End Date')
+                ->required(),
+            Toggle::make('is_processed')
+                ->label('Processed')
+                ->default(false),
         ]);
     }
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                // Define table columns as needed
-            ])
-            ->filters([
-                // Define filters as needed
-            ])
-            ->actions([
-                EditAction::make(),
-            ])
-            ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            // Define relations as needed
-        ];
+        return $table->columns([
+            TextColumn::make('frequency')
+                ->label('Frequency')
+                ->sortable(),
+            TextColumn::make('start_date')
+                ->label('Start Date')
+                ->date(),
+            TextColumn::make('end_date')
+                ->label('End Date')
+                ->date(),
+            BooleanColumn::make('is_processed')
+                ->label('Processed')
+                ->sortable(),
+        ]);
     }
 
     public static function getPages(): array

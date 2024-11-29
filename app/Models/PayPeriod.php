@@ -4,17 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PayPeriod extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
+        'frequency',
         'start_date',
         'end_date',
         'is_processed',
@@ -23,11 +20,6 @@ class PayPeriod extends Model
         'updated_by',
     ];
 
-    /**
-     * Cast attributes to native types.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
@@ -35,25 +27,31 @@ class PayPeriod extends Model
     ];
 
     /**
-     * Get the user who processed the pay period.
+     * Relationship: Processor (User who processed the pay period).
+     *
+     * @return BelongsTo
      */
-    public function processor(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function processor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
     }
 
     /**
-     * Get the user who created the pay period.
+     * Relationship: Creator (User who created the record).
+     *
+     * @return BelongsTo
      */
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Get the user who last updated the pay period.
+     * Relationship: Updater (User who last updated the record).
+     *
+     * @return BelongsTo
      */
-    public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }

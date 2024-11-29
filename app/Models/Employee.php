@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Employee extends Model
 {
@@ -31,7 +32,7 @@ class Employee extends Model
         'rounding_method',
         'normal_hrs_per_day',
         'paid_lunch',
-        'pay_periods_per_year',
+        'payroll_frequency_id', // Updated to reference PayrollFrequency
         'photograph',
         'start_date',
         'start_time',
@@ -50,7 +51,6 @@ class Employee extends Model
     protected $casts = [
         'normal_hrs_per_day' => 'float',
         'paid_lunch' => 'boolean',
-        'pay_periods_per_year' => 'integer',
         'start_date' => 'date',
         'start_time' => 'datetime:H:i:s',
         'stop_time' => 'datetime:H:i:s',
@@ -89,6 +89,16 @@ class Employee extends Model
     }
 
     /**
+     * Relationship: Payroll Frequency.
+     *
+     * @return BelongsTo
+     */
+    public function payrollFrequency(): BelongsTo
+    {
+        return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
+    }
+
+    /**
      * Relationship: Cards.
      *
      * @return HasMany
@@ -96,6 +106,26 @@ class Employee extends Model
     public function cards(): HasMany
     {
         return $this->hasMany(Card::class, 'employee_id');
+    }
+
+    /**
+     * Relationship: Vacation Balance.
+     *
+     * @return HasOne
+     */
+    public function vacationBalance(): HasOne
+    {
+        return $this->hasOne(VacationBalance::class, 'employee_id');
+    }
+
+    /**
+     * Relationship: Vacation Calendars.
+     *
+     * @return HasMany
+     */
+    public function vacationCalendars(): HasMany
+    {
+        return $this->hasMany(VacationCalendar::class, 'employee_id');
     }
 
     /**
@@ -119,22 +149,22 @@ class Employee extends Model
     }
 
     /**
-     * Relationship: Associated User.
+     * Relationship: User (if exists).
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     * @return HasOne
      */
-    public function user(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function user(): HasOne
     {
         return $this->hasOne(User::class, 'employee_id');
     }
 
     /**
-     * Calculated Field: Is Manager.
+     * Accessor: Full Name.
      *
-     * @return bool
+     * @return string
      */
-    public function getIsManagerAttribute(): bool
+    public function getFullNameAttribute(): string
     {
-        return $this->user?->is_manager ?? false; // Check if the related user is a manager
+        return "{$this->first_name} {$this->last_name}";
     }
 }

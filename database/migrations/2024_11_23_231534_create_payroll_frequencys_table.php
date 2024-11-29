@@ -6,9 +6,13 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up(): void
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
     {
-        Schema::disableForeignKeyConstraints();
         Schema::create('payroll_frequencies', function (Blueprint $table) {
             $table->id();
             $table->string('frequency_name', 50)->comment('Name of the payroll frequency');
@@ -26,7 +30,12 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
     {
         Schema::dropIfExists('payroll_frequencies');
     }

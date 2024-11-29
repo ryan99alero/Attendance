@@ -4,17 +4,20 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
-use Filament\Forms\Components\Select;
+use App\Models\Department;
+use App\Models\Shift;
+use App\Models\PayrollFrequency;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\FileUpload;
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\BooleanColumn;
 
 class EmployeeResource extends Resource
 {
@@ -33,53 +36,46 @@ class EmployeeResource extends Resource
                 ->label('Last Name')
                 ->required(),
             TextInput::make('address')
-                ->label('Address')
-                ->nullable(),
+                ->label('Address'),
             TextInput::make('city')
-                ->label('City')
-                ->nullable(),
+                ->label('City'),
             TextInput::make('state')
-                ->label('State')
-                ->nullable(),
+                ->label('State'),
             TextInput::make('zip')
-                ->label('ZIP Code')
-                ->nullable(),
+                ->label('ZIP Code'),
             TextInput::make('country')
-                ->label('Country')
-                ->nullable(),
+                ->label('Country'),
             TextInput::make('phone')
-                ->label('Phone')
-                ->tel()
-                ->nullable(),
+                ->label('Phone'),
             TextInput::make('external_id')
-                ->label('External ID')
-                ->nullable(),
+                ->label('External ID'),
             Select::make('department_id')
-                ->relationship('department', 'name')
                 ->label('Department')
+                ->options(Department::pluck('name', 'id'))
                 ->nullable()
-                ->placeholder('No departments available'),
+                ->searchable(),
             Select::make('shift_id')
-                ->relationship('shift', 'shift_name')
                 ->label('Shift')
-                ->nullable(),
-            Select::make('rounding_method')
-                ->relationship('roundingMethod', 'name') // Ensure the relationship in the model matches
-                ->label('Rounding Method')
-                ->nullable(),
+                ->options(Shift::pluck('shift_name', 'id'))
+                ->nullable()
+                ->searchable(),
+            Select::make('payroll_frequency_id')
+                ->label('Payroll Frequency')
+                ->options(PayrollFrequency::pluck('frequency_name', 'id'))
+                ->nullable()
+                ->searchable(),
+            Toggle::make('is_active')
+                ->label('Active')
+                ->default(true),
             TextInput::make('normal_hrs_per_day')
                 ->label('Normal Hours Per Day')
-                ->numeric()
-                ->nullable(),
+                ->numeric(),
             Toggle::make('paid_lunch')
-                ->label('Paid Lunch')
-                ->default(false),
-            TextInput::make('pay_periods_per_year')
-                ->label('Pay Periods Per Year')
-                ->numeric()
-                ->nullable(),
-            TextInput::make('photograph')
-                ->label('Photograph Path/URL')
+                ->label('Paid Lunch'),
+            FileUpload::make('photograph')
+                ->label('Photograph')
+                ->directory('employee_photos')
+                ->image()
                 ->nullable(),
             DatePicker::make('start_date')
                 ->label('Start Date')
@@ -93,38 +89,30 @@ class EmployeeResource extends Resource
             DatePicker::make('termination_date')
                 ->label('Termination Date')
                 ->nullable(),
-            Toggle::make('is_active')
-                ->label('Active')
-                ->default(true),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('first_name')->label('First Name')->sortable()->searchable(),
-            TextColumn::make('last_name')->label('Last Name')->sortable()->searchable(),
-            TextColumn::make('address')->label('Address')->limit(50)->wrap(),
-            TextColumn::make('city')->label('City'),
-            TextColumn::make('state')->label('State'),
-            TextColumn::make('zip')->label('ZIP Code'),
-            TextColumn::make('country')->label('Country'),
-            TextColumn::make('phone')->label('Phone'),
-            TextColumn::make('external_id')->label('External ID'),
-            TextColumn::make('department.name')->label('Department'),
-            TextColumn::make('shift.shift_name')->label('Shift'),
-            TextColumn::make('normal_hrs_per_day')->label('Hours/Day'),
-            IconColumn::make('paid_lunch')->label('Paid Lunch')->boolean(),
-            TextColumn::make('pay_periods_per_year')->label('Pay Periods/Year'),
-            TextColumn::make('start_date')->label('Start Date')->date(),
-            TextColumn::make('termination_date')->label('Termination Date')->date(),
-            IconColumn::make('is_active')->label('Active')->boolean(),
+            TextColumn::make('full_name')
+                ->label('Name')
+                ->sortable()
+                ->searchable(),
+            TextColumn::make('department.name')
+                ->label('Department')
+                ->sortable(),
+            TextColumn::make('shift.shift_name')
+                ->label('Shift')
+                ->sortable(),
+            TextColumn::make('payrollFrequency.frequency_name')
+                ->label('Payroll Frequency')
+                ->sortable(),
+            TextColumn::make('phone')
+                ->label('Phone'),
+            BooleanColumn::make('is_active')
+                ->label('Active'),
         ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [];
     }
 
     public static function getPages(): array
