@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Shift;
 use App\Models\PayrollFrequency;
+use App\Models\User;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DatePicker;
@@ -17,7 +18,8 @@ use Filament\Resources\Resource;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\BooleanColumn;
+use Filament\Tables\Columns\IconColumn;
+use Illuminate\Support\Facades\Log;
 
 class EmployeeResource extends Resource
 {
@@ -51,17 +53,17 @@ class EmployeeResource extends Resource
                 ->label('External ID'),
             Select::make('department_id')
                 ->label('Department')
-                ->options(Department::pluck('name', 'id'))
+                ->options(Department::all()->pluck('name', 'id'))
                 ->nullable()
                 ->searchable(),
             Select::make('shift_id')
                 ->label('Shift')
-                ->options(Shift::pluck('shift_name', 'id'))
+                ->options(Shift::all()->pluck('shift_name', 'id'))
                 ->nullable()
                 ->searchable(),
             Select::make('payroll_frequency_id')
                 ->label('Payroll Frequency')
-                ->options(PayrollFrequency::pluck('frequency_name', 'id'))
+                ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
                 ->nullable()
                 ->searchable(),
             Toggle::make('is_active')
@@ -110,9 +112,24 @@ class EmployeeResource extends Resource
                 ->sortable(),
             TextColumn::make('phone')
                 ->label('Phone'),
-            BooleanColumn::make('is_active')
-                ->label('Active'),
+            IconColumn::make('is_active')
+                ->label('Active')
+                ->boolean(),
         ]);
+    }
+
+    public static function saving($employee)
+    {
+        // Ensure the association between employee and user is updated
+        if ($employee->user_id) {
+            // Clear any previous associations with this employee
+            User::where('employee_id', $employee->id)
+                ->update(['employee_id' => null]);
+
+            // Set the new association
+            User::where('id', $employee->user_id)
+                ->update(['employee_id' => $employee->id]);
+        }
     }
 
     public static function getPages(): array

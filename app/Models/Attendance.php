@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Attendance extends Model
 {
@@ -30,17 +31,17 @@ class Attendance extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'check_in' => 'datetime',
-        'check_out' => 'datetime',
+        'check_in' => 'datetime:Y-m-d\TH:i:s\Z', // ISO 8601 without microseconds
+        'check_out' => 'datetime:Y-m-d\TH:i:s\Z', // ISO 8601 without microseconds
         'is_manual' => 'boolean',
     ];
 
     /**
      * Relationship with the `Employee` model.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
-    public function employee()
+    public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
     }
@@ -48,7 +49,7 @@ class Attendance extends Model
     /**
      * Relationship with the `Device` model.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
     public function device()
     {
@@ -58,9 +59,9 @@ class Attendance extends Model
     /**
      * Relationship with the `User` model for the creator.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
@@ -68,9 +69,9 @@ class Attendance extends Model
     /**
      * Relationship with the `User` model for the updater.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
-    public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }

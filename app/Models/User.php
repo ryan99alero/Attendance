@@ -24,8 +24,8 @@ class User extends Authenticatable implements FilamentUser
         'is_admin',
         'is_manager',
         'employee_id', // Foreign key to Employee
-        'created_by', // Track the creator of this user
-        'updated_by', // Track the updater of this user
+        'created_by',  // Track the creator of this user
+        'updated_by',  // Track the updater of this user
     ];
 
     /**
@@ -46,16 +46,17 @@ class User extends Authenticatable implements FilamentUser
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
-        'is_admin' => 'boolean', // Cast TINYINT is_admin to boolean
-        'is_manager' => 'boolean', // Cast TINYINT is_manager to boolean
+        'is_admin' => 'boolean',
+        'is_manager' => 'boolean',
     ];
+
 
     /**
      * Relationship with the employee associated with the user.
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function employee()
+    public function employee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_id');
     }
@@ -87,7 +88,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessFilament(): bool
     {
-        return $this->is_admin === true; // Allow only admins access to Filament
+        return $this->is_admin === true || $this->is_manager === true;
     }
 
     /**
@@ -98,7 +99,26 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        // Allow all admins to access the default panel
-        return $this->is_admin === true;
+        return $this->canAccessFilament();
+    }
+
+    /**
+     * Automatically set the `created_by` and `updated_by` fields.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->created_by = auth()->id();
+            }
+        });
+
+        static::updating(function ($model) {
+            if (auth()->check()) {
+                $model->updated_by = auth()->id();
+            }
+        });
     }
 }

@@ -34,13 +34,13 @@ class PayrollFrequencyResource extends Resource
             Select::make('weekly_day')
                 ->label('Weekly Payroll Day')
                 ->options([
-                    '0' => 'Sunday',
-                    '1' => 'Monday',
-                    '2' => 'Tuesday',
-                    '3' => 'Wednesday',
-                    '4' => 'Thursday',
-                    '5' => 'Friday',
-                    '6' => 'Saturday',
+                    0 => 'Sunday',
+                    1 => 'Monday',
+                    2 => 'Tuesday',
+                    3 => 'Wednesday',
+                    4 => 'Thursday',
+                    5 => 'Friday',
+                    6 => 'Saturday',
                 ])
                 ->nullable()
                 ->placeholder('Select a day'),
@@ -84,13 +84,13 @@ class PayrollFrequencyResource extends Resource
             TextColumn::make('weekly_day')
                 ->label('Weekly Day')
                 ->formatStateUsing(fn ($state) => match ($state) {
-                    '0' => 'Sunday',
-                    '1' => 'Monday',
-                    '2' => 'Tuesday',
-                    '3' => 'Wednesday',
-                    '4' => 'Thursday',
-                    '5' => 'Friday',
-                    '6' => 'Saturday',
+                    0 => 'Sunday',
+                    1 => 'Monday',
+                    2 => 'Tuesday',
+                    3 => 'Wednesday',
+                    4 => 'Thursday',
+                    5 => 'Friday',
+                    6 => 'Saturday',
                     default => null,
                 }),
             TextColumn::make('semimonthly_first_day')

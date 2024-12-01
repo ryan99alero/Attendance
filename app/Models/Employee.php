@@ -30,9 +30,9 @@ class Employee extends Model
         'department_id',
         'shift_id',
         'rounding_method',
+        'payroll_frequency_id',
         'normal_hrs_per_day',
         'paid_lunch',
-        'payroll_frequency_id', // Updated to reference PayrollFrequency
         'photograph',
         'start_date',
         'start_time',
@@ -67,7 +67,11 @@ class Employee extends Model
     {
         return $this->belongsTo(Department::class, 'department_id');
     }
-
+    public function getLinkedUserIdAttribute()
+    {
+        // Return the ID of the associated user
+        return $this->user?->id;
+    }
     /**
      * Relationship: Shift.
      *
@@ -76,16 +80,6 @@ class Employee extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class, 'shift_id');
-    }
-
-    /**
-     * Relationship: Rounding Method.
-     *
-     * @return BelongsTo
-     */
-    public function roundingMethod(): BelongsTo
-    {
-        return $this->belongsTo(RoundingRule::class, 'rounding_method');
     }
 
     /**
@@ -99,57 +93,7 @@ class Employee extends Model
     }
 
     /**
-     * Relationship: Cards.
-     *
-     * @return HasMany
-     */
-    public function cards(): HasMany
-    {
-        return $this->hasMany(Card::class, 'employee_id');
-    }
-
-    /**
-     * Relationship: Vacation Balance.
-     *
-     * @return HasOne
-     */
-    public function vacationBalance(): HasOne
-    {
-        return $this->hasOne(VacationBalance::class, 'employee_id');
-    }
-
-    /**
-     * Relationship: Vacation Calendars.
-     *
-     * @return HasMany
-     */
-    public function vacationCalendars(): HasMany
-    {
-        return $this->hasMany(VacationCalendar::class, 'employee_id');
-    }
-
-    /**
-     * Relationship: Creator.
-     *
-     * @return BelongsTo
-     */
-    public function creator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * Relationship: Updater.
-     *
-     * @return BelongsTo
-     */
-    public function updater(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    /**
-     * Relationship: User (if exists).
+     * Relationship: User.
      *
      * @return HasOne
      */
@@ -166,5 +110,25 @@ class Employee extends Model
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    /**
+     * Automatically set the `created_by` and `updated_by` fields.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->created_by = auth()->id();
+            }
+        });
+
+        static::updating(function ($model) {
+            if (auth()->check()) {
+                $model->updated_by = auth()->id();
+            }
+        });
     }
 }

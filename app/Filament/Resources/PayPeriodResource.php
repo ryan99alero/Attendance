@@ -9,8 +9,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables\Columns\BooleanColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Filament\Forms\Form;
 
@@ -56,9 +56,9 @@ class PayPeriodResource extends Resource
             TextColumn::make('end_date')
                 ->label('End Date')
                 ->date(),
-            BooleanColumn::make('is_processed')
+            IconColumn::make('is_processed')
                 ->label('Processed')
-                ->sortable(),
+                ->boolean(),
         ]);
     }
 

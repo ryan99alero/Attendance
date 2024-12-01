@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Form;
 use Filament\Tables\Table;
 
 class ShiftResource extends Resource
@@ -17,29 +19,61 @@ class ShiftResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationLabel = 'Shifts';
 
+    /**
+     * Define the form schema for creating/editing records.
+     *
+     * @param Form $form
+     * @return Form
+     */
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('shift_name')->label('Shift Name')->required(),
-            Forms\Components\TimePicker::make('start_time')->label('Start Time')->required(),
-            Forms\Components\TimePicker::make('end_time')->label('End Time')->required(),
-            Forms\Components\TextInput::make('base_hours_per_period')
+            TextInput::make('shift_name')
+                ->label('Shift Name')
+                ->required()
+                ->maxLength(100),
+            TimePicker::make('start_time')
+                ->label('Start Time')
+                ->required(),
+            TimePicker::make('end_time')
+                ->label('End Time')
+                ->required(),
+            TextInput::make('base_hours_per_period')
                 ->label('Base Hours Per Period')
                 ->numeric()
                 ->nullable(),
         ]);
     }
 
+    /**
+     * Define the table schema for listing records.
+     *
+     * @param Table $table
+     * @return Table
+     */
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('shift_name')->label('Shift Name'),
-            Tables\Columns\TimeColumn::make('start_time')->label('Start Time'),
-            Tables\Columns\TimeColumn::make('end_time')->label('End Time'),
-            Tables\Columns\TextColumn::make('base_hours_per_period')->label('Base Hours Per Period'),
+            TextColumn::make('shift_name')
+                ->label('Shift Name')
+                ->sortable()
+                ->searchable(),
+            TextColumn::make('start_time')
+                ->label('Start Time')
+                ->time('H:i'), // Format as time
+            TextColumn::make('end_time')
+                ->label('End Time')
+                ->time('H:i'), // Format as time
+            TextColumn::make('base_hours_per_period')
+                ->label('Base Hours Per Period'),
         ]);
     }
 
+    /**
+     * Define the available pages for this resource.
+     *
+     * @return array
+     */
     public static function getPages(): array
     {
         return [

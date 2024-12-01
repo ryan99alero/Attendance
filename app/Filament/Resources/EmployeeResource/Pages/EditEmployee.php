@@ -16,4 +16,12 @@ class EditEmployee extends EditRecord
             Actions\DeleteAction::make(),
         ];
     }
+
+    /**
+     * Allow for mutation of form data before filling the form.
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $data; // Ensures the data is passed to the form unaltered
+    }
 }

@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use App\Models\Employee;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
@@ -37,11 +39,22 @@ class UserResource extends Resource
                 ->label('Password')
                 ->password()
                 ->dehydrateStateUsing(static function (?string $state) {
-                    return empty($state) ? null : Hash::make($state); // Only hash if a new password is provided
+                    return empty($state) ? null : Hash::make($state);
                 })
                 ->nullable()
                 ->maxLength(255)
-                ->dehydrated(static fn ($state) => !empty($state)), // Prevent saving if blank
+                ->dehydrated(static fn ($state) => !empty($state)),
+            Select::make('employee_id')
+                ->label('Employee')
+                ->nullable()
+                ->options(function (?User $record) {
+                    return Employee::whereDoesntHave('user') // Employees without linked users
+                    ->orWhereHas('user', fn ($query) => $query->where('id', $record?->id))
+                        ->get()
+                        ->pluck('full_name', 'id');
+                })
+                ->searchable()
+                ->placeholder('Select an Employee'),
             Toggle::make('is_admin')
                 ->label('Admin')
                 ->default(false),
@@ -62,6 +75,10 @@ class UserResource extends Resource
                 ->label('Email')
                 ->sortable()
                 ->searchable(),
+            TextColumn::make('employee.full_name')
+                ->label('Employee')
+                ->sortable()
+                ->searchable(),
             IconColumn::make('is_admin')
                 ->label('Admin')
                 ->boolean(),
@@ -71,9 +88,20 @@ class UserResource extends Resource
         ]);
     }
 
-    public static function getRelations(): array
+    /**
+     * Update the employee's user association when saving a user.
+     */
+    public static function saving($user)
     {
-        return [];
+        if ($user->employee_id) {
+            // Clear previous user associations for this employee
+            Employee::where('user_id', $user->id)
+                ->update(['user_id' => null]);
+
+            // Set the new association
+            Employee::where('id', $user->employee_id)
+                ->update(['user_id' => $user->id]);
+        }
     }
 
     public static function getPages(): array
