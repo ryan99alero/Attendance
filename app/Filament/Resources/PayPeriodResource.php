@@ -5,14 +5,13 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PayPeriodResource\Pages;
 use App\Models\PayPeriod;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action; // Custom Logic
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
-use Filament\Forms\Form;
+use Filament\Forms\Form; // Correct namespace
 
 class PayPeriodResource extends Resource
 {
@@ -24,14 +23,6 @@ class PayPeriodResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Select::make('frequency')
-                ->label('Frequency')
-                ->options([
-                    'weekly' => 'Weekly',
-                    'bi-weekly' => 'Bi-Weekly',
-                    'monthly' => 'Monthly',
-                ])
-                ->required(),
             DatePicker::make('start_date')
                 ->label('Start Date')
                 ->required(),
@@ -47,9 +38,6 @@ class PayPeriodResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('frequency')
-                ->label('Frequency')
-                ->sortable(),
             TextColumn::make('start_date')
                 ->label('Start Date')
                 ->date(),
@@ -59,7 +47,23 @@ class PayPeriodResource extends Resource
             IconColumn::make('is_processed')
                 ->label('Processed')
                 ->boolean(),
-        ]);
+        ])
+            ->actions([
+                // Custom Logic: Add a button to fetch attendance entries
+                Action::make('fetch_attendance')
+                    ->label('Fetch Attendance')
+                    ->color('primary')
+                    ->icon('heroicon-o-download')
+                    ->action(function ($record) {
+                        $count = $record->fetchAttendance();
+
+                        return \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Attendance Fetched')
+                            ->body("$count attendance records have been moved to the punches table.");
+                    }),
+                // Custom Logic Ends
+            ]);
     }
 
     public static function getPages(): array

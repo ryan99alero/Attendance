@@ -17,6 +17,7 @@ return new class extends Migration
             $table->timestamp('check_in')->nullable()->comment('Check-in time');
             $table->timestamp('check_out')->nullable()->comment('Check-out time');
             $table->boolean('is_manual')->default(false)->comment('Indicates if the attendance was manually recorded');
+            $table->boolean('is_migrated')->default(false)->comment('Indicates if the attendance record was migrated over to the Punches Table');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();

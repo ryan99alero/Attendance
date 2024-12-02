@@ -46,6 +46,8 @@ class AttendanceResource extends Resource
                 }),
             Toggle::make('is_manual')
                 ->label('Manually Recorded'),
+            Toggle::make('is_migrated')
+                ->label('Punch Recorded'),
         ]);
     }
 
@@ -84,6 +86,15 @@ class AttendanceResource extends Resource
                 ->label('Manual Entry')
                 ->alignCenter()
                 ->boolean(),
+            IconColumn::make('is_migrated')
+                ->label('Migrated')
+                ->boolean()
+                ->trueIcon('heroicon-s-check-circle')
+                ->falseIcon('heroicon-s-x-circle')
+                ->colors([
+                    'success' => true,
+                    'danger' => false,
+                ]),
         ]);
     }
 
