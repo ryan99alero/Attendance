@@ -4,14 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PayPeriodResource\Pages;
 use App\Models\PayPeriod;
+use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\Action; // Custom Logic
+use Filament\Tables\Actions\Action; // For custom actions
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
-use Filament\Forms\Form; // Correct namespace
 
 class PayPeriodResource extends Resource
 {
@@ -49,7 +49,7 @@ class PayPeriodResource extends Resource
                 ->boolean(),
         ])
             ->actions([
-                // Custom Logic: Add a button to fetch attendance entries
+                // Existing "Fetch Attendance" button
                 Action::make('fetch_attendance')
                     ->label('Fetch Attendance')
                     ->color('primary')
@@ -62,7 +62,13 @@ class PayPeriodResource extends Resource
                             ->title('Attendance Fetched')
                             ->body("$count attendance records have been moved to the punches table.");
                     }),
-                // Custom Logic Ends
+
+                // New "View Punches" button
+                Action::make('view_punches')
+                    ->label('View Punches')
+                    ->color('secondary')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn ($record) => route('filament.admin.resources.punches.index', ['pay_period_id' => $record->id])),
             ]);
     }
 

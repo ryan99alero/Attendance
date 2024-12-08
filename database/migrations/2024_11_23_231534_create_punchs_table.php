@@ -18,6 +18,7 @@ return new class extends Migration
             $table->timestamp('time_in')->comment('Actual punch-in time');
             $table->timestamp('time_out')->nullable()->comment('Actual punch-out time');
             $table->boolean('is_altered')->default(false)->comment('Indicates if the punch was altered post-recording');
+            $table->boolean('is_late')->default(false)->comment('Indicates if one of the employee punches is late');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();

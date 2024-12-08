@@ -34,7 +34,7 @@ class DepartmentResource extends Resource
                         $query->where('is_manager', true);
                     })
                         ->get()
-                        ->pluck('full_name', 'id'); // Ensure full_name accessor is defined
+                        ->pluck('full_names', 'id'); // Ensure full_names accessor is defined
                 })
                 ->placeholder('Select a Manager'),
         ]);

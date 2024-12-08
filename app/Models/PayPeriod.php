@@ -61,6 +61,8 @@ class PayPeriod extends Model
     {
         // Fetch attendance records within the pay period that have not been migrated
         $attendances = Attendance::whereBetween('check_in', [$this->start_date, $this->end_date])
+            ->whereNotNull('check_in')
+            ->whereNotNull('check_out')
             ->where('is_migrated', false)
             ->get();
 
@@ -76,6 +78,7 @@ class PayPeriod extends Model
                 'punch_type_id' => null, // Set null or determine type based on your business logic
                 'time_in' => $attendance->check_in,
                 'time_out' => $attendance->check_out,
+                'pay_period_id' => $this->id, // Assign the current PayPeriod ID
                 'is_altered' => false, // Default to false; update if needed
                 'created_at' => now(),
                 'updated_at' => now(),

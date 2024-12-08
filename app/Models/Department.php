@@ -44,6 +44,13 @@ class Department extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+    /**
+     * Relationship: schedule.
+    */
+    public function schedules(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Schedule::class, 'department_id', 'id');
+    }
 
     /**
      * Get the employees that belong to the department.

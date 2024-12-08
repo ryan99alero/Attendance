@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Employee extends Model
@@ -20,6 +19,7 @@ class Employee extends Model
     protected $fillable = [
         'first_name',
         'last_name',
+        'full_names',
         'address',
         'city',
         'state',
@@ -28,15 +28,8 @@ class Employee extends Model
         'phone',
         'external_id',
         'department_id',
-        'shift_id',
         'rounding_method',
         'payroll_frequency_id',
-        'normal_hrs_per_day',
-        'paid_lunch',
-        'photograph',
-        'start_date',
-        'start_time',
-        'stop_time',
         'termination_date',
         'is_active',
         'created_by',
@@ -49,11 +42,6 @@ class Employee extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'normal_hrs_per_day' => 'float',
-        'paid_lunch' => 'boolean',
-        'start_date' => 'date',
-        'start_time' => 'datetime:H:i:s',
-        'stop_time' => 'datetime:H:i:s',
         'termination_date' => 'date',
         'is_active' => 'boolean',
     ];
@@ -67,20 +55,6 @@ class Employee extends Model
     {
         return $this->belongsTo(Department::class, 'department_id');
     }
-    public function getLinkedUserIdAttribute()
-    {
-        // Return the ID of the associated user
-        return $this->user?->id;
-    }
-    /**
-     * Relationship: Shift.
-     *
-     * @return BelongsTo
-     */
-    public function shift(): BelongsTo
-    {
-        return $this->belongsTo(Shift::class, 'shift_id');
-    }
 
     /**
      * Relationship: Payroll Frequency.
@@ -90,6 +64,15 @@ class Employee extends Model
     public function payrollFrequency(): BelongsTo
     {
         return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
+    }
+    /**
+     * Relationship: Schedule.
+     *
+     * @return HasOne
+     */
+    public function schedule(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Schedule::class, 'employee_id', 'id');
     }
 
     /**
@@ -115,7 +98,7 @@ class Employee extends Model
     /**
      * Automatically set the `created_by` and `updated_by` fields.
      */
-    protected static function boot()
+    protected static function boot(): void
     {
         parent::boot();
 

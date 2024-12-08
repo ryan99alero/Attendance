@@ -51,7 +51,7 @@ class UserResource extends Resource
                     return Employee::whereDoesntHave('user') // Employees without linked users
                     ->orWhereHas('user', fn ($query) => $query->where('id', $record?->id))
                         ->get()
-                        ->pluck('full_name', 'id');
+                        ->pluck('full_names', 'id');
                 })
                 ->searchable()
                 ->placeholder('Select an Employee'),
@@ -75,7 +75,7 @@ class UserResource extends Resource
                 ->label('Email')
                 ->sortable()
                 ->searchable(),
-            TextColumn::make('employee.full_name')
+            TextColumn::make('employee.full_names')
                 ->label('Employee')
                 ->sortable()
                 ->searchable(),

@@ -11,6 +11,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 
@@ -47,48 +48,58 @@ class PunchResource extends Resource
         ]);
     }
 
+    /**
+     * @throws \Exception
+     */
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            TextColumn::make('employee.first_name')
-                ->label('Employee')
-                ->alignCenter()
-                ->sortable()
-                ->searchable(),
+        return $table
+            ->columns([
+                TextColumn::make('employee.first_name')
+                    ->label('Employee')
+                    ->alignCenter()
+                    ->sortable()
+                    ->searchable(),
 
-            TextColumn::make('device.device_name')
-                ->label('Device')
-                ->alignCenter()
-                ->sortable()
-                ->searchable(),
+                TextColumn::make('device.device_name')
+                    ->label('Device')
+                    ->alignCenter()
+                    ->sortable()
+                    ->searchable(),
 
-            TextColumn::make('punchType.name')
-                ->label('Punch Type')
-                ->alignCenter()
-                ->sortable()
-                ->searchable(),
+                TextColumn::make('punchType.name')
+                    ->label('Punch Type')
+                    ->alignCenter()
+                    ->sortable()
+                    ->searchable(),
 
-            TextInputColumn::make('time_in')
-                ->label('Punch In')
-                ->alignCenter()
-                ->rules(['required', 'date_format:Y-m-d H:i:s'])
-                ->afterStateUpdated(fn ($state, $record) => $record->update(['time_in' => $state]))
-                ->placeholder('YYYY-MM-DD HH:MM:SS')
-                ->searchable(),
+                TextInputColumn::make('time_in')
+                    ->label('Punch In')
+                    ->alignCenter()
+                    ->rules(['required', 'date_format:Y-m-d H:i:s'])
+                    ->afterStateUpdated(fn ($state, $record) => $record->update(['time_in' => $state]))
+                    ->placeholder('YYYY-MM-DD HH:MM:SS')
+                    ->searchable(),
 
-            TextInputColumn::make('time_out')
-                ->label('Punch Out')
-                ->alignCenter()
-                ->rules(['nullable', 'date_format:Y-m-d H:i:s'])
-                ->afterStateUpdated(fn ($state, $record) => $record->update(['time_out' => $state]))
-                ->placeholder('YYYY-MM-DD HH:MM:SS')
-                ->searchable(),
+                TextInputColumn::make('time_out')
+                    ->label('Punch Out')
+                    ->alignCenter()
+                    ->rules(['nullable', 'date_format:Y-m-d H:i:s'])
+                    ->afterStateUpdated(fn ($state, $record) => $record->update(['time_out' => $state]))
+                    ->placeholder('YYYY-MM-DD HH:MM:SS')
+                    ->searchable(),
 
-            IconColumn::make('is_altered')
-                ->label('Altered')
-                ->alignCenter()
-                ->boolean(),
-        ]);
+                IconColumn::make('is_altered')
+                    ->label('Altered')
+                    ->alignCenter()
+                    ->boolean(),
+            ])
+            ->filters([
+                Filter::make('pay_period_id')
+                    ->label('Pay Period')
+                    ->query(fn ($query, $value) => $query->where('pay_period_id', $value))
+                    ->default(fn () => request()->input('tableFilters.pay_period_id.value')),
+            ]);
     }
 
     public static function getPages(): array

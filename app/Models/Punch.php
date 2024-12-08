@@ -15,7 +15,9 @@ class Punch extends Model
         'punch_type_id',
         'time_in',
         'time_out',
+        'pay_period_id', // Ensure this is included
         'is_altered',
+        'is_late',
         'created_by',
         'updated_by',
     ];
@@ -24,6 +26,7 @@ class Punch extends Model
         'time_in' => 'datetime',
         'time_out' => 'datetime',
         'is_altered' => 'boolean',
+        'is_late' => 'boolean',
     ];
 
     /**
@@ -86,5 +89,12 @@ class Punch extends Model
     public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+    /**
+     * Relationship with PayPeriod model for Record Fetch.
+     */
+    public function payPeriod(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(PayPeriod::class);
     }
 }
