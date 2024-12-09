@@ -18,6 +18,9 @@ class OvertimeRule extends Model
         'rule_name',
         'hours_threshold',
         'multiplier',
+        'shift_id',
+        'consecutive_days_threshold',
+        'applies_on_weekends',
         'created_by',
         'updated_by',
     ];
@@ -30,6 +33,8 @@ class OvertimeRule extends Model
     protected $casts = [
         'hours_threshold' => 'integer',
         'multiplier' => 'float',
+        'consecutive_days_threshold' => 'integer',
+        'applies_on_weekends' => 'boolean',
     ];
 
     /**
@@ -46,5 +51,13 @@ class OvertimeRule extends Model
     public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Get the shift associated with the overtime rule.
+     */
+    public function shift(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Shift::class, 'shift_id');
     }
 }

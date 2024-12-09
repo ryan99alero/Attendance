@@ -55,6 +55,15 @@ class Employee extends Model
     {
         return $this->belongsTo(Department::class, 'department_id');
     }
+    /**
+     * Relationship: RoundingRule.
+     *
+     * @return BelongsTo
+     */
+    public function RoundingRule(): BelongsTo
+    {
+        return $this->belongsTo(RoundingRule::class, 'id');
+    }
 
     /**
      * Relationship: Payroll Frequency.

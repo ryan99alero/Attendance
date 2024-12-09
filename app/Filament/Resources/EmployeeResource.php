@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
+use App\Models\RoundingRule;
 use App\Models\Department;
 use App\Models\PayrollFrequency;
 use App\Models\Schedule;
@@ -65,35 +66,12 @@ class EmployeeResource extends Resource
                 ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
                 ->nullable()
                 ->searchable(),
-            Select::make('schedule_id')
-                ->label('Schedule')
-                ->options(fn () => Schedule::query()
-                    ->where('is_active', true)
-                    ->pluck('schedule_name', 'id'))
-                ->searchable()
-                ->nullable()
-                ->createOptionForm([
-                    TextInput::make('schedule_name')
-                        ->label('Schedule Name')
-                        ->required(),
-                    TextInput::make('notes')
-                        ->label('Notes')
-                        ->nullable(),
-                    Toggle::make('is_active')
-                        ->label('Is Active')
-                        ->default(true),
-                ])
-                ->placeholder('Select or Create a Schedule'),
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
             Select::make('rounding_method')
                 ->label('Rounding Method')
-                ->options([
-                    1 => 'Nearest 5 Minutes',
-                    2 => 'Nearest 10 Minutes',
-                    3 => 'Nearest 15 Minutes',
-                ])
+                ->options(RoundingRule::all()->pluck('name', 'id'))
                 ->nullable(),
             DatePicker::make('termination_date')
                 ->label('Termination Date')

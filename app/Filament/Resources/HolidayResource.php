@@ -26,8 +26,11 @@ class HolidayResource extends Resource
             TextInput::make('name')
                 ->label('Holiday Name')
                 ->required(),
-            DatePicker::make('date')
-                ->label('Date')
+            DatePicker::make('start_date')
+                ->label('Start Date')
+                ->required(),
+            DatePicker::make('end_date')
+                ->label('End Date')
                 ->required(),
             Toggle::make('is_recurring')
                 ->label('Recurring')
@@ -40,8 +43,10 @@ class HolidayResource extends Resource
         return $table->columns([
             TextColumn::make('name')
                 ->label('Holiday Name'),
-            TextColumn::make('date')
-                ->label('Date'),
+            TextColumn::make('start_date')
+                ->label('Start Date'),
+            TextColumn::make('end_date')
+                ->label('End Date'),
             IconColumn::make('is_recurring')
                 ->boolean()
                 ->label('Recurring'),

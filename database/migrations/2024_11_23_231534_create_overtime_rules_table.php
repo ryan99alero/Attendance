@@ -9,19 +9,26 @@ return new class extends Migration
     public function up(): void
     {
         Schema::disableForeignKeyConstraints();
+
         Schema::create('overtime_rules', function (Blueprint $table) {
             $table->id();
             $table->string('rule_name', 100)->comment('Name of the overtime rule');
             $table->integer('hours_threshold')->default(40)->comment('Hours threshold for overtime calculation');
             $table->decimal('multiplier', 5, 2)->default(1.5)->comment('Overtime pay multiplier');
+            $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key to Shifts');
+            $table->integer('consecutive_days_threshold')->nullable()->comment('Number of consecutive days required to trigger this rule');
+            $table->boolean('applies_on_weekends')->default(false)->comment('Whether this rule applies on weekends');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
             $table->timestamps();
 
             // Foreign key constraints
+            $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('set null');
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
         });
+
+        Schema::enableForeignKeyConstraints();
     }
 
     public function down(): void

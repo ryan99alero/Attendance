@@ -16,7 +16,8 @@ class Holiday extends Model
      */
     protected $fillable = [
         'name',
-        'date',
+        'start_date',
+        'end_date',
         'is_recurring',
         'created_by',
         'updated_by',

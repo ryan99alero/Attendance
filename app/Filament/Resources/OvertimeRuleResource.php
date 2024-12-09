@@ -4,11 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\OvertimeRuleResource\Pages;
 use App\Models\OvertimeRule;
+use App\Models\Shift;
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BooleanColumn;
 
 class OvertimeRuleResource extends Resource
 {
@@ -31,6 +35,19 @@ class OvertimeRuleResource extends Resource
                 ->label('Multiplier')
                 ->numeric()
                 ->required(),
+            Select::make('shift_id')
+                ->label('Shift')
+                ->options(Shift::all()->pluck('shift_name', 'id'))
+                ->searchable()
+                ->nullable(),
+            TextInput::make('consecutive_days_threshold')
+                ->label('Consecutive Days Threshold')
+                ->numeric()
+                ->nullable()
+                ->hint('Number of consecutive days required to trigger the rule.'),
+            Toggle::make('applies_on_weekends')
+                ->label('Applies on Weekends')
+                ->default(false),
         ]);
     }
 
@@ -43,6 +60,13 @@ class OvertimeRuleResource extends Resource
                 ->label('Hours Threshold'),
             TextColumn::make('multiplier')
                 ->label('Multiplier'),
+            TextColumn::make('shift.shift_name')
+                ->label('Shift')
+                ->sortable(),
+            TextColumn::make('consecutive_days_threshold')
+                ->label('Consecutive Days Threshold'),
+            BooleanColumn::make('applies_on_weekends')
+                ->label('Applies on Weekends'),
         ]);
     }
 
