@@ -8,7 +8,7 @@ use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\Action; // For custom actions
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
@@ -49,13 +49,13 @@ class PayPeriodResource extends Resource
                 ->boolean(),
         ])
             ->actions([
-                // Existing "Fetch Attendance" button
+                // Button to trigger AttendanceProcessingService
                 Action::make('fetch_attendance')
                     ->label('Fetch Attendance')
                     ->color('primary')
                     ->icon('heroicon-o-download')
                     ->action(function ($record) {
-                        $count = $record->fetchAttendance();
+                        $count = $record->processAttendance(); // Calls the service through the model
 
                         return \Filament\Notifications\Notification::make()
                             ->success()
@@ -63,7 +63,7 @@ class PayPeriodResource extends Resource
                             ->body("$count attendance records have been moved to the punches table.");
                     }),
 
-                // New "View Punches" button
+                // Button to view punches for the PayPeriod
                 Action::make('view_punches')
                     ->label('View Punches')
                     ->color('secondary')

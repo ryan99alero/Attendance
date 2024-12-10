@@ -3,14 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ScheduleResource\Pages;
-use App\Models\Schedule;
+use App\Models\ShiftSchedule;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
 
-class ScheduleResource extends Resource
+class ShiftScheduleResource extends Resource
 {
-    protected static ?string $model = Schedule::class;
+    protected static ?string $model = ShiftSchedule::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
@@ -19,7 +19,7 @@ class ScheduleResource extends Resource
         return $form->schema([
             // General Information
             Forms\Components\TextInput::make('schedule_name')
-                ->label('Schedule Name')
+                ->label('ShiftSchedule Name')
                 ->required()
                 ->maxLength(255),
 

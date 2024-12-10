@@ -7,7 +7,7 @@ use App\Models\Employee;
 use App\Models\RoundingRule;
 use App\Models\Department;
 use App\Models\PayrollFrequency;
-use App\Models\Schedule;
+use App\Models\ShiftSchedule;
 use App\Models\User;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;

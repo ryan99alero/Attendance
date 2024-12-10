@@ -37,12 +37,9 @@ class PunchResource extends Resource
                 ->relationship('punchType', 'name')
                 ->label('Punch Type')
                 ->nullable(),
-            DateTimePicker::make('time_in')
+            DateTimePicker::make('punch_time')
                 ->label('Punch In')
                 ->required(),
-            DateTimePicker::make('time_out')
-                ->label('Punch Out')
-                ->nullable(),
             Toggle::make('is_altered')
                 ->label('Altered'),
         ]);
@@ -73,20 +70,12 @@ class PunchResource extends Resource
                     ->sortable()
                     ->searchable(),
 
-                TextInputColumn::make('time_in')
+                TextInputColumn::make('punch_time')
                     ->label('Punch In')
                     ->alignCenter()
-                    ->rules(['required', 'date_format:Y-m-d H:i:s'])
-                    ->afterStateUpdated(fn ($state, $record) => $record->update(['time_in' => $state]))
-                    ->placeholder('YYYY-MM-DD HH:MM:SS')
-                    ->searchable(),
-
-                TextInputColumn::make('time_out')
-                    ->label('Punch Out')
-                    ->alignCenter()
-                    ->rules(['nullable', 'date_format:Y-m-d H:i:s'])
-                    ->afterStateUpdated(fn ($state, $record) => $record->update(['time_out' => $state]))
-                    ->placeholder('YYYY-MM-DD HH:MM:SS')
+                    ->rules(['required', 'date_format:Y-m-d H:i'])
+                    ->afterStateUpdated(fn ($state, $record) => $record->update(['punch_time' => $state]))
+                    ->placeholder('YYYY-MM-DD HH:MM')
                     ->searchable(),
 
                 IconColumn::make('is_altered')

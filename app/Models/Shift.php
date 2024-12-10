@@ -30,7 +30,7 @@ class Shift extends Model
 
     public function schedules(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(Schedule::class);
+        return $this->hasMany(ShiftSchedule::class);
     }
 
     public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo

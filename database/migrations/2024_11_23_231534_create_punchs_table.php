@@ -14,9 +14,9 @@ return new class extends Migration
             $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key to Employees');
             $table->unsignedBigInteger('device_id')->nullable()->comment('Foreign key to Devices');
             $table->unsignedBigInteger('punch_type_id')->nullable()->comment('Foreign key to Punch Types');
-            $table->unsignedBigInteger('pay_period_id')->nullable()->comment('Foreign key to Pay Periods'); // New field
-            $table->timestamp('time_in')->comment('Actual punch-in time');
-            $table->timestamp('time_out')->nullable()->comment('Actual punch-out time');
+            $table->unsignedBigInteger('pay_period_id')->nullable()->comment('Foreign key to Pay Periods');
+            $table->unsignedBigInteger('attendance_id')->nullable()->comment('Foreign key to Attendances'); // New field
+            $table->timestamp('punch_time')->comment('Actual punch time');
             $table->boolean('is_altered')->default(false)->comment('Indicates if the punch was altered post-recording');
             $table->boolean('is_late')->default(false)->comment('Indicates if one of the employee punches is late');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
@@ -27,7 +27,8 @@ return new class extends Migration
             $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade');
             $table->foreign('device_id')->references('id')->on('devices')->onDelete('set null');
             $table->foreign('punch_type_id')->references('id')->on('punch_types')->onDelete('set null');
-            $table->foreign('pay_period_id')->references('id')->on('pay_periods')->onDelete('set null'); // New constraint
+            $table->foreign('pay_period_id')->references('id')->on('pay_periods')->onDelete('set null');
+            $table->foreign('attendance_id')->references('id')->on('attendances')->onDelete('set null'); // New constraint
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
         });

@@ -75,13 +75,13 @@ class Employee extends Model
         return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
     }
     /**
-     * Relationship: Schedule.
+     * Relationship: ShiftSchedule.
      *
      * @return HasOne
      */
     public function schedule(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
-        return $this->hasOne(Schedule::class, 'employee_id', 'id');
+        return $this->hasOne(ShiftSchedule::class, 'employee_id', 'id');
     }
 
     /**

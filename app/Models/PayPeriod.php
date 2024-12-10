@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Services\AttendanceProcessing\AttendanceProcessingService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\Attendance; // Custom Logic
 
 class PayPeriod extends Model
 {
@@ -56,44 +56,14 @@ class PayPeriod extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    // Custom Logic: Fetch attendance entries within the pay period
-    public function fetchAttendance(): int
+    /**
+     * Use the AttendanceProcessingService to process attendance.
+     */
+    public function processAttendance(): int
     {
-        // Fetch attendance records within the pay period that have not been migrated
-        $attendances = Attendance::whereBetween('check_in', [$this->start_date, $this->end_date])
-            ->whereNotNull('check_in')
-            ->whereNotNull('check_out')
-            ->where('is_migrated', false)
-            ->get();
+        $service = new \App\Services\AttendanceProcessing\AttendanceProcessingService();
+        $service->processAll($this);
 
-        if ($attendances->isEmpty()) {
-            return 0; // No records to migrate
-        }
-
-        // Prepare data for the punches table
-        $punches = $attendances->map(function ($attendance) {
-            return [
-                'employee_id' => $attendance->employee_id,
-                'device_id' => $attendance->device_id,
-                'punch_type_id' => null, // Set null or determine type based on your business logic
-                'time_in' => $attendance->check_in,
-                'time_out' => $attendance->check_out,
-                'pay_period_id' => $this->id, // Assign the current PayPeriod ID
-                'is_altered' => false, // Default to false; update if needed
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        })->toArray();
-
-        // Insert data into the punches table
-        \DB::table('punches')->insert($punches);
-
-        // Mark the attendance records as migrated
-        $attendanceIds = $attendances->pluck('id')->toArray();
-        Attendance::whereIn('id', $attendanceIds)->update(['is_migrated' => true]);
-
-        // Return the count of records processed
-        return count($punches);
+        return 0; // Return count if needed
     }
-    // Custom Logic Ends
 }

@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Schedule extends Model
+class ShiftSchedule extends Model
 {
     use HasFactory;
 
     /**
-     * The attributes that are mass assignable.
+     * Attributes that are mass assignable.
      *
      * @var array<int, string>
      */
@@ -33,22 +33,29 @@ class Schedule extends Model
     ];
 
     /**
-     * The attributes that should be cast.
+     * Automatically include related models.
+     *
+     * @var array<string>
+     */
+    protected $with = ['employee', 'department', 'shift'];
+
+    /**
+     * Attributes that should be cast.
      *
      * @var array<string, string>
      */
     protected $casts = [
         'is_active' => 'boolean',
-        'lunch_start_time' => 'datetime:H:i', // Enforce HH:MM
-        'start_time' => 'datetime:H:i',      // Enforce HH:MM
-        'end_time' => 'datetime:H:i',        // Enforce HH:MM
+        'lunch_start_time' => 'datetime:H:i', // HH:MM format
+        'start_time' => 'datetime:H:i',
+        'end_time' => 'datetime:H:i',
         'grace_period' => 'integer',
     ];
 
     /**
      * Relationship: Employee.
      */
-    public function employee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_id', 'id');
     }
@@ -56,7 +63,7 @@ class Schedule extends Model
     /**
      * Relationship: Department.
      */
-    public function department(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'department_id', 'id');
     }
@@ -67,6 +74,17 @@ class Schedule extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class, 'shift_id');
+    }
+
+    /**
+     * Scope to get active schedules.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     /**

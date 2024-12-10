@@ -7,7 +7,9 @@ use App\Models\Attendance;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
@@ -33,19 +35,21 @@ class AttendanceResource extends Resource
                 ->relationship('device', 'device_name') // Relationship to Device
                 ->label('Device')
                 ->nullable(),
-            DateTimePicker::make('check_in')
-                ->label('Check-In Time')
-                ->formatStateUsing(function ($state) {
-                    return $state ? Carbon::parse($state)->format('Y-m-d\TH:i:s') : null;
-                })
+            DateTimePicker::make('punch_time')
+                ->label('Punch Time')
+                ->seconds(false)
+                ->displayFormat('Y-m-d H:i')
                 ->required(),
-            DateTimePicker::make('check_out')
-                ->label('Check-Out Time')
-                ->formatStateUsing(function ($state) {
-                    return $state ? Carbon::parse($state)->format('Y-m-d\TH:i:s') : null;
-                }),
             Toggle::make('is_manual')
                 ->label('Manually Recorded'),
+            TextInput::make('status')
+                ->label('Status')
+                ->placeholder('Pending, Reviewed, Fixed')
+                ->required(),
+            Textarea::make('issue_notes')
+                ->label('Issue Notes')
+                ->rows(3)
+                ->placeholder('Enter details about any issues or anomalies'),
             Toggle::make('is_migrated')
                 ->label('Punch Recorded'),
         ]);
@@ -56,35 +60,31 @@ class AttendanceResource extends Resource
         return $table->columns([
             TextColumn::make('employee.first_name')
                 ->label('Employee')
-                ->alignCenter()
                 ->sortable()
                 ->searchable(),
 
             TextColumn::make('device.device_name')
                 ->label('Device')
-                ->alignCenter()
                 ->sortable()
                 ->searchable(),
 
-            TextInputColumn::make('check_in')
-                ->label('Check-In')
-                ->alignCenter()
-                ->rules(['required', 'date_format:Y-m-d H:i:s']) // Validation rule for datetime
-                ->afterStateUpdated(fn ($state, $record) => $record->update(['check_in' => $state])) // Update the record
-                ->placeholder('YYYY-MM-DD HH:MM:SS')
+            TextInputColumn::make('punch_time')
+                ->label('punch_time')
+                ->rules(['required', 'date_format:Y-m-d H:i']) // Validation rule for datetime
+                ->placeholder('YYYY-MM-DD HH:MM')
                 ->searchable(),
 
-            TextInputColumn::make('check_out')
-                ->label('Check-Out')
-                ->alignCenter()
-                ->rules(['nullable', 'date_format:Y-m-d H:i:s'])
-                ->afterStateUpdated(fn ($state, $record) => $record->update(['check_out' => $state]))
-                ->placeholder('YYYY-MM-DD HH:MM:SS')
-                ->searchable(),
+            TextColumn::make('status')
+                ->label('Status')
+                ->sortable(),
+
+            TextColumn::make('issue_notes')
+                ->label('Issue Notes')
+                ->limit(50) // Truncate notes for display
+                ->tooltip(fn ($state) => $state), // Full notes as tooltip
 
             IconColumn::make('is_manual')
                 ->label('Manual Entry')
-                ->alignCenter()
                 ->boolean(),
             IconColumn::make('is_migrated')
                 ->label('Migrated')

@@ -49,7 +49,7 @@ class Department extends Model
     */
     public function schedules(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(Schedule::class, 'department_id', 'id');
+        return $this->hasMany(ShiftSchedule::class, 'department_id', 'id');
     }
 
     /**
