@@ -90,13 +90,12 @@ class PunchResource extends Resource
                     ->default(fn () => request()->input('tableFilters.pay_period_id.value')),
             ]);
     }
-
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPunches::route('/'),
-            'create' => Pages\CreatePunch::route('/create'),
-            'edit' => Pages\EditPunch::route('/{record}/edit'),
+            'index' => Pages\ListPunches::route('/filament-punches'),
+            'create' => Pages\CreatePunch::route('/filament-punches/create'),
+            'edit' => Pages\EditPunch::route('/filament-punches/{record}/edit'),
         ];
     }
 }

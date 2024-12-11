@@ -13,8 +13,7 @@ class Punch extends Model
         'employee_id',
         'device_id',
         'punch_type_id',
-        'time_in',
-        'time_out',
+        'punch_time',
         'pay_period_id', // Ensure this is included
         'is_altered',
         'is_late',
@@ -23,8 +22,7 @@ class Punch extends Model
     ];
 
     protected $casts = [
-        'time_in' => 'datetime',
-        'time_out' => 'datetime',
+        'punch_time' => 'datetime',
         'is_altered' => 'boolean',
         'is_late' => 'boolean',
     ];
@@ -90,11 +88,38 @@ class Punch extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+
     /**
      * Relationship with PayPeriod model for Record Fetch.
      */
     public function payPeriod(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(PayPeriod::class);
+    }
+
+    /**
+     * Scope for shifts crossing midnight, grouping punches within a 24-hour window.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $employeeId
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForShiftsCrossingMidnight($query, $employeeId)
+    {
+        // Get the employee's shift start time from the ShiftSchedule table
+        $referenceTime = ShiftSchedule::where('employee_id', $employeeId)
+            ->orWhere('department_id', function ($query) use ($employeeId) {
+                $query->select('department_id')
+                    ->from('employees')
+                    ->where('id', $employeeId);
+            })
+            ->value('start_time') ?? '06:00:00'; // Default to 6:00 AM if no schedule found
+
+        return $query->whereRaw("
+        TIME(punch_time) >= ?
+        OR TIME(punch_time) < ?
+    ", [$referenceTime, $referenceTime])
+            ->orderBy('employee_id')
+            ->orderBy('punch_time');
     }
 }
