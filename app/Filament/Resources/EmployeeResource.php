@@ -22,7 +22,7 @@ use Filament\Tables\Columns\IconColumn;
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
     protected static ?string $navigationLabel = 'Employees';
 

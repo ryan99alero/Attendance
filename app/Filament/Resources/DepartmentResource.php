@@ -15,7 +15,7 @@ use Filament\Tables\Table;
 class DepartmentResource extends Resource
 {
     protected static ?string $model = Department::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-office-building';
     protected static ?string $navigationLabel = 'Departments';
 

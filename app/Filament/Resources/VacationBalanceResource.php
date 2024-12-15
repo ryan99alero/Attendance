@@ -13,7 +13,7 @@ use Filament\Tables\Table;
 class VacationBalanceResource extends Resource
 {
     protected static ?string $model = VacationBalance::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Vacation Balances';
 

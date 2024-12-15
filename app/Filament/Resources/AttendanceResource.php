@@ -20,7 +20,7 @@ use Carbon\Carbon;
 class AttendanceResource extends Resource
 {
     protected static ?string $model = Attendance::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationLabel = 'Attendances';
 

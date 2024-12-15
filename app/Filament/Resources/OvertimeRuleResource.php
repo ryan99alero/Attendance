@@ -17,7 +17,7 @@ use Filament\Tables\Columns\BooleanColumn;
 class OvertimeRuleResource extends Resource
 {
     protected static ?string $model = OvertimeRule::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-briefcase';
     protected static ?string $navigationLabel = 'Overtime Rules';
 

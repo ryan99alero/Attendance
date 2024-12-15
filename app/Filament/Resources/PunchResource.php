@@ -18,9 +18,15 @@ use Filament\Tables\Table;
 class PunchResource extends Resource
 {
     protected static ?string $model = Punch::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
-    protected static ?string $navigationLabel = 'Punches';
+    protected static ?string $navigationGroup = 'Punch';
+    protected static ?string $navigationLabel = 'Punch';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Punch Entries'; // Group Name in the Sidebar
+    }
 
     public static function form(Form $form): Form
     {
@@ -93,9 +99,9 @@ class PunchResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPunches::route('/filament-punches'),
-            'create' => Pages\CreatePunch::route('/filament-punches/create'),
-            'edit' => Pages\EditPunch::route('/filament-punches/{record}/edit'),
+            'index' => Pages\ListPunches::route('/'),
+            'create' => Pages\CreatePunch::route('/create'),
+            'edit' => Pages\EditPunch::route('/{record}/edit'),
         ];
     }
 }

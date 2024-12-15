@@ -16,7 +16,7 @@ use Filament\Tables\Columns\IconColumn;
 class DeviceResource extends Resource
 {
     protected static ?string $model = Device::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-desktop-computer';
     protected static ?string $navigationLabel = 'Devices';
 

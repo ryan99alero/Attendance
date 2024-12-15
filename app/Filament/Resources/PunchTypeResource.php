@@ -13,7 +13,7 @@ use Filament\Tables\Table;
 class PunchTypeResource extends Resource
 {
     protected static ?string $model = PunchType::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-tag';
     protected static ?string $navigationLabel = 'Punch Types';
 

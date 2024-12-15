@@ -16,7 +16,7 @@ use Filament\Tables\Table;
 class CardResource extends Resource
 {
     protected static ?string $model = Card::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
     protected static ?string $navigationLabel = 'Cards';
 

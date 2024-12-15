@@ -11,7 +11,7 @@ use Filament\Tables;
 class ShiftScheduleResource extends Resource
 {
     protected static ?string $model = ShiftSchedule::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
     public static function form(Forms\Form $form): Forms\Form

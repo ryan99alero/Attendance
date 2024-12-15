@@ -14,7 +14,7 @@ use Filament\Tables\Columns\TextColumn;
 class EmployeeStatResource extends Resource
 {
     protected static ?string $model = EmployeeStat::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
     protected static ?string $navigationLabel = 'Employee Stats';
 

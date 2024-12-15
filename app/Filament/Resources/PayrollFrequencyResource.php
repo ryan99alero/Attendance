@@ -14,7 +14,7 @@ use Filament\Tables\Table;
 class PayrollFrequencyResource extends Resource
 {
     protected static ?string $model = PayrollFrequency::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-calendar';
     protected static ?string $navigationLabel = 'Payroll Frequencies';
 

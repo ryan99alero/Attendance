@@ -16,7 +16,7 @@ use Filament\Tables\Columns\IconColumn;
 class HolidayResource extends Resource
 {
     protected static ?string $model = Holiday::class;
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-sparkles';
     protected static ?string $navigationLabel = 'Holidays';
 

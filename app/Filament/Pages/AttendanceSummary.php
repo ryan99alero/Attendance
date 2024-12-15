@@ -5,22 +5,22 @@ namespace App\Filament\Pages;
 use Filament\Forms;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
-use App\Models\Punch;
+use App\Models\Attendance;
 
-class PunchSummary extends Page
+class AttendanceSummary extends Page
 {
-    protected static bool $shouldRegisterNavigation = false;
+//    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-table';
-    protected static string $view = 'filament.pages.punch-summary';
-    protected static ?string $navigationLabel = 'Punch Summary';
+    protected static string $view = 'filament.pages.attendance-summary';
+    protected static ?string $navigationLabel = 'Attendance Summary';
 
     public $payPeriodId; // Bound to the select dropdown
-    public $groupedPunches;
+    public $groupedAttendances;
 
     public function mount()
     {
         $this->payPeriodId = null; // Default to no filter
-        $this->groupedPunches = $this->fetchPunches(); // Fetch punches initially
+        $this->groupedAttendances = $this->fetchAttendances(); // Fetch initial attendance data
     }
 
     protected function getFormSchema(): array
@@ -30,31 +30,33 @@ class PunchSummary extends Page
                 ->label('Select Pay Period')
                 ->options($this->getPayPeriods()) // Options for the dropdown
                 ->reactive()
-                ->afterStateUpdated(fn () => $this->updatePunches()) // Refresh data on selection
+                ->afterStateUpdated(fn () => $this->updateAttendances()) // Refresh data on selection
                 ->placeholder('All Pay Periods'),
         ];
     }
 
     protected function getPayPeriods(): array
     {
-        // Ensure PayPeriod model exists and contains data
+        // Fetch pay periods from the database
         return \App\Models\PayPeriod::query()
             ->select('id', 'start_date', 'end_date')
             ->get()
-            ->pluck('start_date', 'id') // Make sure 'name' exists for each record
+            ->mapWithKeys(fn ($period) => [
+                $period->id => $period->start_date . ' to ' . $period->end_date,
+            ])
             ->toArray();
     }
 
-    public function fetchPunches(): Collection
+    public function fetchAttendances(): Collection
     {
-        $query = Punch::select([
+        $query = Attendance::select([
             'employee_id',
-            \DB::raw("DATE(punch_time) as punch_date"),
+            \DB::raw("DATE(punch_time) as attendance_date"),
             \DB::raw("
-                MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as ClockIn,
-                MAX(CASE WHEN punch_type_id = 8 THEN TIME(punch_time) END) as LunchStart,
-                MAX(CASE WHEN punch_type_id = 9 THEN TIME(punch_time) END) as LunchStop,
-                MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as ClockOut
+                MIN(punch_time) as FirstPunch,
+                MAX(punch_time) as LastPunch,
+                SUM(CASE WHEN is_manual = 1 THEN 1 ELSE 0 END) as ManualEntries,
+                COUNT(*) as TotalPunches
             "),
         ])
             ->groupBy('employee_id', \DB::raw('DATE(punch_time)'))
@@ -68,8 +70,8 @@ class PunchSummary extends Page
         return $query->get();
     }
 
-    public function updatePunches()
+    public function updateAttendances()
     {
-        $this->groupedPunches = $this->fetchPunches();
+        $this->groupedAttendances = $this->fetchAttendances();
     }
 }
