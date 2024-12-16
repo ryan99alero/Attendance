@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Carbon\Carbon;
 
 class Attendance extends Model
 {
@@ -19,6 +20,7 @@ class Attendance extends Model
         'employee_id',
         'device_id',
         'punch_time',
+        'punch_type_id',
         'status',
         'issue_notes',
         'is_manual',
@@ -33,10 +35,34 @@ class Attendance extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'punch_time' => 'datetime:Y-m-d\TH:i', // ISO 8601 format
+        'punch_time' => 'datetime', // Use raw datetime for flexibility
         'is_manual' => 'boolean',
         'is_migrated' => 'boolean',
     ];
+
+    /**
+     * Accessor for `punch_time` to format it as `Y-m-d H:i` for display purposes.
+     */
+    public function getPunchTimeAttribute($value): string
+    {
+        return Carbon::parse($value)->format('Y-m-d H:i');
+    }
+
+    /**
+     * Mutator for `punch_time` to ensure it is saved in full datetime format.
+     */
+    public function setPunchTimeAttribute($value): void
+    {
+        $this->attributes['punch_time'] = Carbon::parse($value)->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Relationship with the `PunchType` model.
+     */
+    public function punchType(): BelongsTo
+    {
+        return $this->belongsTo(PunchType::class, 'punch_type_id');
+    }
 
     /**
      * Relationship with the `Employee` model.

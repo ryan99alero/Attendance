@@ -4,18 +4,19 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AttendanceResource\Pages;
 use App\Models\Attendance;
+use App\Models\PunchType;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\TextInput;
+use Illuminate\Support\Facades\DB;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
-use Carbon\Carbon;
 
 class AttendanceResource extends Resource
 {
@@ -28,11 +29,11 @@ class AttendanceResource extends Resource
     {
         return $form->schema([
             Select::make('employee_id')
-                ->relationship('employee', 'first_name') // Relationship to Employee
+                ->relationship('employee', 'first_name')
                 ->label('Employee')
                 ->required(),
             Select::make('device_id')
-                ->relationship('device', 'device_name') // Relationship to Device
+                ->relationship('device', 'device_name')
                 ->label('Device')
                 ->nullable(),
             DateTimePicker::make('punch_time')
@@ -40,11 +41,25 @@ class AttendanceResource extends Resource
                 ->seconds(false)
                 ->displayFormat('Y-m-d H:i')
                 ->required(),
+            Select::make('punch_type_id')
+                ->label('Punch Type')
+                ->options(PunchType::pluck('name', 'id')->toArray())
+                ->nullable()
+                ->searchable(),
             Toggle::make('is_manual')
                 ->label('Manually Recorded'),
-            TextInput::make('status')
+            Select::make('status')
                 ->label('Status')
-                ->placeholder('Pending, Reviewed, Fixed')
+                ->options(function () {
+                    $type = DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
+
+                    preg_match('/^enum\((.*)\)$/', $type, $matches);
+                    $enumOptions = array_map(function ($value) {
+                        return trim($value, "'");
+                    }, explode(',', $matches[1]));
+
+                    return array_combine($enumOptions, $enumOptions);
+                })
                 ->required(),
             Textarea::make('issue_notes')
                 ->label('Issue Notes')
@@ -69,23 +84,47 @@ class AttendanceResource extends Resource
                 ->searchable(),
 
             TextInputColumn::make('punch_time')
-                ->label('punch_time')
-                ->rules(['required', 'date_format:Y-m-d H:i']) // Validation rule for datetime
+                ->label('Punch Time')
+                ->rules(['required', 'date_format:Y-m-d H:i'])
                 ->placeholder('YYYY-MM-DD HH:MM')
-                ->searchable(),
+                ->sortable()
+                ->searchable()
+                ->extraAttributes(['class' => 'editable']),
 
-            TextColumn::make('status')
+            SelectColumn::make('punch_type_id')
+                ->label('Punch Type')
+                ->options(PunchType::pluck('name', 'id')->toArray())
+                ->sortable()
+                ->searchable()
+                ->extraAttributes(['class' => 'editable']),
+
+            SelectColumn::make('status')
                 ->label('Status')
-                ->sortable(),
+                ->options(function () {
+                    $type = DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
 
-            TextColumn::make('issue_notes')
+                    preg_match('/^enum\((.*)\)$/', $type, $matches);
+                    $enumOptions = array_map(function ($value) {
+                        return trim($value, "'");
+                    }, explode(',', $matches[1]));
+
+                    return array_combine($enumOptions, $enumOptions);
+                })
+                ->sortable()
+                ->searchable()
+                ->extraAttributes(['class' => 'editable']),
+
+            TextInputColumn::make('issue_notes')
                 ->label('Issue Notes')
-                ->limit(50) // Truncate notes for display
-                ->tooltip(fn ($state) => $state), // Full notes as tooltip
+                ->placeholder('Enter notes...')
+                ->sortable()
+                ->searchable()
+                ->extraAttributes(['class' => 'editable']),
 
             IconColumn::make('is_manual')
                 ->label('Manual Entry')
                 ->boolean(),
+
             IconColumn::make('is_migrated')
                 ->label('Migrated')
                 ->boolean()

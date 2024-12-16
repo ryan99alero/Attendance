@@ -16,7 +16,6 @@ class AppServiceProvider extends ServiceProvider
     {
         //
     }
-
     /**
      * Bootstrap any application services.
      */
@@ -24,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Define a custom Carbon macro for the desired format
         Carbon::macro('toCustomFormat', function () {
-            return $this->format('Y-m-d H:i:s');
+            return $this->format('Y-m-d H:i');
         });
 
         // Set the default serialization format to the custom format
