@@ -20,9 +20,27 @@ class PunchTypeResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')->label('Punch Type Name')->required(),
-            Forms\Components\Textarea::make('description')->label('Description')->nullable(),
-            Forms\Components\Toggle::make('is_active')->label('Active')->default(true),
+            Forms\Components\TextInput::make('name')
+                ->label('Punch Type Name')
+                ->required(),
+            Forms\Components\Textarea::make('description')
+                ->label('Description')
+                ->nullable(),
+            Forms\Components\Select::make('schedule_reference')
+                ->label('Schedule')
+                ->options([
+                    'start_time' => 'Start Time',
+                    'lunch_start' => 'Lunch Start',
+                    'lunch_stop' => 'Lunch Stop',
+                    'stop_time' => 'Stop Time',
+                    'flexible' => 'flexible',
+                    'passthrough' => 'passthrough',
+                ])
+                ->nullable()
+                ->searchable(), // Optional: make the dropdown searchable
+            Forms\Components\Toggle::make('is_active')
+                ->label('Active')
+                ->default(true),
         ]);
     }
 
@@ -31,6 +49,20 @@ class PunchTypeResource extends Resource
         return $table->columns([
             Tables\Columns\TextColumn::make('name')->label('Punch Type Name'),
             Tables\Columns\TextColumn::make('description')->label('Description'),
+            Tables\Columns\TextColumn::make('schedule_reference')
+                ->label('Schedule')
+                ->formatStateUsing(function ($state) {
+                    // Format the value to display user-friendly text
+                    return match ($state) {
+                        'start_time' => 'Start Time',
+                        'lunch_start' => 'Lunch Start',
+                        'lunch_stop' => 'Lunch Stop',
+                        'stop_time' => 'Stop Time',
+                        'flexible' => 'flexible',
+                        'passthrough' => 'passthrough',
+                        default => 'None',
+                    };
+                }),
             Tables\Columns\IconColumn::make('is_active')->label('Active'),
         ]);
     }

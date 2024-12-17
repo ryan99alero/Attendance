@@ -18,12 +18,16 @@ class AttendanceProcessingService
         $userService = new AttendanceCleansingUserService();
         $userService->processUserSchedulesWithinPayPeriod($payPeriod);
 
-        // Cleanse department schedules
+        // Cleanse group/department schedules
         $groupService = new AttendanceCleansingGroupService();
         $groupService->processDepartmentSchedulesWithinPayPeriod($payPeriod);
 
-        // Validate and process punches
+        // Validate attendance punches and prepare for migration
         $validationService = new PunchValidationService();
         $validationService->validatePunchesWithinPayPeriod($payPeriod);
+
+        // Migrate punches to the Punches table
+        $migrationService = new PunchMigrationService();
+        $migrationService->migratePunchesWithinPayPeriod($payPeriod);
     }
 }

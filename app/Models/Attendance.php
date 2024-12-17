@@ -26,7 +26,6 @@ class Attendance extends Model
         'is_manual',
         'created_by',
         'updated_by',
-        'is_migrated',
     ];
 
     /**
@@ -39,6 +38,8 @@ class Attendance extends Model
         'is_manual' => 'boolean',
         'is_migrated' => 'boolean',
     ];
+
+    protected $guarded = ['is_migrated'];
 
     /**
      * Accessor for `punch_time` to format it as `Y-m-d H:i` for display purposes.

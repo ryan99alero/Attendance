@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Punch extends Model
 {
-    use HasFactory;
 
     protected $fillable = [
         'employee_id',
@@ -30,7 +28,7 @@ class Punch extends Model
     /**
      * Automatically flag 'is_altered' when a record is updated.
      */
-    protected static function boot()
+    protected static function boot(): void
     {
         parent::boot();
 

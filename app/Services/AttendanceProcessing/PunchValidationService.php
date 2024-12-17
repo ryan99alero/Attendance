@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Services\AttendanceProcessing;
-
+use Illuminate\Support\Facades\DB;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 
@@ -35,10 +35,9 @@ class PunchValidationService
         })->toArray();
 
         // Insert punches into the punches table
-        \DB::table('punches')->insert($punches);
+        DB::table('punches')->insert($punches);
 
-        // Mark attendances as migrated
+        // Mark attendances as migrated by updating the status column
         $attendanceIds = $attendances->pluck('id')->toArray();
-        Attendance::whereIn('id', $attendanceIds)->update(['is_migrated' => true]);
-    }
+        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Migrated']);    }
 }

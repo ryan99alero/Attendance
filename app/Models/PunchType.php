@@ -12,6 +12,7 @@ class PunchType extends Model
     protected $fillable = [
         'name',
         'description',
+        'schedule_reference',
         'is_active',
         'created_by',
         'updated_by',

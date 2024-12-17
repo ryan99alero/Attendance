@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-//use App\Http\Controllers\PunchController;
+// use App\Http\Controllers\PunchController;
 
 // Route for the homepage
 Route::get('/', function () {
@@ -9,4 +9,4 @@ Route::get('/', function () {
 });
 
 // Route for punches
-// Route::get('/admin/punches', [PunchController::class, 'index'])->name('punches.index');
+//Route::get('/admin/punches', [PunchController::class, 'index'])->name('punches.index');

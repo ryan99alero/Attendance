@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Filament\Pages;
-
+use Illuminate\Support\Facades\DB;
 use Filament\Forms;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
@@ -17,7 +17,7 @@ class PunchSummary extends Page
     public $payPeriodId; // Bound to the select dropdown
     public $groupedPunches;
 
-    public function mount()
+    public function mount(): void
     {
         $this->payPeriodId = null; // Default to no filter
         $this->groupedPunches = $this->fetchPunches(); // Fetch punches initially
@@ -49,17 +49,17 @@ class PunchSummary extends Page
     {
         $query = Punch::select([
             'employee_id',
-            \DB::raw("DATE(punch_time) as punch_date"),
-            \DB::raw("
+            DB::raw("DATE(punch_time) as punch_date"),
+            DB::raw("
                 MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as ClockIn,
                 MAX(CASE WHEN punch_type_id = 8 THEN TIME(punch_time) END) as LunchStart,
                 MAX(CASE WHEN punch_type_id = 9 THEN TIME(punch_time) END) as LunchStop,
                 MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as ClockOut
             "),
         ])
-            ->groupBy('employee_id', \DB::raw('DATE(punch_time)'))
+            ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
             ->orderBy('employee_id')
-            ->orderBy(\DB::raw('DATE(punch_time)'));
+            ->orderBy(DB::raw('DATE(punch_time)'));
 
         if ($this->payPeriodId) {
             $query->where('pay_period_id', $this->payPeriodId);
@@ -68,7 +68,7 @@ class PunchSummary extends Page
         return $query->get();
     }
 
-    public function updatePunches()
+    public function updatePunches(): void
     {
         $this->groupedPunches = $this->fetchPunches();
     }

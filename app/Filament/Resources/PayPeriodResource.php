@@ -68,11 +68,11 @@ class PayPeriodResource extends Resource
                     ->label('View Punches')
                     ->color('secondary')
                     ->icon('heroicon-o-eye')
-                    ->url(fn ($record) => route('punches.index', ['pay_period_id' => $record->id])),
+                    ->url(fn ($record) => route('filament.admin.resources.punches.index', ['pay_period_id' => $record->id])),
             ]);
     }
 
-    public static function getPages(): array
+    public static function getPages (): array
     {
         return [
             'index' => Pages\ListPayPeriods::route('/'),
