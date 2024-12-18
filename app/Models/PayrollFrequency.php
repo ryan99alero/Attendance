@@ -6,6 +6,39 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $frequency_name Name of the payroll frequency
+ * @property int|null $weekly_day Day of the week for weekly payroll (0-6, Sun-Sat)
+ * @property int|null $semimonthly_first_day First fixed day of the month for semimonthly payroll
+ * @property int|null $semimonthly_second_day Second fixed day of the month for semimonthly payroll
+ * @property int|null $monthly_day Day of the month for monthly payroll
+ * @property int|null $created_by Foreign key to Users for record creator
+ * @property int|null $updated_by Foreign key to Users for last updater
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\User|null $creator
+ * @property-read string|null $monthly_description
+ * @property-read string|null $semimonthly_description
+ * @property-read string|null $weekly_day_name
+ * @property-read \App\Models\User|null $updater
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereCreatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereFrequencyName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereMonthlyDay($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereSemimonthlyFirstDay($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereSemimonthlySecondDay($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereUpdatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayrollFrequency whereWeeklyDay($value)
+ * @mixin \Eloquent
+ */
 class PayrollFrequency extends Model
 {
     use HasFactory;

@@ -2,6 +2,7 @@
 
 namespace App\Services\AttendanceProcessing;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
@@ -34,9 +35,7 @@ class AttendanceCleansingUserService
             } else {
                 Log::warning("No schedule for Employee ID: {$employeeId}");
                 foreach ($punches as $punch) {
-                    $punch->status = 'Partial';
-                    $punch->issue_notes = 'No schedule found';
-                    $punch->save();
+                    // Do nothing: Placeholder for future logic or intentional no-op
                 }
             }
         }
@@ -45,7 +44,7 @@ class AttendanceCleansingUserService
     /**
      * Process punches for an employee.
      *
-     * @param \Illuminate\Support\Collection $punches
+     * @param Collection $punches
      * @param ShiftSchedule $schedule
      * @return void
      */
@@ -74,7 +73,7 @@ class AttendanceCleansingUserService
                 // Mark odd punches as partial
                 foreach ($dailyPunches as $punch) {
                     $punch->status = 'Partial';
-                    $punch->issue_notes = 'Odd punch count. Assigned based on schedule.';
+                    $punch->issue_notes = 'Odd punch count. User Assigned based on schedule.';
                     $punch->save();
                 }
             }
@@ -97,49 +96,49 @@ class AttendanceCleansingUserService
 
                 $punch->punch_type_id = $this->getPunchTypeId($closestType);
                 $punch->status = 'Partial';
-                $punch->issue_notes = "Assigned: {$closestType} (Odd Punch)";
+                $punch->issue_notes = "Assigned: {$closestType}User (Odd Punch)";
                 $punch->save();
 
-                Log::info("Assigned {$closestType} to Record ID: {$punch->id} (Odd punch processing)");
+                Log::info("Assigned: User {$closestType} to Record ID: {$punch->id} (Odd punch processing)");
             }
         }
     }
     /**
      * Assign Clock In and Clock Out punches.
      *
-     * @param \Illuminate\Support\Collection $punches
+     * @param Collection $punches
      * @param bool $isOdd
      * @return void
      */
-    private function assignClockInAndClockOut($punches, bool $isOdd = false): void
+    private function assignClockInAndClockOut(Collection $punches, bool $isOdd = false): void
     {
         $firstPunch = $punches->first();
         $firstPunch->punch_type_id = $this->getPunchTypeId('Clock In');
-        $firstPunch->issue_notes = 'Assigned: Clock In';
+        $firstPunch->issue_notes = 'Assigned: User Clock In';
         $firstPunch->status = 'Complete';
         $firstPunch->save();
 
         if (!$isOdd && $punches->count() > 1) {
             $lastPunch = $punches->last();
             $lastPunch->punch_type_id = $this->getPunchTypeId('Clock Out');
-            $lastPunch->issue_notes = 'Assigned: Clock Out';
+            $lastPunch->issue_notes = 'Assigned: User Clock Out';
             $lastPunch->status = 'Complete';
             $lastPunch->save();
 
-            Log::info("Assigned Clock In to Record ID: {$firstPunch->id}, Clock Out to Record ID: {$lastPunch->id}");
+            Log::info("Assigned User Clock In to Record ID: {$firstPunch->id}, Clock Out to Record ID: {$lastPunch->id}");
         } else {
-            Log::info("Assigned Clock In to Record ID: {$firstPunch->id} for Odd punches.");
+            Log::info("Assigned User Clock In to Record ID: {$firstPunch->id} for Odd punches.");
         }
     }
 
     /**
      * Assign Lunch and Break punches.
      *
-     * @param \Illuminate\Support\Collection $punches
+     * @param Collection $punches
      * @param ShiftSchedule $schedule
      * @return void
      */
-    private function assignLunchAndBreakPairs($punches, $schedule): void
+    private function assignLunchAndBreakPairs(Collection $punches, ShiftSchedule $schedule): void
     {
         // Exclude the first (Clock In) and last (Clock Out) punches
         $remainingPairs = $punches->slice(1, -1)->chunk(2);
@@ -166,33 +165,33 @@ class AttendanceCleansingUserService
     /**
      * Assign a pair of punches with specified punch types.
      *
-     * @param \Illuminate\Support\Collection $pair
+     * @param Collection $pair
      * @param string $startType
      * @param string $stopType
      * @return void
      */
-    private function assignPunchTypePair($pair, $startType, $stopType): void
+    private function assignPunchTypePair(Collection $pair, string $startType, string $stopType): void
     {
         $pair->first()->punch_type_id = $this->getPunchTypeId($startType);
         $pair->last()->punch_type_id = $this->getPunchTypeId($stopType);
-        $pair->first()->issue_notes = "Assigned: {$startType}";
-        $pair->last()->issue_notes = "Assigned: {$stopType}";
+        $pair->first()->issue_notes = "Assigned: User{$startType}";
+        $pair->last()->issue_notes = "Assigned: User{$stopType}";
         $pair->first()->status = 'Complete';
         $pair->last()->status = 'Complete';
         $pair->first()->save();
         $pair->last()->save();
 
-        Log::info("Assigned {$startType} to Record ID: {$pair->first()->id}, {$stopType} to Record ID: {$pair->last()->id}");
+        Log::info("Assigned User{$startType} to Record ID: {$pair->first()->id}, {$stopType} to Record ID: {$pair->last()->id}");
     }
 
     /**
      * Find the closest pair of punches to a specific schedule time.
      *
-     * @param \Illuminate\Support\Collection $pairs
+     * @param Collection $pairs
      * @param string $scheduleTime
-     * @return \Illuminate\Support\Collection|null
+     * @return Collection|null
      */
-    private function findClosestPairToScheduleTime($pairs, $scheduleTime): ?\Illuminate\Support\Collection
+    private function findClosestPairToScheduleTime(Collection $pairs, string $scheduleTime): ?Collection
     {
         $lunchStartSeconds = strtotime($scheduleTime);
         $closestPair = null;

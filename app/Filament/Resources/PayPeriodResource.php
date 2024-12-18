@@ -41,12 +41,29 @@ class PayPeriodResource extends Resource
             TextColumn::make('start_date')
                 ->label('Start Date')
                 ->date(),
+
             TextColumn::make('end_date')
                 ->label('End Date')
                 ->date(),
+
             IconColumn::make('is_processed')
                 ->label('Processed')
                 ->boolean(),
+
+            TextColumn::make('attendanceIssuesCount')
+                ->label('Attendance Issues')
+                ->state(fn ($record) => $record->attendanceIssuesCount())
+                ->sortable()
+                ->url(fn ($record) => route('filament.admin.resources.attendances.index', [
+                    'filter_ids' => $record->attendanceIssues()->pluck('id')->implode(',')
+                ]), true) // Generate a URL with filter_ids query param
+                ->color('danger'),
+
+            TextColumn::make('punchCount')
+                ->label('Punch Count')
+                ->state(fn ($record) => $record->punchCount())
+                ->sortable()
+                ->color('success'),
         ])
             ->actions([
                 // Button to trigger AttendanceProcessingService
@@ -71,7 +88,6 @@ class PayPeriodResource extends Resource
                     ->url(fn ($record) => route('filament.admin.resources.punches.index', ['pay_period_id' => $record->id])),
             ]);
     }
-
     public static function getPages (): array
     {
         return [

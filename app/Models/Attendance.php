@@ -7,6 +7,47 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int|null $employee_id Foreign key to Employees
+ * @property int|null $device_id Foreign key to Devices
+ * @property string $punch_time
+ * @property bool $is_manual Indicates if the attendance was manually recorded
+ * @property int|null $created_by Foreign key to Users for record creator
+ * @property int|null $updated_by Foreign key to Users for last updater
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $issue_notes Notes or issues related to the attendance record
+ * @property string $status
+ * @property int|null $punch_type_id
+ * @property bool|null $is_migrated
+ * @property-read \App\Models\User|null $creator
+ * @property-read \App\Models\Device|null $device
+ * @property-read \App\Models\Employee|null $employee
+ * @property-read \App\Models\PunchType|null $punchType
+ * @property-read \App\Models\User|null $updater
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance byStatus(string $status)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereCreatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereDeviceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereEmployeeId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereIsManual($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereIsMigrated($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereIssueNotes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance wherePunchTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance wherePunchTypeId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereUpdatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance withinTimeRange(string $startTime, string $endTime)
+ * @mixin \Eloquent
+ */
 class Attendance extends Model
 {
     use HasFactory;

@@ -47,7 +47,8 @@ class AttendanceResource extends Resource
                 ->nullable()
                 ->searchable(),
             Toggle::make('is_manual')
-                ->label('Manually Recorded'),
+                ->label('Manually Recorded')
+                ->default(true), // Set the default value to true
             Select::make('status')
                 ->label('Status')
                 ->options(function () {
@@ -72,69 +73,77 @@ class AttendanceResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            TextColumn::make('employee.first_name')
-                ->label('Employee')
-                ->sortable()
-                ->searchable(),
+        return $table
+            ->modifyQueryUsing(function (\Illuminate\Database\Eloquent\Builder $query) {
+                // Check for 'filter_ids' in the request URL
+                if (request()->has('filter_ids')) {
+                    $ids = explode(',', request()->get('filter_ids'));
+                    $query->whereIn('id', $ids);
+                }
+            })
+            ->columns([
+                TextColumn::make('employee.first_name')
+                    ->label('Employee')
+                    ->sortable()
+                    ->searchable(),
 
-            TextColumn::make('device.device_name')
-                ->label('Device')
-                ->sortable()
-                ->searchable(),
+                TextColumn::make('device.device_name')
+                    ->label('Device')
+                    ->sortable()
+                    ->searchable(),
 
-            TextInputColumn::make('punch_time')
-                ->label('Punch Time')
-                ->rules(['required', 'date_format:Y-m-d H:i'])
-                ->placeholder('YYYY-MM-DD HH:MM')
-                ->sortable()
-                ->searchable()
-                ->extraAttributes(['class' => 'editable']),
+                TextInputColumn::make('punch_time')
+                    ->label('Punch Time')
+                    ->rules(['required', 'date_format:Y-m-d H:i'])
+                    ->placeholder('YYYY-MM-DD HH:MM')
+                    ->sortable()
+                    ->searchable()
+                    ->extraAttributes(['class' => 'editable']),
 
-            SelectColumn::make('punch_type_id')
-                ->label('Punch Type')
-                ->options(PunchType::pluck('name', 'id')->toArray())
-                ->sortable()
-                ->searchable()
-                ->extraAttributes(['class' => 'editable']),
+                SelectColumn::make('punch_type_id')
+                    ->label('Punch Type')
+                    ->options(PunchType::pluck('name', 'id')->toArray())
+                    ->sortable()
+                    ->searchable()
+                    ->extraAttributes(['class' => 'editable']),
 
-            SelectColumn::make('status')
-                ->label('Status')
-                ->options(function () {
-                    $type = DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
+                SelectColumn::make('status')
+                    ->label('Status')
+                    ->options(function () {
+                        $type = DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
 
-                    preg_match('/^enum\((.*)\)$/', $type, $matches);
-                    $enumOptions = array_map(function ($value) {
-                        return trim($value, "'");
-                    }, explode(',', $matches[1]));
+                        preg_match('/^enum\((.*)\)$/', $type, $matches);
+                        $enumOptions = array_map(function ($value) {
+                            return trim($value, "'");
+                        }, explode(',', $matches[1]));
 
-                    return array_combine($enumOptions, $enumOptions);
-                })
-                ->sortable()
-                ->searchable()
-                ->extraAttributes(['class' => 'editable']),
+                        return array_combine($enumOptions, $enumOptions);
+                    })
+                    ->sortable()
+                    ->searchable()
+                    ->extraAttributes(['class' => 'editable']),
 
-            TextInputColumn::make('issue_notes')
-                ->label('Issue Notes')
-                ->placeholder('Enter notes...')
-                ->sortable()
-                ->searchable()
-                ->extraAttributes(['class' => 'editable']),
+                TextInputColumn::make('issue_notes')
+                    ->label('Issue Notes')
+                    ->placeholder('Enter notes...')
+                    ->sortable()
+                    ->searchable()
+                    ->extraAttributes(['class' => 'editable']),
 
-            IconColumn::make('is_manual')
-                ->label('Manual Entry')
-                ->boolean(),
+                IconColumn::make('is_manual')
+                    ->label('Manual Entry')
+                    ->boolean(),
 
-            IconColumn::make('is_migrated')
-                ->label('Migrated')
-                ->boolean()
-                ->trueIcon('heroicon-s-check-circle')
-                ->falseIcon('heroicon-s-x-circle')
-                ->colors([
-                    'success' => true,
-                    'danger' => false,
-                ]),
-        ]);
+                IconColumn::make('is_migrated')
+                    ->label('Migrated')
+                    ->boolean()
+                    ->trueIcon('heroicon-s-check-circle')
+                    ->falseIcon('heroicon-s-x-circle')
+                    ->colors([
+                        'success' => true,
+                        'danger' => false,
+                    ]),
+            ]);
     }
 
     public static function getPages(): array

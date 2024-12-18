@@ -5,6 +5,35 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int $employee_id Foreign key to Employees
+ * @property int $hours_worked Total hours worked
+ * @property int $overtime_hours Total overtime hours
+ * @property int $leave_days Total leave days
+ * @property int|null $created_by Foreign key to Users for record creator
+ * @property int|null $updated_by Foreign key to Users for last updater
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\User|null $creator
+ * @property-read \App\Models\Employee $employee
+ * @property-read \App\Models\User|null $updater
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereCreatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereEmployeeId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereHoursWorked($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereLeaveDays($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereOvertimeHours($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|EmployeeStat whereUpdatedBy($value)
+ * @mixin \Eloquent
+ */
 class EmployeeStat extends Model
 {
     use HasFactory;

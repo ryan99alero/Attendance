@@ -20,7 +20,7 @@ class AttendanceProcessingService
 
         // Cleanse group/department schedules
         $groupService = new AttendanceCleansingGroupService();
-        $groupService->processDepartmentSchedulesWithinPayPeriod($payPeriod);
+        $groupService->processGroupSchedulesWithinPayPeriod($payPeriod);
 
         // Validate attendance punches and prepare for migration
         $validationService = new PunchValidationService();
