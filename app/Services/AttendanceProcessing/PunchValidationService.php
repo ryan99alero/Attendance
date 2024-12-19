@@ -39,5 +39,5 @@ class PunchValidationService
 
         // Mark attendances as migrated by updating the status column
         $attendanceIds = $attendances->pluck('id')->toArray();
-        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Migrated']);    }
+        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Migrated']);                                                                                                                                                                      }
 }

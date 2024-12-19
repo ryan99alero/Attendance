@@ -80,6 +80,26 @@ class PayPeriodResource extends Resource
                             ->body("$count attendance records have been moved to the punches table.");
                     }),
 
+                // Button to process vacation records
+                Action::make('process_vacation')
+                    ->label('Process Vacation')
+                    ->color('success')
+                    ->icon('heroicon-o-calendar')
+                    ->action(function ($record) {
+                        // Ensure start_date and end_date are strings
+                        $startDate = $record->start_date->format('Y-m-d H:i:s'); // Full timestamp format
+                        $endDate = $record->end_date->format('Y-m-d H:i:s'); // Full timestamp format
+
+                        // Call the service
+                        $service = app(\App\Services\AttendanceProcessing\VacationTimeProcessAttendanceService::class);
+                        $service->processVacationDays($startDate, $endDate);
+
+                        return \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Vacation Processed')
+                            ->body("Vacation records have been successfully processed for Pay Period ID: {$record->id}");
+                    }),
+
                 // Button to view punches for the PayPeriod
                 Action::make('view_punches')
                     ->label('View Punches')
@@ -88,7 +108,8 @@ class PayPeriodResource extends Resource
                     ->url(fn ($record) => route('filament.admin.resources.punches.index', ['pay_period_id' => $record->id])),
             ]);
     }
-    public static function getPages (): array
+
+    public static function getPages(): array
     {
         return [
             'index' => Pages\ListPayPeriods::route('/'),

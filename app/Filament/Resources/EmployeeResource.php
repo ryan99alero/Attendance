@@ -69,6 +69,12 @@ class EmployeeResource extends Resource
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
+            Toggle::make('full_time')
+                ->label('Full Time')
+                ->default(false),
+            Toggle::make('vacation_pay')
+                ->label('Vacation Pay')
+                ->default(false),
             Select::make('rounding_method')
                 ->label('Rounding Method')
                 ->options(RoundingRule::all()->pluck('name', 'id'))

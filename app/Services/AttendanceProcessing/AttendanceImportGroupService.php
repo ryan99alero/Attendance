@@ -10,7 +10,7 @@ use App\Models\ShiftSchedule;
 use App\Models\Employee;
 use Illuminate\Support\Facades\Log;
 
-class AttendanceCleansingGroupService
+class AttendanceImportGroupService
 {
     /**
      * Process attendance records for employees under group schedules.

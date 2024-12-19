@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Forms\Get;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\TextInput;
 use App\Filament\Resources\VacationCalendarResource\Pages;
 use App\Models\VacationCalendar;
 use Filament\Forms;
@@ -9,6 +12,8 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+
+
 
 class VacationCalendarResource extends Resource
 {
@@ -20,19 +25,39 @@ class VacationCalendarResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
+            Forms\Components\Grid::make(3)
+                ->schema([
+                    Forms\Components\Toggle::make('is_active')
+                        ->label('Active')
+                        ->live()
+                        ->columnSpan(0)
+                        ->default(true),
+                    Forms\Components\Toggle::make('is_half_day')
+                        ->label('Half Day')
+                        ->live()
+                        ->columnSpan(0)
+                        ->default(false),
+                    Forms\Components\Toggle::make('vacation_pay')
+                        ->label('Group Vacation')
+                        ->columnSpan(0)
+                        ->live()
+                        ->default(false)
+                ]),
             Forms\Components\Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
+                ->required()
+                ->preload()
+                ->searchable()
+                ->hidden(
+                    fn ($get): bool => $get('vacation_pay') == true),
+            Forms\Components\DatePicker::make('start_date')
+                ->label('Start Date')
                 ->required(),
-            Forms\Components\DatePicker::make('vacation_date')
-                ->label('Vacation Date')
-                ->required(),
-            Forms\Components\Toggle::make('is_half_day')
-                ->label('Half Day')
-                ->default(false),
-            Forms\Components\Toggle::make('is_active')
-                ->label('Active')
-                ->default(true),
+            Forms\Components\DatePicker::make('end_date')
+                ->label('End Date')
+                ->required()
+                ->afterOrEqual('start_date'),
         ]);
     }
 
@@ -41,8 +66,18 @@ class VacationCalendarResource extends Resource
         return $table->columns([
             Tables\Columns\TextColumn::make('employee.first_name')->label('Employee'),
             Tables\Columns\TextColumn::make('vacation_date')->label('Vacation Date'),
-            Tables\Columns\IconColumn::make('is_half_day')->label('Half Day'),
-            Tables\Columns\IconColumn::make('is_active')->label('Active'),
+            Tables\Columns\IconColumn::make('is_half_day')
+                ->label('Half Day')
+                ->boolean(),
+            Tables\Columns\IconColumn::make('is_active')
+                ->label('Active')
+                ->boolean(),
+            Tables\Columns\IconColumn::make('is_recorded')
+                ->label('Time Recorded')
+                ->boolean(),
+            Tables\Columns\IconColumn::make('employee.vacation_pay')
+                ->label('Group Entry')
+                ->boolean(),
         ]);
     }
 

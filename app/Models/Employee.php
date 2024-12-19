@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $first_name First name of the employee
@@ -92,6 +92,8 @@ class Employee extends Model
         'payroll_frequency_id',
         'termination_date',
         'is_active',
+        'full_time',
+        'vacation_pay',
         'created_by',
         'updated_by',
     ];
@@ -104,6 +106,9 @@ class Employee extends Model
     protected $casts = [
         'termination_date' => 'date',
         'is_active' => 'boolean',
+        'full_time' => 'boolean',
+        'vacation_pay' => 'boolean',
+
     ];
 
     /**

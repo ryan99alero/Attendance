@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employees
@@ -93,9 +94,26 @@ class Attendance extends Model
     /**
      * Mutator for `punch_time` to ensure it is saved in full datetime format.
      */
+    /**
+     * Mutator for `punch_time` to ensure it is saved in full datetime format.
+     */
+    /**
+     * Mutator for `punch_time` to ensure it is saved in full datetime format.
+     */
     public function setPunchTimeAttribute($value): void
     {
-        $this->attributes['punch_time'] = Carbon::parse($value)->format('Y-m-d H:i:s');
+        try {
+            // Only parse and set if $value is not null and is a valid date
+            if (!empty($value)) {
+                $this->attributes['punch_time'] = Carbon::parse($value)->format('Y-m-d H:i:s');
+            } else {
+                $this->attributes['punch_time'] = null; // Set null if $value is invalid
+            }
+        } catch (\Exception $e) {
+            // Log the invalid value for debugging purposes
+            Log::error("Invalid punch_time value: " . json_encode($value) . ". Error: " . $e->getMessage());
+            $this->attributes['punch_time'] = null; // Gracefully handle the error
+        }
     }
 
     /**

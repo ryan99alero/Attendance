@@ -9,7 +9,7 @@ use App\Models\PayPeriod;
 use App\Models\ShiftSchedule;
 use Illuminate\Support\Facades\Log;
 
-class AttendanceCleansingUserService
+class AttendanceImportUserService
 {
     /**
      * Process attendance records for employees with unique schedules.
