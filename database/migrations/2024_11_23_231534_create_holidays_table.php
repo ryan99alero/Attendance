@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('is_recurring')->default(false)->comment('Indicates if the holiday recurs annually');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and last update');
+            $table->timestamps();
 
             // Indexes for optimization
             $table->index(['start_date', 'end_date'], 'idx_holiday_dates')->comment('Index for optimizing queries on holiday date range');

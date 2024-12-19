@@ -22,7 +22,7 @@ return new class extends Migration
             $table->boolean('is_recorded')->default(false)->comment('Indicates if this vacation has been recorded in the Attendance table');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and updates');
+            $table->timestamps();
 
             // Foreign key constraints
             $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade')->comment('References the employees table');

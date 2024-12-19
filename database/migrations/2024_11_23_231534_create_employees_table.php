@@ -12,6 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::create('employees', function (Blueprint $table) {
             $table->id()->comment('Primary key of the employees table');
             $table->string('first_name', 50)->comment('First name of the employee');
@@ -23,8 +24,8 @@ return new class extends Migration
             $table->string('country', 255)->nullable()->comment('Country of residence of the employee');
             $table->string('phone', 15)->nullable()->comment('Contact phone number of the employee');
             $table->string('external_id', 255)->nullable()->comment('External system identifier for the employee');
-            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing departments table');
-            $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing shifts table');
+            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing the departments table');
+            $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing the shifts table');
             $table->enum('rounding_method', ['1_minute', '5_minute', '6_minute', '7_minute', '10_minute', '15_minute'])
                 ->nullable()
                 ->comment('Rounding method for time calculations');
@@ -35,13 +36,11 @@ return new class extends Migration
             $table->boolean('vacation_pay')->default(false)->comment('Indicates if the employee is eligible for vacation pay');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and last update');
-            $table->unsignedBigInteger('payroll_frequency_id')->nullable()->comment('Foreign key referencing payroll frequencies table');
+            $table->timestamps();
+            $table->unsignedBigInteger('payroll_frequency_id')->nullable()->comment('Foreign key referencing the payroll frequencies table');
             $table->string('full_names', 101)->nullable()->comment('Concatenated full name of the employee');
-            $table->unsignedBigInteger('shift_schedule_id')->nullable()->comment('Foreign key referencing shift schedules table');
-            $table->unsignedInteger('round_group_id')->nullable()->comment('Foreign key referencing round groups table');
-
-            $table->primary('id')->comment('Defines the primary key of the employees table');
+            $table->unsignedBigInteger('shift_schedule_id')->nullable()->comment('Foreign key referencing the shift schedules table');
+            $table->unsignedBigInteger('round_group_id')->nullable()->comment('Foreign key referencing the round_groups table');
 
             // Foreign key constraints
             $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null')->comment('Relationship with departments');
@@ -51,6 +50,10 @@ return new class extends Migration
             $table->foreign('payroll_frequency_id')->references('id')->on('payroll_frequencies')->onDelete('set null')->comment('Relationship with payroll frequencies');
             $table->foreign('shift_schedule_id')->references('id')->on('shift_schedules')->onDelete('set null')->comment('Relationship with shift schedules');
             $table->foreign('round_group_id')->references('id')->on('round_groups')->onDelete('set null')->onUpdate('cascade')->comment('Relationship with round groups');
+
+            // Indexes for optimization
+            $table->index(['first_name', 'last_name'], 'idx_employee_name')->comment('Index for optimizing queries by employee name');
+            $table->index('department_id', 'idx_department_id')->comment('Index for optimizing queries by department');
         });
 
         // Add triggers for full_names
@@ -75,6 +78,7 @@ return new class extends Migration
                 );
             END;
         ");
+        Schema::enableForeignKeyConstraints();
     }
 
     /**

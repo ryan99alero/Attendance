@@ -23,7 +23,7 @@ return new class extends Migration
             $table->integer('grace_period')->default(15)->comment('Allowed grace period in minutes for lateness');
             $table->boolean('is_active')->default(true)->comment('Indicates if the schedule is active');
             $table->text('notes')->nullable()->comment('Additional notes for the schedule');
-            $table->timestamps()->comment('Timestamps for record creation and updates');
+            $table->timestamps();
 
             // Foreign key columns
             $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key referencing the employees table');

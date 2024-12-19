@@ -25,7 +25,7 @@ return new class extends Migration
             $table->boolean('is_late')->default(false)->comment('Indicates if the punch is considered late');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and updates');
+            $table->timestamps();
 
             // Indexes for optimization
             $table->index('employee_id', 'idx_employee_id')->comment('Index for optimizing queries by employee ID');

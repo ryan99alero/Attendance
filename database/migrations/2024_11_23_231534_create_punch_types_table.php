@@ -33,7 +33,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true)->comment('Indicates if the punch type is currently active');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and updates');
+            $table->timestamps();
 
             // Foreign key constraints
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null')->comment('References the users table for the record creator');

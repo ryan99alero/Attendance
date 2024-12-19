@@ -27,7 +27,7 @@ return new class extends Migration
             $table->boolean('is_migrated')->storedAs("`status` = 'Migrated'")->comment('Indicates if the attendance record is marked as migrated');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and updates');
+            $table->timestamps();
 
             // Indexes for optimization
             $table->index('punch_time', 'idx_punch_time')->comment('Index for optimizing queries on punch time');

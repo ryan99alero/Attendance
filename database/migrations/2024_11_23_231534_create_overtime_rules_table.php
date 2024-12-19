@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('applies_on_weekends')->default(false)->comment('Indicates if the rule applies to work done on weekends');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
-            $table->timestamps()->comment('Timestamps for record creation and last update');
+            $table->timestamps();
 
             // Indexes for optimization
             $table->index('hours_threshold', 'idx_hours_threshold')->comment('Index for queries involving hours threshold');
