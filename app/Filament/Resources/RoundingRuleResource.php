@@ -24,19 +24,34 @@ class RoundingRuleResource extends Resource
                 Forms\Components\TextInput::make('id')
                     ->disabled()
                     ->label('ID'),
-                Forms\Components\TextInput::make('name')
+                Forms\Components\TextInput::make('rule_name')
                     ->required()
                     ->maxLength(50)
                     ->label('Name'),
-                Forms\Components\TextInput::make('minute_min')
+                Forms\Components\TextInput::make('lower_limit')
                     ->numeric()
-                    ->label('Minimum Minute'),
-                Forms\Components\TextInput::make('minute_max')
+                    ->required()
+                    ->label('Start Minute (Lower Limit)'),
+                Forms\Components\TextInput::make('upper_limit')
                     ->numeric()
-                    ->label('Maximum Minute'),
-                Forms\Components\TextInput::make('new_minute')
+                    ->required()
+                    ->label('End Minute (Upper Limit)'),
+                Forms\Components\TextInput::make('rounded_value')
                     ->numeric()
-                    ->label('New Minute'),
+                    ->required()
+                    ->label('Rounded Minute'),
+                Forms\Components\TextInput::make('interval_minutes')
+                    ->numeric()
+                    ->required()
+                    ->label('Interval Minutes'),
+                Forms\Components\Select::make('apply_to')
+                    ->options([
+                        'check_in' => 'Check In',
+                        'check_out' => 'Check Out',
+                        'both' => 'Both',
+                    ])
+                    ->required()
+                    ->label('Applies To'),
                 Forms\Components\Select::make('created_by')
                     ->relationship('creator', 'name')
                     ->disabled()
@@ -59,10 +74,12 @@ class RoundingRuleResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('ID'),
-                Tables\Columns\TextColumn::make('name')->label('Name'),
-                Tables\Columns\TextColumn::make('minute_min')->label('Minimum Minute'),
-                Tables\Columns\TextColumn::make('minute_max')->label('Maximum Minute'),
-                Tables\Columns\TextColumn::make('new_minute')->label('New Minute'),
+                Tables\Columns\TextColumn::make('rule_name')->label('Name'),
+                Tables\Columns\TextColumn::make('lower_limit')->label('Start Minute (Lower Limit)'),
+                Tables\Columns\TextColumn::make('upper_limit')->label('End Minute (Upper Limit)'),
+                Tables\Columns\TextColumn::make('rounded_value')->label('Rounded Minute'),
+                Tables\Columns\TextColumn::make('interval_minutes')->label('Interval Minutes'),
+                Tables\Columns\TextColumn::make('apply_to')->label('Applies To'),
             ])
             ->filters([
                 // Add specific filters if needed

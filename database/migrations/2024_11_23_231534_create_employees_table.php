@@ -13,39 +13,49 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('employees', function (Blueprint $table) {
-            $table->id();
+            $table->id()->comment('Primary key of the employees table');
             $table->string('first_name', 50)->comment('First name of the employee');
             $table->string('last_name', 50)->comment('Last name of the employee');
-            $table->string('full_names', 101)->comment('Full name as a combination of first and last name');
-            $table->string('address', 255)->nullable()->comment('Employee address');
-            $table->string('city', 255)->nullable()->comment('City of the employee');
-            $table->string('state', 255)->nullable()->comment('State of the employee');
-            $table->string('zip', 255)->nullable()->comment('ZIP code of the employee');
-            $table->string('country', 255)->nullable()->comment('Country of the employee');
-            $table->string('phone', 15)->nullable()->comment('Phone number of the employee');
-            $table->string('external_id', 255)->nullable()->comment('External ID of the employee');
-            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key to Departments');
-            $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key to Shifts');
-            $table->unsignedBigInteger('rounding_method')->nullable()->comment('Foreign key to Rounding Rules');
-            $table->unsignedBigInteger('payroll_frequency_id')->nullable()->comment('Foreign key to Payroll Frequencies'); // Retained
-            $table->date('termination_date')->nullable()->comment('Termination date of the employee'); // Retained
-            $table->boolean('is_active')->default(true)->comment('Indicates if the employee is active');
-            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
-            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');
-            $table->timestamps();
+            $table->string('address', 255)->nullable()->comment('Residential address of the employee');
+            $table->string('city', 255)->nullable()->comment('City of residence of the employee');
+            $table->string('state', 255)->nullable()->comment('State of residence of the employee');
+            $table->string('zip', 255)->nullable()->comment('ZIP or postal code of the employee');
+            $table->string('country', 255)->nullable()->comment('Country of residence of the employee');
+            $table->string('phone', 15)->nullable()->comment('Contact phone number of the employee');
+            $table->string('external_id', 255)->nullable()->comment('External system identifier for the employee');
+            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing departments table');
+            $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing shifts table');
+            $table->enum('rounding_method', ['1_minute', '5_minute', '6_minute', '7_minute', '10_minute', '15_minute'])
+                ->nullable()
+                ->comment('Rounding method for time calculations');
+            $table->string('photograph', 255)->nullable()->comment('Path or URL of the employee photograph');
+            $table->date('termination_date')->nullable()->comment('Date of termination, if applicable');
+            $table->boolean('is_active')->default(true)->comment('Indicates if the employee is currently active');
+            $table->boolean('full_time')->default(false)->comment('Indicates if the employee is a full-time worker');
+            $table->boolean('vacation_pay')->default(false)->comment('Indicates if the employee is eligible for vacation pay');
+            $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
+            $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
+            $table->timestamps()->comment('Timestamps for record creation and last update');
+            $table->unsignedBigInteger('payroll_frequency_id')->nullable()->comment('Foreign key referencing payroll frequencies table');
+            $table->string('full_names', 101)->nullable()->comment('Concatenated full name of the employee');
+            $table->unsignedBigInteger('shift_schedule_id')->nullable()->comment('Foreign key referencing shift schedules table');
+            $table->unsignedInteger('round_group_id')->nullable()->comment('Foreign key referencing round groups table');
+
+            $table->primary('id')->comment('Defines the primary key of the employees table');
 
             // Foreign key constraints
-            $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null');
-            $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('set null');
-            $table->foreign('rounding_method')->references('id')->on('rounding_rules')->onDelete('set null');
-            $table->foreign('payroll_frequency_id')->references('id')->on('payroll_frequencies')->onDelete('set null'); // Retained
-            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
-            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null')->comment('Relationship with departments');
+            $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('set null')->comment('Relationship with shifts');
+            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null')->comment('User who created the record');
+            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null')->comment('User who last updated the record');
+            $table->foreign('payroll_frequency_id')->references('id')->on('payroll_frequencies')->onDelete('set null')->comment('Relationship with payroll frequencies');
+            $table->foreign('shift_schedule_id')->references('id')->on('shift_schedules')->onDelete('set null')->comment('Relationship with shift schedules');
+            $table->foreign('round_group_id')->references('id')->on('round_groups')->onDelete('set null')->onUpdate('cascade')->comment('Relationship with round groups');
         });
 
         // Add triggers for full_names
         DB::unprepared("
-            CREATE TRIGGER insert_full_names
+            CREATE TRIGGER insert_full_name
             BEFORE INSERT ON employees
             FOR EACH ROW
             BEGIN
@@ -55,7 +65,7 @@ return new class extends Migration
                 );
             END;
 
-            CREATE TRIGGER update_full_names
+            CREATE TRIGGER update_full_name
             BEFORE UPDATE ON employees
             FOR EACH ROW
             BEGIN
@@ -73,8 +83,8 @@ return new class extends Migration
     public function down(): void
     {
         // Drop triggers first
-        DB::unprepared("DROP TRIGGER IF EXISTS insert_full_names;");
-        DB::unprepared("DROP TRIGGER IF EXISTS update_full_names;");
+        DB::unprepared("DROP TRIGGER IF EXISTS insert_full_name;");
+        DB::unprepared("DROP TRIGGER IF EXISTS update_full_name;");
 
         Schema::dropIfExists('employees');
     }

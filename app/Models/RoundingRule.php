@@ -6,13 +6,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $name Name of the rounding rule
- * @property int|null $minute_min Minimum minute value for the rounding range
- * @property int|null $minute_max Maximum minute value for the rounding range
- * @property int|null $new_minute New minute value after rounding
+ * @property int|null $lower_limit Start minute of the rounding range
+ * @property int|null $upper_limit End minute of the rounding range
+ * @property int|null $rounded_value Minute value after rounding
+ * @property int|null $interval_minutes Rounding interval in minutes (e.g., 5, 6, 15)
+ * @property string|null $apply_to Where the rule applies (check_in, check_out, or both)
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -25,10 +27,12 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereCreatedBy($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereMinuteMax($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereMinuteMin($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereLowerLimit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereUpperLimit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereRoundedValue($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereIntervalMinutes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereApplyTo($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereNewMinute($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereUpdatedBy($value)
  * @mixin \Eloquent
@@ -38,18 +42,22 @@ class RoundingRule extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
-        'minute_min',
-        'minute_max',
-        'new_minute',
+        'rule_name',
+        'lower_limit',
+        'upper_limit',
+        'rounded_value',
+        'interval_minutes',
+        'apply_to',
         'created_by',
         'updated_by',
     ];
 
     protected $casts = [
-        'minute_min' => 'integer',
-        'minute_max' => 'integer',
-        'new_minute' => 'integer',
+        'lower_limit' => 'integer',
+        'upper_limit' => 'integer',
+        'rounded_value' => 'integer',
+        'interval_minutes' => 'integer',
+        'apply_to' => 'string',
     ];
 
     public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo

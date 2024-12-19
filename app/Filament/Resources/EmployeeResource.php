@@ -66,6 +66,11 @@ class EmployeeResource extends Resource
                 ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
                 ->nullable()
                 ->searchable(),
+            Select::make('round_group_id')
+                ->label('Rounding Group')
+                ->relationship('roundGroup', 'group_name') // 'roundGroup' refers to the method in the model
+                ->nullable()
+                ->searchable(),
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
@@ -75,10 +80,6 @@ class EmployeeResource extends Resource
             Toggle::make('vacation_pay')
                 ->label('Vacation Pay')
                 ->default(false),
-            Select::make('rounding_method')
-                ->label('Rounding Method')
-                ->options(RoundingRule::all()->pluck('name', 'id'))
-                ->nullable(),
             DatePicker::make('termination_date')
                 ->label('Termination Date')
                 ->nullable(),
@@ -109,13 +110,10 @@ class EmployeeResource extends Resource
 
     public static function saving($employee): void
     {
-        // Ensure the association between employee and user is updated
         if ($employee->user_id) {
-            // Clear any previous associations with this employee
             User::query()->where('employee_id', $employee->id)
                 ->update(['employee_id' => null]);
 
-            // Set the new association
             User::query()->where('id', $employee->user_id)
                 ->update(['employee_id' => $employee->id]);
         }
