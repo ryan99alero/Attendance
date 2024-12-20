@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
 use App\Models\Employee;
+use App\Exports\DataExport; // Add this for Export
+use App\Imports\DataImport; // Add this for Import
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Select;
@@ -13,6 +15,8 @@ use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Actions\Action; // Import Action
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
@@ -85,7 +89,25 @@ class UserResource extends Resource
             IconColumn::make('is_manager')
                 ->label('Manager')
                 ->boolean(),
-        ]);
+        ])
+            ->actions([
+                Action::make('Export Users')
+                    ->label('Export')
+                    ->action(function () {
+                        return Excel::download(new DataExport(Employee::class), 'users.xlsx');
+                    }),
+                Action::make('Import Users')
+                    ->label('Import')
+                    ->form([
+                        FileUpload::make('file')
+                            ->label('Import File')
+                            ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
+                            ->required(),
+                    ])
+                    ->action(function ($data) {
+                        Excel::import(new DataImport(Employee::class), $data['file']);
+                    }),
+            ]);
     }
 
     /**

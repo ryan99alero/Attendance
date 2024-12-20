@@ -13,11 +13,10 @@ use Filament\Tables\Table;
 class PunchTypeResource extends Resource
 {
     protected static ?string $model = PunchType::class;
-    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-tag';
     protected static ?string $navigationLabel = 'Punch Types';
 
-    public static function form(Form $form): Form
+    public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
             Forms\Components\TextInput::make('name')
@@ -33,11 +32,11 @@ class PunchTypeResource extends Resource
                     'lunch_start' => 'Lunch Start',
                     'lunch_stop' => 'Lunch Stop',
                     'stop_time' => 'Stop Time',
-                    'flexible' => 'flexible',
-                    'passthrough' => 'passthrough',
+                    'flexible' => 'Flexible',
+                    'passthrough' => 'Passthrough',
                 ])
                 ->nullable()
-                ->searchable(), // Optional: make the dropdown searchable
+                ->searchable(),
             Forms\Components\Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
@@ -52,14 +51,13 @@ class PunchTypeResource extends Resource
             Tables\Columns\TextColumn::make('schedule_reference')
                 ->label('Schedule')
                 ->formatStateUsing(function ($state) {
-                    // Format the value to display user-friendly text
                     return match ($state) {
                         'start_time' => 'Start Time',
                         'lunch_start' => 'Lunch Start',
                         'lunch_stop' => 'Lunch Stop',
                         'stop_time' => 'Stop Time',
-                        'flexible' => 'flexible',
-                        'passthrough' => 'passthrough',
+                        'flexible' => 'Flexible',
+                        'passthrough' => 'Passthrough',
                         default => 'None',
                     };
                 }),

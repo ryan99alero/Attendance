@@ -4,25 +4,21 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
-use App\Models\RoundingRule;
 use App\Models\Department;
 use App\Models\PayrollFrequency;
-use App\Models\ShiftSchedule;
-use App\Models\User;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
-    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
     protected static ?string $navigationLabel = 'Employees';
 
@@ -66,11 +62,6 @@ class EmployeeResource extends Resource
                 ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
                 ->nullable()
                 ->searchable(),
-            Select::make('round_group_id')
-                ->label('Rounding Group')
-                ->relationship('roundGroup', 'group_name') // 'roundGroup' refers to the method in the model
-                ->nullable()
-                ->searchable(),
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
@@ -88,35 +79,25 @@ class EmployeeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            TextColumn::make('full_names')
-                ->label('Name')
-                ->sortable()
-                ->searchable(),
-            TextColumn::make('department.name')
-                ->label('Department')
-                ->sortable(),
-            TextColumn::make('payrollFrequency.frequency_name')
-                ->label('Payroll Frequency')
-                ->sortable(),
-            TextColumn::make('termination_date')
-                ->label('Termination Date')
-                ->date(),
-            IconColumn::make('is_active')
-                ->label('Active')
-                ->boolean(),
-        ]);
-    }
-
-    public static function saving($employee): void
-    {
-        if ($employee->user_id) {
-            User::query()->where('employee_id', $employee->id)
-                ->update(['employee_id' => null]);
-
-            User::query()->where('id', $employee->user_id)
-                ->update(['employee_id' => $employee->id]);
-        }
+        return $table
+            ->columns([
+                TextColumn::make('full_names')
+                    ->label('Name')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('department.name')
+                    ->label('Department')
+                    ->sortable(),
+                TextColumn::make('payrollFrequency.frequency_name')
+                    ->label('Payroll Frequency')
+                    ->sortable(),
+                TextColumn::make('termination_date')
+                    ->label('Termination Date')
+                    ->date(),
+                IconColumn::make('is_active')
+                    ->label('Active')
+                    ->boolean(),
+            ]);
     }
 
     public static function getPages(): array
