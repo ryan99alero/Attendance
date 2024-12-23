@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Carbon\Carbon;
 
 class DataImport implements ToCollection, WithHeadingRow
 {
@@ -46,6 +47,16 @@ class DataImport implements ToCollection, WithHeadingRow
 
         foreach ($collection as $index => $row) {
             Log::info("Processing raw row {$index}: ", $row->toArray());
+
+            // Standardize the punch_time field
+            if (isset($row['punch_time'])) {
+                try {
+                    $row['punch_time'] = $this->parseDateTime($row['punch_time']);
+                } catch (\Exception $e) {
+                    Log::error("Failed to parse punch_time for row {$index}: " . $row['punch_time']);
+                    continue; // Skip this row
+                }
+            }
 
             $data = array_intersect_key($row->toArray(), array_flip((new $this->modelClass())->getFillable()));
             Log::info("Filtered data for row {$index}: ", $data);
@@ -95,6 +106,41 @@ class DataImport implements ToCollection, WithHeadingRow
         }
 
         Log::info("TACO10: Import completed for model: {$this->modelClass}");
+    }
+
+    /**
+     * Parse and standardize the date and time.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function parseDateTime($value): string
+    {
+        // Handle Excel serial date format (numeric values)
+        if (is_numeric($value)) {
+            return Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value))
+                ->format('Y-m-d H:i');
+        }
+
+        // Define acceptable formats
+        $formats = [
+            'Y-m-d H:i', // 2024-12-20 08:12
+            'm/d/Y g:i A', // 12/20/2024 8:12 AM
+            'm/d/Y H:i:s', // 12/20/2024 08:12:00
+            'Y-m-d', // 2024-12-20
+            'm/d/Y', // 12/20/2024
+        ];
+
+        foreach ($formats as $format) {
+            try {
+                $date = Carbon::createFromFormat($format, $value);
+                return $date->format('Y-m-d H:i'); // Standardize to this format
+            } catch (\Exception $e) {
+                // Continue to next format
+            }
+        }
+
+        throw new \Exception("Invalid date format: {$value}");
     }
 
     /**
