@@ -13,7 +13,7 @@ class AttendanceSummary extends Page
     protected static ?string $navigationIcon = 'heroicon-o-table';
     protected static string $view = 'filament.pages.attendance-summary';
     protected static ?string $navigationLabel = 'Attendance Summary';
-
+    protected static bool $shouldRegisterNavigation = false;
     public $payPeriodId; // Bound to the select dropdown
     public $groupedAttendances;
 

@@ -49,12 +49,18 @@ class Employee extends Model
         'phone',
         'external_id',
         'department_id',
+        'shift_id',
         'round_group_id',
-        'payroll_frequency_id',
+        'photograph',
         'termination_date',
         'is_active',
         'full_time',
         'vacation_pay',
+        'created_at',
+        'updated_at',
+        'payroll_frequency_id',
+        'full_names',
+        'shift_schedule_id',
     ];
 
     protected $casts = [

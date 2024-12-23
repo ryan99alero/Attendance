@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $name Department name
@@ -46,6 +46,7 @@ class Department extends Model
     protected $fillable = [
         'name',
         'manager_id',
+        'external_department_id',
         'created_by',
         'updated_by',
     ];

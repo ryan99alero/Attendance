@@ -15,6 +15,7 @@ class PunchTypeResource extends Resource
     protected static ?string $model = PunchType::class;
     protected static ?string $navigationIcon = 'heroicon-o-tag';
     protected static ?string $navigationLabel = 'Punch Types';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Forms\Form $form): Forms\Form
     {

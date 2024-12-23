@@ -4,58 +4,81 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DepartmentResource\Pages;
 use App\Models\Department;
-use App\Models\Employee;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Resources\Resource;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Log;
 
 class DepartmentResource extends Resource
 {
     protected static ?string $model = Department::class;
-    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-office-building';
     protected static ?string $navigationLabel = 'Departments';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
+        Log::info('TACO: Loading form for DepartmentResource');
+
         return $form->schema([
             TextInput::make('name')
                 ->label('Department Name')
-                ->required(),
-            Select::make('manager_id')
-                ->label('Manager')
+                ->required()
+                ->unique(ignorable: fn ($record) => $record)
+                ->maxLength(100)
+                ->reactive()
+                ->afterStateUpdated(function ($state) {
+                    Log::info("TACO1: Department Name updated to: {$state}");
+                }),
+            TextInput::make('external_department_id')
+                ->label('External Department ID')
+                ->numeric()
                 ->nullable()
-                ->options(function () {
-                    return Employee::with('user') // Ensure the user relationship is loaded
-                    ->whereHas('user', function ($query) {
-                        $query->where('is_manager', true);
-                    })
-                        ->get()
-                        ->pluck('full_names', 'id'); // Ensure full_names accessor is defined
-                })
-                ->placeholder('Select a Manager'),
+                ->unique()
+                ->afterStateUpdated(function ($state) {
+                    Log::info("TACO2: External Department ID updated to: {$state}");
+                }),
         ]);
     }
 
     public static function table(Table $table): Table
     {
+        Log::info('TACO3: Loading table for DepartmentResource');
+
         return $table->columns([
+            TextColumn::make('id')
+                ->label('ID')
+                ->sortable()
+                ->searchable(),
             TextColumn::make('name')
                 ->label('Department Name')
                 ->sortable()
                 ->searchable(),
-            TextColumn::make('manager.first_name')
-                ->label('Manager')
+            TextColumn::make('external_department_id')
+                ->label('External Department ID')
                 ->sortable()
                 ->searchable(),
+        ])->actions([
+            EditAction::make()
+                ->after(function ($record) {
+                    Log::info("TACO4: Edited record with ID: {$record->id}");
+                }),
         ]);
+    }
+
+    public static function getRelations(): array
+    {
+        Log::info('TACO5: Loading relations for DepartmentResource');
+        return [];
     }
 
     public static function getPages(): array
     {
+        Log::info('TACO6: Loading pages for DepartmentResource');
+
         return [
             'index' => Pages\ListDepartments::route('/'),
             'create' => Pages\CreateDepartment::route('/create'),

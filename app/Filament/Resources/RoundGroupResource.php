@@ -16,6 +16,7 @@ class RoundGroupResource extends Resource
     protected static ?string $model = RoundGroup::class;
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
     protected static ?string $navigationLabel = 'Round Groups';
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?int $navigationSort = 10;
 
     public static function form(Forms\Form $form): Forms\Form

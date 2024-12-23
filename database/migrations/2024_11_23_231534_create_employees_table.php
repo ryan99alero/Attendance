@@ -26,9 +26,6 @@ return new class extends Migration
             $table->string('external_id', 255)->nullable()->comment('External system identifier for the employee');
             $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing the departments table');
             $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing the shifts table');
-            $table->enum('rounding_method', ['1_minute', '5_minute', '6_minute', '7_minute', '10_minute', '15_minute'])
-                ->nullable()
-                ->comment('Rounding method for time calculations');
             $table->string('photograph', 255)->nullable()->comment('Path or URL of the employee photograph');
             $table->date('termination_date')->nullable()->comment('Date of termination, if applicable');
             $table->boolean('is_active')->default(true)->comment('Indicates if the employee is currently active');

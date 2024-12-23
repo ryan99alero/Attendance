@@ -21,6 +21,7 @@ class EmployeeResource extends Resource
     protected static ?string $model = Employee::class;
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
     protected static ?string $navigationLabel = 'Employees';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -71,8 +72,8 @@ class EmployeeResource extends Resource
             Toggle::make('vacation_pay')
                 ->label('Vacation Pay')
                 ->default(false),
-            DatePicker::make('termination_date')
-                ->label('Termination Date')
+            TextInput::make('external_id')
+                ->label('Payroll ID')
                 ->nullable(),
         ]);
     }
@@ -91,9 +92,8 @@ class EmployeeResource extends Resource
                 TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')
                     ->sortable(),
-                TextColumn::make('termination_date')
-                    ->label('Termination Date')
-                    ->date(),
+                TextColumn::make('external_id')
+                    ->label('Payroll ID'),
                 IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),
