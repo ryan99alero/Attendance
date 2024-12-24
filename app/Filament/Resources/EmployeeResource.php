@@ -12,7 +12,6 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 
@@ -28,10 +27,12 @@ class EmployeeResource extends Resource
         return $form->schema([
             TextInput::make('first_name')
                 ->label('First Name')
-                ->required(),
+                ->required()
+                ->searchable(),
             TextInput::make('last_name')
                 ->label('Last Name')
-                ->required(),
+                ->required()
+                ->searchable(),
             TextInput::make('address')
                 ->label('Address')
                 ->nullable(),
@@ -52,7 +53,8 @@ class EmployeeResource extends Resource
                 ->nullable(),
             TextInput::make('external_id')
                 ->label('External ID')
-                ->nullable(),
+                ->nullable()
+                ->searchable(),
             Select::make('department_id')
                 ->label('Department')
                 ->options(Department::all()->pluck('name', 'id'))
@@ -93,7 +95,9 @@ class EmployeeResource extends Resource
                     ->label('Payroll Frequency')
                     ->sortable(),
                 TextColumn::make('external_id')
-                    ->label('Payroll ID'),
+                    ->label('Payroll ID')
+                    ->sortable()
+                    ->searchable(),
                 IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),

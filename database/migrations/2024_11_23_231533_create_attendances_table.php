@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('attendances', function (Blueprint $table) {
             $table->id()->comment('Primary key of the attendances table');
             $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key to employees table');
+            $table->string('employee_external_id')->nullable()->comment('External ID of the employee for mapping');
             $table->unsignedBigInteger('device_id')->nullable()->comment('Foreign key to devices table');
             $table->dateTime('punch_time')->nullable()->comment('Time of the punch event');
             $table->boolean('is_manual')->default(false)->comment('Indicates if the attendance was manually recorded');
@@ -32,6 +33,7 @@ return new class extends Migration
             // Indexes for optimization
             $table->index('punch_time', 'idx_punch_time')->comment('Index for optimizing queries on punch time');
             $table->index('employee_id', 'idx_employee_id')->comment('Index for optimizing queries by employee');
+            $table->index('employee_external_id', 'idx_employee_external_id')->comment('Index for optimizing queries by external employee ID');
 
             // Foreign key constraints
             $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade')->comment('References the employees table');

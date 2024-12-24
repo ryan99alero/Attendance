@@ -6,6 +6,7 @@ use App\Filament\Resources\AttendanceResource;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
 use App\Models\Attendance;
+use App\Models\Employee;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Notifications\Notification;
@@ -45,10 +46,38 @@ class ListAttendances extends ListRecords
                     try {
                         Excel::import(
                             new class ('App\Models\Attendance') extends DataImport {
+                                /**
+                                 * Transform row data for Attendance imports.
+                                 */
                                 protected function transformRow(array $row): array
                                 {
-                                    // Add any necessary data transformations for Attendance here
+                                    // Attempt to map employee_external_id to employee_id
+                                    if (isset($row['employee_external_id'])) {
+                                        $employee = Employee::where('external_id', $row['employee_external_id'])->first();
+
+                                        if ($employee) {
+                                            $row['employee_id'] = $employee->id; // Set the mapped employee ID
+                                            Log::info("Mapped external ID {$row['employee_external_id']} to employee ID {$employee->id}");
+                                        } else {
+                                            Log::warning("No employee found for external ID: {$row['employee_external_id']}. Row skipped.");
+                                        }
+                                    }
+
                                     return $row;
+                                }
+
+                                /**
+                                 * Validate the row data before import.
+                                 */
+                                protected function validateRow(array $row): void
+                                {
+                                    if (empty($row['employee_id'])) {
+                                        throw new \Exception("Employee ID is missing for external ID: {$row['employee_external_id']}");
+                                    }
+
+                                    if (empty($row['punch_time'])) {
+                                        throw new \Exception("Punch time is missing or invalid for row: " . json_encode($row));
+                                    }
                                 }
                             },
                             $filePath

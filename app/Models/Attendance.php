@@ -60,6 +60,7 @@ class Attendance extends Model
      */
     protected $fillable = [
         'employee_id',
+        'employee_external_id',
         'device_id',
         'punch_time',
         'punch_type_id',
@@ -131,7 +132,13 @@ class Attendance extends Model
     {
         return $this->belongsTo(Employee::class);
     }
-
+    /**
+     * Relationship to map external ID to employee.
+     */
+    public function employeeByExternalId(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'employee_external_id', 'external_id');
+    }
     /**
      * Relationship with the `Device` model.
      */
