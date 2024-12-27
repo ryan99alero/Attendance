@@ -41,48 +41,44 @@ class ListAttendances extends ListRecords
                     $fileName = $data['file'];
                     $filePath = DataImport::resolveFilePath($fileName);
 
-                    Log::info("Resolved file path for import: {$filePath}");
+                    $import = new DataImport(Attendance::class);
 
                     try {
-                        Excel::import(
-                            new class ('App\Models\Attendance') extends DataImport {
-                                /**
-                                 * Transform row data for Attendance imports.
-                                 */
-                                protected function transformRow(array $row): array
-                                {
-                                    // Attempt to map employee_external_id to employee_id
-                                    if (isset($row['employee_external_id'])) {
-                                        $employee = Employee::where('external_id', $row['employee_external_id'])->first();
+                        Excel::import($import, $filePath);
 
-                                        if ($employee) {
-                                            $row['employee_id'] = $employee->id; // Set the mapped employee ID
-                                            Log::info("Mapped external ID {$row['employee_external_id']} to employee ID {$employee->id}");
-                                        } else {
-                                            Log::warning("No employee found for external ID: {$row['employee_external_id']}. Row skipped.");
-                                        }
-                                    }
+                        // Check for failed records
+                        if (!empty($import->getFailedRecordsWithErrors())) {
+                            $failedRecords = $import->getFailedRecordsWithErrors();
 
-                                    return $row;
+                            // Add error messages and context to the original rows
+                            $updatedRows = collect(Excel::toArray([], $filePath)[0])
+                                ->map(function ($row, $index) use ($failedRecords) {
+                                    // Adjust index to account for the header row
+                                    $failedRecord = collect($failedRecords)->firstWhere('row', $index - 1);
+
+                                    return array_merge($row, [
+                                        'error' => $failedRecord['error'] ?? null,
+                                        'employee_name' => $failedRecord['employee_name'] ?? null,
+                                        'department_name' => $failedRecord['department_name'] ?? null,
+                                    ]);
+                                });
+
+                            // Return the updated file with errors
+                            return Excel::download(new class($updatedRows) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
+                                private $data;
+                                public function __construct($data) {
+                                    $this->data = $data;
                                 }
-
-                                /**
-                                 * Validate the row data before import.
-                                 */
-                                protected function validateRow(array $row): void
-                                {
-                                    if (empty($row['employee_id'])) {
-                                        throw new \Exception("Employee ID is missing for external ID: {$row['employee_external_id']}");
-                                    }
-
-                                    if (empty($row['punch_time'])) {
-                                        throw new \Exception("Punch time is missing or invalid for row: " . json_encode($row));
-                                    }
+                                public function collection() {
+                                    return collect($this->data);
                                 }
-                            },
-                            $filePath
-                        );
+                                public function headings(): array {
+                                    return array_keys($this->data->first());
+                                }
+                            }, 'attendance_import_errors.xlsx');
+                        }
 
+                        // Notify user of success if no errors
                         Notification::make()
                             ->title('Import Success')
                             ->body('Attendances imported successfully!')

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DepartmentResource\Pages;
+use App\Filament\Resources\DepartmentResource\RelationManagers\EmployeesRelationManager;
 use App\Models\Department;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -37,7 +38,7 @@ class DepartmentResource extends Resource
                 ->label('External Department ID')
                 ->numeric()
                 ->nullable()
-                ->unique()
+                ->unique(ignorable: fn ($record) => $record)
                 ->afterStateUpdated(function ($state) {
                     Log::info("TACO2: External Department ID updated to: {$state}");
                 }),
@@ -72,7 +73,9 @@ class DepartmentResource extends Resource
     public static function getRelations(): array
     {
         Log::info('TACO5: Loading relations for DepartmentResource');
-        return [];
+        return [
+            EmployeesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

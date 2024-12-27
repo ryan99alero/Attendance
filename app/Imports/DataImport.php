@@ -89,8 +89,9 @@ class DataImport implements ToCollection, WithHeadingRow
                     $mappedEmployee = Employee::where('external_id', $data['employee_external_id'])->first();
 
                     if ($mappedEmployee) {
-                        Log::info("Mapped employee_external_id {$data['employee_external_id']} to employee ID {$mappedEmployee->id}.");
-                        $data['employee_id'] = $mappedEmployee->id; // Set the employee_id
+                        $data['employee_id'] = $mappedEmployee->id;
+                        $data['employee_name'] = $mappedEmployee->full_name;
+                        $data['department_name'] = optional($mappedEmployee->department)->name;
                     } else {
                         throw new \Exception("No employee found for external_id {$data['employee_external_id']}.");
                     }
@@ -114,6 +115,8 @@ class DataImport implements ToCollection, WithHeadingRow
                 $this->failedRecords[] = [
                     'row' => $index,
                     'data' => $row->toArray(),
+                    'employee_name' => $mappedEmployee->full_name ?? null,
+                    'department_name' => $mappedEmployee->department->name ?? null,
                     'error' => $e->getMessage(),
                 ];
                 Log::error("Failed to import row {$index}: " . json_encode($row->toArray()) . " Error: " . $e->getMessage());
@@ -137,11 +140,11 @@ class DataImport implements ToCollection, WithHeadingRow
     }
 
     /**
-     * Get failed records.
+     * Get failed records with errors.
      *
      * @return array
      */
-    public function getFailedRecords(): array
+    public function getFailedRecordsWithErrors(): array
     {
         return $this->failedRecords;
     }

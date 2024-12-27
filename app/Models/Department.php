@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  *
@@ -13,15 +15,15 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $manager_id Foreign key to Employees for department manager
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User|null $creator
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Employee> $employees
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read User|null $creator
+ * @property-read Collection<int, Employee> $employees
  * @property-read int|null $employees_count
- * @property-read \App\Models\Employee|null $manager
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ShiftSchedule> $schedules
+ * @property-read Employee|null $manager
+ * @property-read Collection<int, ShiftSchedule> $schedules
  * @property-read int|null $schedules_count
- * @property-read \App\Models\User|null $updater
+ * @property-read User|null $updater
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Department newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Department newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Department query()

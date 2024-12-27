@@ -25,11 +25,11 @@ class EmployeeResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            TextInput::make('first_name')
+            Select::make('first_name')
                 ->label('First Name')
                 ->required()
                 ->searchable(),
-            TextInput::make('last_name')
+            Select::make('last_name')
                 ->label('Last Name')
                 ->required()
                 ->searchable(),
@@ -51,7 +51,7 @@ class EmployeeResource extends Resource
             TextInput::make('phone')
                 ->label('Phone')
                 ->nullable(),
-            TextInput::make('external_id')
+            Select::make('external_id')
                 ->label('External ID')
                 ->nullable()
                 ->searchable(),
