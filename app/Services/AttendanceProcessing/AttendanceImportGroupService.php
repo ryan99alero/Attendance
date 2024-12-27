@@ -194,7 +194,19 @@ class AttendanceImportGroupService
             $this->assignPunchTypePair($pair, 'Break Start', 'Break Stop');
         }
     }
+    private function assignPunchTypePair(Collection $pair, string $startType, string $stopType): void
+    {
+        $pair->first()->punch_type_id = $this->getPunchTypeId($startType);
+        $pair->last()->punch_type_id = $this->getPunchTypeId($stopType);
+        $pair->first()->issue_notes = "Assigned: User{$startType}";
+        $pair->last()->issue_notes = "Assigned: User{$stopType}";
+        $pair->first()->status = 'Complete';
+        $pair->last()->status = 'Complete';
+        $pair->first()->save();
+        $pair->last()->save();
 
+        Log::info("Assigned User{$startType} to Record ID: {$pair->first()->id}, {$stopType} to Record ID: {$pair->last()->id}");
+    }
     /**
      * Find the closest punch type to a schedule time.
      *

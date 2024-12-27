@@ -33,6 +33,9 @@ class EmployeeResource extends Resource
                 ->label('Last Name')
                 ->required()
                 ->searchable(),
+            TextInput::make('email')
+                ->label('eMail')
+                ->nullable(),
             TextInput::make('address')
                 ->label('Address')
                 ->nullable(),

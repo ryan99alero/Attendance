@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('country', 255)->nullable()->comment('Country of residence of the employee');
             $table->string('phone', 15)->nullable()->comment('Contact phone number of the employee');
             $table->string('external_id', 255)->nullable()->comment('External system identifier for the employee');
+            $table->string('email')->primary()->comment('Employee email address of the employee');
             $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing the departments table');
             $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing the shifts table');
             $table->string('photograph', 255)->nullable()->comment('Path or URL of the employee photograph');

@@ -96,9 +96,8 @@ class EmployeesRelationManager extends RelationManager
                 ->label('Last Name')
                 ->required(),
             Forms\Components\TextInput::make('email')
-                ->label('Email')
-                ->email()
-                ->required(),
+                ->label('eMail')
+                ->email(),
         ]);
     }
 }
