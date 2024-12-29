@@ -57,7 +57,7 @@ class AttendanceResource extends Resource
             DateTimePicker::make('punch_time')
                 ->label('Punch Time')
                 ->seconds(false)
-                ->displayFormat('Y-m-d H:i')
+                ->displayFormat('Y-m-d H:i:s')
                 ->required(),
 
             Select::make('punch_type_id')
@@ -123,7 +123,7 @@ class AttendanceResource extends Resource
 
                 TextInputColumn::make('punch_time')
                     ->label('Punch Time')
-                    ->rules(['required', 'date_format:Y-m-d H:i'])
+                    ->rules(['required', 'date_format:Y-m-d H:i:s'])
                     ->placeholder('YYYY-MM-DD HH:MM')
                     ->sortable()
                     ->searchable()

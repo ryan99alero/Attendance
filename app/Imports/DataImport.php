@@ -161,7 +161,7 @@ class DataImport implements ToCollection, WithHeadingRow
         if (is_numeric($value)) {
             try {
                 return Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value))
-                    ->format('Y-m-d H:i'); // Standardize format
+                    ->format('Y-m-d H:i:s'); // Standardize format
             } catch (\Exception $e) {
                 throw new \Exception("Failed to parse Excel serial date format: {$value}");
             }
@@ -176,7 +176,7 @@ class DataImport implements ToCollection, WithHeadingRow
         foreach ($formats as $format) {
             try {
                 $date = Carbon::createFromFormat($format, $value);
-                return $date->format('Y-m-d H:i'); // Standardize format
+                return $date->format('Y-m-d H:i:s'); // Standardize format
             } catch (\Exception $e) {
                 // Continue to next format
             }

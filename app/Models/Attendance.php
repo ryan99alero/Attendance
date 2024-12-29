@@ -85,11 +85,11 @@ class Attendance extends Model
     protected $guarded = ['is_migrated'];
 
     /**
-     * Accessor for `punch_time` to format it as `Y-m-d H:i` for display purposes.
+     * Accessor for `punch_time` to format it as `Y-m-d H:i:s` for display purposes.
      */
     public function getPunchTimeAttribute($value): string
     {
-        return Carbon::parse($value)->format('Y-m-d H:i');
+        return Carbon::parse($value)->format('Y-m-d H:i:s');
     }
 
     /**

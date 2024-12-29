@@ -79,7 +79,7 @@ class PunchResource extends Resource
                 TextInputColumn::make('punch_time')
                     ->label('Punch In')
                     ->alignCenter()
-                    ->rules(['required', 'date_format:Y-m-d H:i'])
+                    ->rules(['required', 'date_format:Y-m-d H:i:s'])
                     ->afterStateUpdated(fn ($state, $record) => $record->update(['punch_time' => $state]))
                     ->placeholder('YYYY-MM-DD HH:MM')
                     ->searchable(),
