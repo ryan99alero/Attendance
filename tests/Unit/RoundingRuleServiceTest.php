@@ -3,7 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\RoundingRule;
-use App\Services\RoundingRuleService;
+use App\Services\AttendanceProcessing\RoundingRuleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

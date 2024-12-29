@@ -2,67 +2,46 @@
 
 namespace App\Services;
 
+use App\Models\RoundGroup;
 use App\Models\RoundingRule;
 
 class RoundingRuleService
 {
     /**
-     * Retrieve all rounding rules for a specific group.
+     * Calculate rounded punch time.
      *
+     * @param \DateTime $originalTime
      * @param int $roundGroupId
-     * @return \Illuminate\Support\Collection
+     * @return \DateTime
      */
-    public function getRulesForGroup(int $roundGroupId)
+    public function getRoundedTime(\DateTime $originalTime, int $roundGroupId): \DateTime
     {
-        return RoundingRule::where('round_group_id', $roundGroupId)->orderBy('minute_min')->get();
-    }
+        \Log::info("Original Time: {$originalTime->format('Y-m-d H:i:s')}, Round Group ID: {$roundGroupId}");
 
-    /**
-     * Find a rounding rule for specific minutes and group.
-     *
-     * @param int $minutes
-     * @param int $roundGroupId
-     * @return RoundingRule|null
-     */
-    public function findRule(int $minutes, int $roundGroupId): ?RoundingRule
-    {
-        return RoundingRule::where('round_group_id', $roundGroupId)
-            ->where('minute_min', '<=', $minutes)
-            ->where('minute_max', '>=', $minutes)
-            ->first();
-    }
+        $roundingRules = RoundingRule::where('round_group_id', $roundGroupId)->get();
 
-    /**
-     * Apply a rounding rule to elapsed minutes based on the group.
-     *
-     * @param int $minutes
-     * @param int $roundGroupId
-     * @return int
-     */
-    public function applyRoundingRule(int $minutes, int $roundGroupId): int
-    {
-        $rule = $this->findRule($minutes, $roundGroupId);
+        if ($roundingRules->isEmpty()) {
+            \Log::info("No rounding rules found for Round Group ID: {$roundGroupId}");
+            return $originalTime;
+        }
 
-        return $rule ? $rule->new_minute : $minutes; // Default to original minutes if no rule is found
-    }
+        $minute = (int)$originalTime->format('i'); // Extract the minutes from the time
 
-    /**
-     * Validate that the rounding rules for a group are consistent.
-     *
-     * @param int $roundGroupId
-     * @return bool
-     */
-    public function validateRules(int $roundGroupId): bool
-    {
-        $rules = $this->getRulesForGroup($roundGroupId);
-
-        foreach ($rules as $i => $rule) {
-            if (isset($rules[$i + 1]) && $rules[$i + 1]->minute_min <= $rule->minute_max) {
-                // Overlapping ranges detected
-                return false;
+        foreach ($roundingRules as $rule) {
+            if ($minute >= $rule->minute_min && $minute <= $rule->minute_max) {
+                $roundedMinute = $rule->new_minute;
+                $roundedTime = clone $originalTime;
+                $roundedTime->setTime(
+                    (int)$originalTime->format('H'),
+                    $roundedMinute,
+                    0
+                );
+                \Log::info("Rounded Time: {$roundedTime->format('Y-m-d H:i:s')}");
+                return $roundedTime;
             }
         }
 
-        return true;
+        \Log::info("No matching rounding rule for Minute: {$minute}");
+        return $originalTime;
     }
 }

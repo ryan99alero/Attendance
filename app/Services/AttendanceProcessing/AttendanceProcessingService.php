@@ -3,11 +3,28 @@
 namespace App\Services\AttendanceProcessing;
 
 use App\Models\PayPeriod;
-use App\Services\AttendanceProcessing\VacationTimeProcessAttendanceService;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceProcessingService
 {
+    protected PunchMigrationService $punchMigrationService;
+
+    /**
+     * Constructor to inject PunchMigrationService.
+     *
+     * @param PunchMigrationService $punchMigrationService
+     */
+    public function __construct(PunchMigrationService $punchMigrationService)
+    {
+        $this->punchMigrationService = $punchMigrationService;
+    }
+
+    /**
+     * Process all attendance records for the given PayPeriod.
+     *
+     * @param PayPeriod $payPeriod
+     * @return void
+     */
     public function processAll(PayPeriod $payPeriod): void
     {
         Log::info("Starting Attendance Processing for PayPeriod: {$payPeriod->id}");
@@ -28,8 +45,7 @@ class AttendanceProcessingService
         $validationService->validatePunchesWithinPayPeriod($payPeriod);
 
         // Migrate punches to the Punch table
-        $migrationService = new PunchMigrationService();
-        $migrationService->migratePunchesWithinPayPeriod($payPeriod);
+        $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
 
         Log::info("Attendance Processing completed for PayPeriod: {$payPeriod->id}");
     }

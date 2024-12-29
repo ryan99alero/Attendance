@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property \Illuminate\Support\Carbon $start_date Start date of the pay period
@@ -138,7 +138,7 @@ class PayPeriod extends Model
      */
     public function processAttendance(): int
     {
-        $service = new \App\Services\AttendanceProcessing\AttendanceProcessingService();
+        $service = app(\App\Services\AttendanceProcessing\AttendanceProcessingService::class);
         $service->processAll($this);
 
         return 0; // Return count if needed
