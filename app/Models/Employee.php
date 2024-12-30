@@ -49,6 +49,7 @@ class Employee extends Model
         'country',
         'phone',
         'external_id',
+        'external_department_id',
         'department_id',
         'shift_id',
         'round_group_id',

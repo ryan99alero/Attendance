@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -16,6 +17,7 @@ class AppServiceProvider extends ServiceProvider
     {
         //
     }
+
     /**
      * Bootstrap any application services.
      */
@@ -29,11 +31,20 @@ class AppServiceProvider extends ServiceProvider
         // Set the default serialization format to the custom format
         Carbon::serializeUsing(function ($carbon) {
             return $carbon->toCustomFormat();
-
-
         });
+
+        // Log every view that is loaded
         View::composer('*', function ($view) {
             Log::channel('view_log')->info("View Loaded: " . $view->getName(), $view->getData());
+        });
+
+        // Log all SQL queries executed
+        DB::listen(function ($query) {
+            Log::channel('sql')->info('SQL Query Executed:', [
+                'sql' => $query->sql,
+                'bindings' => $query->bindings,
+                'time' => $query->time . ' ms',
+            ]);
         });
     }
 }

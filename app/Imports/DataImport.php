@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\Department;
 use App\Models\Employee;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -56,32 +57,31 @@ class DataImport implements ToCollection, WithHeadingRow
                     $row['punch_time'] = $this->parseDateTime($row['punch_time']);
                 }
 
-                // Default the status field to "Incomplete" if it is empty
-                if (empty($row['status'])) {
-                    $row['status'] = 'Incomplete';
-                    Log::info("Defaulted status to 'Incomplete' for row {$index}");
-                }
-
                 // Default the is_manual field to true if it is empty
                 if (!isset($row['is_manual']) || $row['is_manual'] === '') {
                     $row['is_manual'] = true;
                     Log::info("Defaulted is_manual to true for row {$index}");
                 }
 
+                // Filter data to include only fillable fields
                 $data = array_intersect_key($row->toArray(), array_flip((new $this->modelClass())->getFillable()));
-                Log::info("Filtered data for row {$index}: ", $data);
+                Log::info("Row {$index} - Filtered data (fillable fields only): ", $data);
 
-                // Lookup and replace department_id
-                if (isset($data['department_id'])) {
-                    $mappedDepartment = Department::where('external_department_id', $data['department_id'])->first();
+                // Handle external_department_id mapping to department_id
+                if (isset($row['external_department_id'])) {
+                    Log::info("Row {$index} - Attempting to map external_department_id: {$row['external_department_id']}");
+
+                    $mappedDepartment = Department::where('external_department_id', $row['external_department_id'])->first();
 
                     if ($mappedDepartment) {
-                        Log::info("Mapped external_department_id {$data['department_id']} to department ID {$mappedDepartment->id}.");
-                        $data['department_id'] = $mappedDepartment->id; // Replace with actual ID
+                        Log::info("Row {$index} - Mapped external_department_id {$row['external_department_id']} to department_id: {$mappedDepartment->id}");
+                        $data['department_id'] = $mappedDepartment->id; // Assign the actual department_id
                     } else {
-                        Log::warning("No department found for external_department_id {$data['department_id']}. Setting department_id to null.");
-                        $data['department_id'] = null; // Handle missing mappings
+                        Log::warning("Row {$index} - No department found for external_department_id: {$row['external_department_id']}");
+                        $data['department_id'] = null; // Set to null if no mapping found
                     }
+                } else {
+                    Log::warning("Row {$index} - external_department_id is missing in the input data.");
                 }
 
                 // Lookup and map employee_external_id to employee_id
@@ -103,11 +103,17 @@ class DataImport implements ToCollection, WithHeadingRow
                     ? Validator::make($data, $model->rules())->validate()
                     : $data;
 
+                // Log final validated data
+                Log::info("Row {$index} - Final data being saved to Employee table: ", $validatedData);
+
                 // Create or update the model
-                $model::updateOrCreate(
-                    ['id' => $data['id'] ?? null], // Match by ID if provided
-                    $validatedData
-                );
+                if (isset($data['id'])) {
+                    Log::info("Row {$index} - Executing UPDATE for Employee with ID: {$data['id']}");
+                    DB::table('employees')->where('id', $data['id'])->update($validatedData);
+                } else {
+                    Log::info("Row {$index} - Executing INSERT for new Employee.");
+                    DB::table('employees')->insert($validatedData);
+                }
 
                 Log::info("Successfully imported/updated row {$index}: ", $data);
             } catch (\Exception $e) {
@@ -115,8 +121,8 @@ class DataImport implements ToCollection, WithHeadingRow
                 $this->failedRecords[] = [
                     'row' => $index,
                     'data' => $row->toArray(),
-                    'employee_name' => $mappedEmployee->full_name ?? null,
-                    'department_name' => $mappedEmployee->department->name ?? null,
+                    'employee_name' => $data['employee_name'] ?? null,
+                    'department_name' => $data['department_name'] ?? null,
                     'error' => $e->getMessage(),
                 ];
                 Log::error("Failed to import row {$index}: " . json_encode($row->toArray()) . " Error: " . $e->getMessage());
@@ -125,7 +131,6 @@ class DataImport implements ToCollection, WithHeadingRow
 
         if (!empty($this->failedRecords)) {
             Log::warning("Import completed with errors. See details below:");
-
             foreach ($this->failedRecords as $failedRecord) {
                 Log::warning(sprintf(
                     "Row %d failed. Error: %s | Data: %s",
@@ -137,16 +142,6 @@ class DataImport implements ToCollection, WithHeadingRow
         } else {
             Log::info("Import completed successfully with no errors.");
         }
-    }
-
-    /**
-     * Get failed records with errors.
-     *
-     * @return array
-     */
-    public function getFailedRecordsWithErrors(): array
-    {
-        return $this->failedRecords;
     }
 
     /**
