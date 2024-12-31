@@ -3,13 +3,13 @@
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
-use App\Imports\DataImport;
-use App\Exports\DataExport;
+use App\Models\Employee;
 use App\Models\Department;
+use App\Services\ExcelErrorImportService;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
-use Maatwebsite\Excel\Facades\Excel;
 use Filament\Notifications\Notification;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
 
 class ListEmployees extends ListRecords
@@ -36,24 +36,37 @@ class ListEmployees extends ListRecords
                 ])
                 ->action(function (array $data) {
                     $fileName = $data['file'];
-                    $filePath = DataImport::resolveFilePath($fileName);
+                    $filePath = storage_path("app/public/{$fileName}");
 
                     Log::info("Resolved file path for import: {$filePath}");
 
+                    // Initialize the import service
+                    $importService = new ExcelErrorImportService(Employee::class, function (array $row) {
+                        // Department lookup logic
+                        if (isset($row['external_department_id'])) {
+                            $externalDepartmentId = str_pad((string) $row['external_department_id'], 3, '0', STR_PAD_LEFT);
+                            $mappedDepartment = Department::where('external_department_id', $externalDepartmentId)->first();
+                            $row['department_id'] = $mappedDepartment?->id ?? null;
+
+                            if ($row['department_id'] === null) {
+                                Log::warning("No department found for external_department_id: {$externalDepartmentId}");
+                            } else {
+                                Log::info("Mapped external_department_id {$externalDepartmentId} to department_id {$row['department_id']}");
+                            }
+                        } else {
+                            Log::warning("external_department_id is missing in the input data: " . json_encode($row));
+                        }
+
+                        return $row; // Ensure the updated row is returned
+                    });
+
                     try {
-                        Excel::import(
-                            new class ('App\Models\Employee') extends DataImport {
-                                protected function transformRow(array $row): array
-                                {
-                                    if (isset($row['department_id'])) {
-                                        $mappedDepartment = Department::where('external_department_id', $row['department_id'])->first();
-                                        $row['department_id'] = $mappedDepartment?->id ?? null;
-                                    }
-                                    return $row;
-                                }
-                            },
-                            $filePath
-                        );
+                        Excel::import($importService, $filePath);
+
+                        if ($failedRecords = $importService->getFailedRecords()) {
+                            // Export failed records if any errors occurred
+                            return $importService->exportFailedRecords();
+                        }
 
                         Notification::make()
                             ->title('Import Success')
@@ -76,7 +89,17 @@ class ListEmployees extends ListRecords
                 ->label('Export')
                 ->color('warning')
                 ->action(function () {
-                    return Excel::download(new DataExport(EmployeeResource::getModel()), 'employees.xlsx');
+                    try {
+                        return Excel::download(new DataExport(EmployeeResource::getModel()), 'employees.xlsx');
+                    } catch (\Exception $e) {
+                        Log::error("Export failed: {$e->getMessage()}");
+
+                        Notification::make()
+                            ->title('Export Failed')
+                            ->body("An error occurred during the export: {$e->getMessage()}")
+                            ->danger()
+                            ->send();
+                    }
                 })
                 ->icon('heroicon-o-download'),
         ];

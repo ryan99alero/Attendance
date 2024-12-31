@@ -3,10 +3,8 @@
 namespace App\Filament\Resources\AttendanceResource\Pages;
 
 use App\Filament\Resources\AttendanceResource;
-use App\Imports\DataImport;
-use App\Exports\DataExport;
 use App\Models\Attendance;
-use App\Models\Employee;
+use App\Services\ExcelErrorImportService;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Notifications\Notification;
@@ -39,46 +37,20 @@ class ListAttendances extends ListRecords
                 ])
                 ->action(function (array $data) {
                     $fileName = $data['file'];
-                    $filePath = DataImport::resolveFilePath($fileName);
+                    $filePath = storage_path("app/public/{$fileName}");
 
-                    $import = new DataImport(Attendance::class);
+                    Log::info("Resolved file path for import: {$filePath}");
+
+                    $importService = new ExcelErrorImportService(Attendance::class);
 
                     try {
-                        Excel::import($import, $filePath);
+                        Excel::import($importService, $filePath);
 
-                        // Check for failed records
-                        if (!empty($import->getFailedRecordsWithErrors())) {
-                            $failedRecords = $import->getFailedRecordsWithErrors();
-
-                            // Add error messages and context to the original rows
-                            $updatedRows = collect(Excel::toArray([], $filePath)[0])
-                                ->map(function ($row, $index) use ($failedRecords) {
-                                    // Adjust index to account for the header row
-                                    $failedRecord = collect($failedRecords)->firstWhere('row', $index - 1);
-
-                                    return array_merge($row, [
-                                        'error' => $failedRecord['error'] ?? null,
-                                        'employee_name' => $failedRecord['employee_name'] ?? null,
-                                        'department_name' => $failedRecord['department_name'] ?? null,
-                                    ]);
-                                });
-
-                            // Return the updated file with errors
-                            return Excel::download(new class($updatedRows) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
-                                private $data;
-                                public function __construct($data) {
-                                    $this->data = $data;
-                                }
-                                public function collection() {
-                                    return collect($this->data);
-                                }
-                                public function headings(): array {
-                                    return array_keys($this->data->first());
-                                }
-                            }, 'attendance_import_errors.xlsx');
+                        if ($failedRecords = $importService->getFailedRecords()) {
+                            // Export failed records if any errors occurred
+                            return $importService->exportFailedRecords();
                         }
 
-                        // Notify user of success if no errors
                         Notification::make()
                             ->title('Import Success')
                             ->body('Attendances imported successfully!')

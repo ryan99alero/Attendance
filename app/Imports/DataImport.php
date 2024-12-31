@@ -16,7 +16,6 @@ use Carbon\Carbon;
 class DataImport implements ToCollection, WithHeadingRow
 {
     protected string $modelClass;
-    protected array $failedRecords = []; // To track failed rows
 
     /**
      * Constructor to initialize the model class.
@@ -117,31 +116,11 @@ class DataImport implements ToCollection, WithHeadingRow
 
                 Log::info("Successfully imported/updated row {$index}: ", $data);
             } catch (\Exception $e) {
-                // Add failed record to the failedRecords array
-                $this->failedRecords[] = [
-                    'row' => $index,
-                    'data' => $row->toArray(),
-                    'employee_name' => $data['employee_name'] ?? null,
-                    'department_name' => $data['department_name'] ?? null,
-                    'error' => $e->getMessage(),
-                ];
                 Log::error("Failed to import row {$index}: " . json_encode($row->toArray()) . " Error: " . $e->getMessage());
             }
         }
 
-        if (!empty($this->failedRecords)) {
-            Log::warning("Import completed with errors. See details below:");
-            foreach ($this->failedRecords as $failedRecord) {
-                Log::warning(sprintf(
-                    "Row %d failed. Error: %s | Data: %s",
-                    $failedRecord['row'],
-                    $failedRecord['error'],
-                    json_encode($failedRecord['data'])
-                ));
-            }
-        } else {
-            Log::info("Import completed successfully with no errors.");
-        }
+        Log::info("Import completed successfully with no errors.");
     }
 
     /**
