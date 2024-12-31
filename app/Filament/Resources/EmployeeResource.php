@@ -63,6 +63,11 @@ class EmployeeResource extends Resource
                 ->options(Department::all()->pluck('name', 'id'))
                 ->nullable()
                 ->searchable(),
+            Select::make('round_group_id')
+                ->label('Payroll Rounding')
+                ->options(\App\Models\RoundGroup::all()->pluck('group_name', 'id')) // Use the actual model and fields
+                ->nullable()
+                ->searchable(),
             Select::make('payroll_frequency_id')
                 ->label('Payroll Frequency')
                 ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
@@ -96,6 +101,9 @@ class EmployeeResource extends Resource
                     ->sortable(),
                 TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')
+                    ->sortable(),
+                TextColumn::make('roundGroup.group_name') // Ensure the relationship is defined in the Employee model
+                ->label('Payroll Rounding')
                     ->sortable(),
                 TextColumn::make('external_id')
                     ->label('Payroll ID')
