@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\DepartmentResource\Pages;
 use App\Filament\Resources\DepartmentResource\RelationManagers\EmployeesRelationManager;
 use App\Models\Department;
+use App\Models\Employee; // Import Employee model
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\EditAction;
@@ -42,6 +44,15 @@ class DepartmentResource extends Resource
                 ->afterStateUpdated(function ($state) {
                     Log::info("TACO2: External Department ID updated to: {$state}");
                 }),
+            Select::make('manager_id')
+                ->label('Manager') // Use a clear label
+                ->options(Employee::pluck('full_names', 'id')->toArray()) // Populate dropdown with managers
+                ->searchable(false) // Disable typing to search
+                ->placeholder('Select a Manager') // Provide a placeholder
+                ->required() // Mark as required if necessary
+                ->afterStateUpdated(function ($state) {
+                    Log::info("TACO2.5: Manager ID updated to: {$state}");
+                }),
         ]);
     }
 
@@ -61,6 +72,10 @@ class DepartmentResource extends Resource
             TextColumn::make('external_department_id')
                 ->label('External Department ID')
                 ->sortable()
+                ->searchable(),
+            TextColumn::make('manager.full_names') // Assuming the relationship is correctly defined
+            ->label('Manager Name') // Display the related manager's name
+            ->sortable()
                 ->searchable(),
         ])->actions([
             EditAction::make()

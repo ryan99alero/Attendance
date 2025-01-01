@@ -14,35 +14,55 @@ class CreateVacationCalendar extends CreateRecord
 
     protected function handleRecordCreation(array $data): VacationCalendar
     {
+        \Log::info("Starting VacationCalendar creation process with data: ", $data);
+
         $startDate = Carbon::parse($data['start_date']);
         $endDate = Carbon::parse($data['end_date']);
-        $isHalfDay = $data['is_half_day'];
-        $isActive = $data['is_active'];
+        $isHalfDay = $data['is_half_day'] ?? false;
+        $isActive = $data['is_active'] ?? true;
 
-        // Fetch all employees with vacation_pay = true
-        if ($data['vacation_pay']) {
-            $employees = Employee::where('vacation_pay', true)->get();
-        } else {
-            $employees = Employee::where('id', $data['employee_id'])->get();
+        // Validation: Check if the selected date range includes only weekends
+        $currentDate = $startDate->copy();
+        $onlyWeekends = true;
+
+        while ($currentDate->lte($endDate)) {
+            if ($currentDate->isWeekday()) {
+                $onlyWeekends = false;
+                break;
+            }
+            $currentDate->addDay();
         }
-        \Log::info($employees);
-        // Debugging: Check the retrieved employees
+
+        if ($onlyWeekends) {
+            \Log::warning("Vacation dates selected are only weekends.");
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'start_date' => 'Vacation dates cannot include only weekends.',
+                'end_date' => 'Please select a date range that includes at least one weekday.',
+            ]);
+        }
+
+        // Determine employees to process
+        $employees = $data['vacation_pay']
+            ? Employee::where('vacation_pay', true)->get()
+            : Employee::where('id', $data['employee_id'])->get();
+
         if ($employees->isEmpty()) {
+            \Log::error("No employees found matching the criteria.");
             throw new \Exception('No employees found matching the criteria.');
         }
 
-        // Loop through all retrieved employees
-        foreach ($employees as $employee) {
-            \Log::info("Processing employee: {$employee->id}, {$employee->first_name} {$employee->last_name}");
+        \Log::info("Number of employees to process: {$employees->count()}");
 
-            // Clone the start date for each employee to avoid mutation
+        $lastCreated = null;
+
+        foreach ($employees as $employee) {
             $currentDate = $startDate->copy();
 
             while ($currentDate->lte($endDate)) {
                 if ($currentDate->isWeekday()) {
-                    \Log::info("Creating vacation entry for {$employee->id} on {$currentDate->toDateString()}");
+                    \Log::info("Creating vacation entry for Employee ID: {$employee->id} on {$currentDate->toDateString()}");
 
-                    VacationCalendar::create([
+                    $vacationCalendar = VacationCalendar::create([
                         'employee_id' => $employee->id,
                         'vacation_date' => $currentDate->toDateString(),
                         'is_half_day' => $isHalfDay,
@@ -50,13 +70,23 @@ class CreateVacationCalendar extends CreateRecord
                         'created_by' => auth()->id(),
                         'updated_by' => auth()->id(),
                     ]);
+
+                    $lastCreated = $vacationCalendar;
+                    \Log::info("VacationCalendar record created: ", $vacationCalendar->toArray());
                 }
 
                 $currentDate->addDay();
             }
         }
 
-        // Return the last created vacation calendar record
-        return VacationCalendar::latest()->first();
+        // Ensure at least one record was created
+        if (!$lastCreated) {
+            \Log::error("No VacationCalendar records were created. Process failed.");
+            throw new \Exception('No valid vacation dates were found within the specified range.');
+        }
+
+        \Log::info("VacationCalendar creation process completed successfully. Returning the last created record.");
+
+        return $lastCreated;
     }
 }

@@ -52,8 +52,8 @@ class PunchSummary extends Page
             DB::raw("DATE(punch_time) as punch_date"),
             DB::raw("
                 MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as ClockIn,
-                MAX(CASE WHEN punch_type_id = 8 THEN TIME(punch_time) END) as LunchStart,
-                MAX(CASE WHEN punch_type_id = 9 THEN TIME(punch_time) END) as LunchStop,
+                MAX(CASE WHEN punch_type_id = 3 THEN TIME(punch_time) END) as LunchStart,
+                MAX(CASE WHEN punch_type_id = 4 THEN TIME(punch_time) END) as LunchStop,
                 MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as ClockOut
             "),
         ])

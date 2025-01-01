@@ -207,4 +207,20 @@ class Attendance extends Model
             }
         });
     }
+    /**
+     * Get status options for the 'status' field.
+     *
+     * @return array
+     */
+    public static function getStatusOptions(): array
+    {
+        $type = \DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
+
+        preg_match('/^enum\((.*)\)$/', $type, $matches);
+        $enumOptions = array_map(function ($value) {
+            return trim($value, "'");
+        }, explode(',', $matches[1]));
+
+        return array_combine($enumOptions, $enumOptions);
+    }
 }

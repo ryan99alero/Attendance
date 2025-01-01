@@ -80,8 +80,8 @@ class PunchResource extends Resource
                     ->label('Punch In')
                     ->alignCenter()
                     ->rules(['required', 'date_format:Y-m-d H:i:s'])
-                    ->afterStateUpdated(fn ($state, $record) => $record->update(['punch_time' => $state]))
                     ->placeholder('YYYY-MM-DD HH:MM')
+                    ->afterStateUpdated(fn ($state, $record) => $record->update(['punch_time' => $state]))
                     ->searchable(),
 
                 IconColumn::make('is_altered')

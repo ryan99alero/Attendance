@@ -13,8 +13,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-
-
 class VacationCalendarResource extends Resource
 {
     protected static ?string $model = VacationCalendar::class;
@@ -41,7 +39,7 @@ class VacationCalendarResource extends Resource
                         ->label('Group Vacation')
                         ->columnSpan(0)
                         ->live()
-                        ->default(false)
+                        ->default(false),
                 ]),
             Forms\Components\Select::make('employee_id')
                 ->relationship('employee', 'first_name')
@@ -50,14 +48,27 @@ class VacationCalendarResource extends Resource
                 ->preload()
                 ->searchable()
                 ->hidden(
-                    fn ($get): bool => $get('vacation_pay') == true),
+                    fn ($get): bool => $get('vacation_pay') == true
+                ),
             Forms\Components\DatePicker::make('start_date')
                 ->label('Start Date')
-                ->required(),
+                ->required()
+                ->prefix('No Weekends')
+                ->disabledDates([
+                    'Sat', 'Sun', // Disable all weekends
+                    'before ' . now()->format('Y-m-d'), // Disable dates before today
+                    'after ' . now()->addDays(5)->format('Y-m-d'), // Disable dates after 5 days from now
+                ]),
             Forms\Components\DatePicker::make('end_date')
                 ->label('End Date')
                 ->required()
-                ->afterOrEqual('start_date'),
+                ->prefix('No Weekends')
+                ->afterOrEqual('start_date')
+                ->disabledDates([
+                    'Sat', 'Sun', // Disable all weekends
+                    'before ' . now()->format('Y-m-d'), // Disable dates before today
+                    'after ' . now()->addDays(5)->format('Y-m-d'), // Disable dates after 5 days from now
+                ]),
         ]);
     }
 

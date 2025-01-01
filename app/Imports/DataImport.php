@@ -4,7 +4,6 @@ namespace App\Imports;
 
 use App\Models\Department;
 use App\Models\Employee;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -68,31 +67,28 @@ class DataImport implements ToCollection, WithHeadingRow
 
                 // Handle external_department_id mapping to department_id
                 if (isset($row['external_department_id'])) {
-                    Log::info("Row {$index} - Attempting to map external_department_id: {$row['external_department_id']}");
-
                     $mappedDepartment = Department::where('external_department_id', $row['external_department_id'])->first();
-
+                    $data['department_id'] = $mappedDepartment->id ?? null;
                     if ($mappedDepartment) {
                         Log::info("Row {$index} - Mapped external_department_id {$row['external_department_id']} to department_id: {$mappedDepartment->id}");
-                        $data['department_id'] = $mappedDepartment->id; // Assign the actual department_id
                     } else {
                         Log::warning("Row {$index} - No department found for external_department_id: {$row['external_department_id']}");
-                        $data['department_id'] = null; // Set to null if no mapping found
                     }
-                } else {
-                    Log::warning("Row {$index} - external_department_id is missing in the input data.");
                 }
 
-                // Lookup and map employee_external_id to employee_id
-                if (isset($data['employee_external_id'])) {
-                    $mappedEmployee = Employee::where('external_id', $data['employee_external_id'])->first();
+                // Conditionally apply Employee-specific logic
+                if ($this->modelClass === Employee::class) {
+                    // Lookup and map employee_external_id to employee_id
+                    if (isset($data['employee_external_id'])) {
+                        $mappedEmployee = Employee::where('external_id', $data['employee_external_id'])->first();
 
-                    if ($mappedEmployee) {
-                        $data['employee_id'] = $mappedEmployee->id;
-                        $data['employee_name'] = $mappedEmployee->full_name;
-                        $data['department_name'] = optional($mappedEmployee->department)->name;
-                    } else {
-                        throw new \Exception("No employee found for external_id {$data['employee_external_id']}.");
+                        if ($mappedEmployee) {
+                            $data['employee_id'] = $mappedEmployee->id;
+                            $data['employee_name'] = $mappedEmployee->full_name;
+                            $data['department_name'] = optional($mappedEmployee->department)->name;
+                        } else {
+                            throw new \Exception("No employee found for external_id {$data['employee_external_id']}.");
+                        }
                     }
                 }
 
@@ -103,16 +99,13 @@ class DataImport implements ToCollection, WithHeadingRow
                     : $data;
 
                 // Log final validated data
-                Log::info("Row {$index} - Final data being saved to Employee table: ", $validatedData);
+                Log::info("Row {$index} - Final data being saved to {$this->modelClass}: ", $validatedData);
 
                 // Create or update the model
-                if (isset($data['id'])) {
-                    Log::info("Row {$index} - Executing UPDATE for Employee with ID: {$data['id']}");
-                    DB::table('employees')->where('id', $data['id'])->update($validatedData);
-                } else {
-                    Log::info("Row {$index} - Executing INSERT for new Employee.");
-                    DB::table('employees')->insert($validatedData);
-                }
+                $model::updateOrCreate(
+                    ['id' => $data['id'] ?? null], // Match by ID if provided
+                    $validatedData
+                );
 
                 Log::info("Successfully imported/updated row {$index}: ", $data);
             } catch (\Exception $e) {
@@ -120,7 +113,7 @@ class DataImport implements ToCollection, WithHeadingRow
             }
         }
 
-        Log::info("Import completed successfully with no errors.");
+        Log::info("Import completed successfully.");
     }
 
     /**

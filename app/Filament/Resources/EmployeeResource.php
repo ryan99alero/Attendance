@@ -6,6 +6,7 @@ use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Models\PayrollFrequency;
+use App\Models\Shift; // Added for shift_id dropdown
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
@@ -25,17 +26,21 @@ class EmployeeResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Select::make('first_name')
+            // Basic personal information
+            TextInput::make('first_name')
                 ->label('First Name')
-                ->required()
-                ->searchable(),
-            Select::make('last_name')
+                ->required(),
+            TextInput::make('last_name')
                 ->label('Last Name')
-                ->required()
-                ->searchable(),
+                ->required(),
             TextInput::make('email')
-                ->label('eMail')
+                ->label('Email')
                 ->nullable(),
+            TextInput::make('phone')
+                ->label('Phone')
+                ->nullable(),
+
+            // Address fields
             TextInput::make('address')
                 ->label('Address')
                 ->nullable(),
@@ -51,21 +56,16 @@ class EmployeeResource extends Resource
             TextInput::make('country')
                 ->label('Country')
                 ->nullable(),
-            TextInput::make('phone')
-                ->label('Phone')
-                ->nullable(),
-            Select::make('external_id')
-                ->label('External ID')
-                ->nullable()
-                ->searchable(),
+
+            // Employment and organizational details
             Select::make('department_id')
                 ->label('Department')
                 ->options(Department::all()->pluck('name', 'id'))
                 ->nullable()
                 ->searchable(),
-            Select::make('round_group_id')
-                ->label('Payroll Rounding')
-                ->options(\App\Models\RoundGroup::all()->pluck('group_name', 'id')) // Use the actual model and fields
+            Select::make('shift_id')
+                ->label('Shift')
+                ->options(Shift::all()->pluck('shift_name', 'id')) // Dropdown for shifts
                 ->nullable()
                 ->searchable(),
             Select::make('payroll_frequency_id')
@@ -73,6 +73,16 @@ class EmployeeResource extends Resource
                 ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
                 ->nullable()
                 ->searchable(),
+            Select::make('round_group_id')
+                ->label('Payroll Rounding')
+                ->options(\App\Models\RoundGroup::all()->pluck('group_name', 'id')) // Use the correct model and fields
+                ->nullable()
+                ->searchable(),
+
+            // Flags and identifiers
+            TextInput::make('external_id')
+                ->label('External ID')
+                ->nullable(),
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
@@ -82,9 +92,6 @@ class EmployeeResource extends Resource
             Toggle::make('vacation_pay')
                 ->label('Vacation Pay')
                 ->default(false),
-            TextInput::make('external_id')
-                ->label('Payroll ID')
-                ->nullable(),
         ]);
     }
 
@@ -98,6 +105,9 @@ class EmployeeResource extends Resource
                     ->searchable(),
                 TextColumn::make('department.name')
                     ->label('Department')
+                    ->sortable(),
+                TextColumn::make('shift.shift_name') // Ensure the relationship is defined in the Employee model
+                ->label('Shift')
                     ->sortable(),
                 TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')

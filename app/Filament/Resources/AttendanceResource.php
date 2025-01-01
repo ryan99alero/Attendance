@@ -6,6 +6,7 @@ use App\Filament\Resources\AttendanceResource\Pages;
 use App\Models\Attendance;
 use App\Models\PunchType;
 use App\Models\Employee;
+use App\Models\PayPeriod;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
@@ -32,20 +33,14 @@ class AttendanceResource extends Resource
             Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
-                ->getOptionLabelUsing(function ($value) {
-                    $employee = Employee::find($value);
-                    if (!$employee || !$employee->first_name) {
-                        \Log::info('Missing label for employee ID: ' . $value);
-                    }
-                    return $employee ? ($employee->first_name ?? 'Unknown Employee') : 'Unknown Employee';
-                })
-                ->placeholder('Select an Employee') // Set placeholder text
+                ->getOptionLabelUsing(fn ($value) => Employee::find($value)?->first_name ?? 'Unknown Employee')
+                ->placeholder('Select an Employee')
                 ->searchable()
                 ->required(),
 
             Select::make('employee_external_id')
                 ->label('Employee External ID')
-                ->options(Employee::pluck('external_id', 'external_id')->toArray())
+                ->options(Employee::pluck('external_id', 'external_id'))
                 ->nullable()
                 ->searchable(),
 
@@ -62,7 +57,7 @@ class AttendanceResource extends Resource
 
             Select::make('punch_type_id')
                 ->label('Punch Type')
-                ->options(PunchType::pluck('name', 'id')->toArray())
+                ->options(PunchType::pluck('name', 'id'))
                 ->nullable()
                 ->searchable(),
 
@@ -72,16 +67,7 @@ class AttendanceResource extends Resource
 
             Select::make('status')
                 ->label('Status')
-                ->options(function () {
-                    $type = DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
-
-                    preg_match('/^enum\((.*)\)$/', $type, $matches);
-                    $enumOptions = array_map(function ($value) {
-                        return trim($value, "'");
-                    }, explode(',', $matches[1]));
-
-                    return array_combine($enumOptions, $enumOptions);
-                })
+                ->options(fn () => Attendance::getStatusOptions())
                 ->placeholder('Select a Status')
                 ->required(),
 
@@ -99,10 +85,20 @@ class AttendanceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function (\Illuminate\Database\Eloquent\Builder $query) {
-                if (request()->has('filter_ids')) {
-                    $ids = explode(',', request()->get('filter_ids'));
+            ->modifyQueryUsing(function ($query) {
+                $filterIds = request()->input('filter_ids');
+                if ($filterIds) {
+                    $ids = array_filter(explode(',', $filterIds), 'is_numeric');
                     $query->whereIn('id', $ids);
+                }
+
+                // Add date range filter using PayPeriod
+                $filter = request()->input('filter');
+                if ($filter && isset($filter['date_range']['start'], $filter['date_range']['end'])) {
+                    $query->whereBetween('punch_time', [
+                        $filter['date_range']['start'],
+                        $filter['date_range']['end'],
+                    ]);
                 }
             })
             ->columns([
@@ -131,23 +127,14 @@ class AttendanceResource extends Resource
 
                 SelectColumn::make('punch_type_id')
                     ->label('Punch Type')
-                    ->options(PunchType::pluck('name', 'id')->toArray())
+                    ->options(PunchType::pluck('name', 'id'))
                     ->sortable()
                     ->searchable()
                     ->extraAttributes(['class' => 'editable']),
 
                 SelectColumn::make('status')
                     ->label('Status')
-                    ->options(function () {
-                        $type = DB::selectOne("SHOW COLUMNS FROM `attendances` WHERE Field = 'status'")->Type;
-
-                        preg_match('/^enum\((.*)\)$/', $type, $matches);
-                        $enumOptions = array_map(function ($value) {
-                            return trim($value, "'");
-                        }, explode(',', $matches[1]));
-
-                        return array_combine($enumOptions, $enumOptions);
-                    })
+                    ->options(fn () => Attendance::getStatusOptions())
                     ->sortable()
                     ->searchable()
                     ->extraAttributes(['class' => 'editable']),

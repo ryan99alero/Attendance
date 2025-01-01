@@ -24,7 +24,7 @@ class AttendanceImportGroupService
 
         // Step 1: Fetch attendance records for the pay period
         $attendances = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
-            ->whereIn('status', ['Incomplete', 'Partial'])
+            ->where('status', 'Incomplete')
             ->orderBy('employee_id')
             ->orderBy('punch_time')
             ->get()

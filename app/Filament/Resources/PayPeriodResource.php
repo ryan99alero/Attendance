@@ -26,9 +26,11 @@ class PayPeriodResource extends Resource
             DatePicker::make('start_date')
                 ->label('Start Date')
                 ->required(),
+
             DatePicker::make('end_date')
                 ->label('End Date')
                 ->required(),
+
             Toggle::make('is_processed')
                 ->label('Processed')
                 ->default(false),
@@ -55,8 +57,14 @@ class PayPeriodResource extends Resource
                 ->state(fn ($record) => $record->attendanceIssuesCount())
                 ->sortable()
                 ->url(fn ($record) => route('filament.admin.resources.attendances.index', [
-                    'filter_ids' => $record->attendanceIssues()->pluck('id')->implode(',')
-                ]), true) // Generate a URL with filter_ids query param
+                    'filter' => [
+                        'is_migrated' => false,
+                        'date_range' => [
+                            'start' => $record->start_date->toDateString(),
+                            'end' => $record->end_date->toDateString(),
+                        ],
+                    ],
+                ]), true)
                 ->color('danger'),
 
             TextColumn::make('punchCount')
@@ -66,13 +74,12 @@ class PayPeriodResource extends Resource
                 ->color('success'),
         ])
             ->actions([
-                // Button to trigger AttendanceProcessingService
                 Action::make('fetch_attendance')
                     ->label('Fetch Attendance')
                     ->color('primary')
                     ->icon('heroicon-o-download')
                     ->action(function ($record) {
-                        $count = $record->processAttendance(); // Calls the service through the model
+                        $count = $record->processAttendance();
 
                         return \Filament\Notifications\Notification::make()
                             ->success()
@@ -80,19 +87,13 @@ class PayPeriodResource extends Resource
                             ->body("$count attendance records have been moved to the punches table.");
                     }),
 
-                // Button to process vacation records
                 Action::make('process_vacation')
                     ->label('Process Vacation')
                     ->color('success')
                     ->icon('heroicon-o-calendar')
                     ->action(function ($record) {
-                        // Ensure start_date and end_date are strings
-                        $startDate = $record->start_date->format('Y-m-d H:i:s'); // Full timestamp format
-                        $endDate = $record->end_date->format('Y-m-d H:i:s'); // Full timestamp format
-
-                        // Call the service
                         $service = app(\App\Services\AttendanceProcessing\VacationTimeProcessAttendanceService::class);
-                        $service->processVacationDays($startDate, $endDate);
+                        $service->processVacationDays($record->start_date->format('Y-m-d H:i:s'), $record->end_date->format('Y-m-d H:i:s'));
 
                         return \Filament\Notifications\Notification::make()
                             ->success()
@@ -100,7 +101,6 @@ class PayPeriodResource extends Resource
                             ->body("Vacation records have been successfully processed for Pay Period ID: {$record->id}");
                     }),
 
-                // Button to view punches for the PayPeriod
                 Action::make('view_punches')
                     ->label('View Punches')
                     ->color('secondary')

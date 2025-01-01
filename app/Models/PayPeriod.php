@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- *
+ * Class PayPeriod
  *
  * @property int $id
  * @property \Illuminate\Support\Carbon $start_date Start date of the pay period
@@ -24,18 +24,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Punch> $punches
  * @property-read int|null $punches_count
  * @property-read \App\Models\User|null $updater
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereEndDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereIsProcessed($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereProcessedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereStartDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereUpdatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod query()
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereCreatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereEndDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereIsProcessed($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereProcessedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereStartDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereUpdatedBy($value)
  * @mixin \Eloquent
  */
 class PayPeriod extends Model
@@ -57,53 +57,27 @@ class PayPeriod extends Model
         'is_processed' => 'boolean',
     ];
 
-    /**
-     * Relationship: Processor (User who processed the pay period).
-     *
-     * @return BelongsTo
-     */
+    // Relationships
     public function processor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
     }
 
-    /**
-     * Relationship: Creator (User who created the record).
-     *
-     * @return BelongsTo
-     */
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /**
-     * Relationship: Updater (User who last updated the record).
-     *
-     * @return BelongsTo
-     */
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    /**
-     * Relationship: Punches associated with the PayPeriod.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
     public function punches(): HasMany
     {
         return $this->hasMany(Punch::class, 'pay_period_id');
     }
 
-    /**
-     * Virtual Relationship: Attendances with issues for this PayPeriod.
-     * Query attendances where `punch_time` falls within the PayPeriod's range
-     * and status is NOT 'Migrated'.
-     *
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
     public function attendanceIssues()
     {
         return Attendance::query()
@@ -111,36 +85,28 @@ class PayPeriod extends Model
             ->where('status', '!=', 'Migrated');
     }
 
-    /**
-     * Count of attendance issues for this PayPeriod.
-     *
-     * @return int
-     */
+    // Custom Methods
     public function attendanceIssuesCount(): int
     {
         return $this->attendanceIssues()->count();
     }
 
-    /**
-     * Count of punches for this PayPeriod.
-     *
-     * @return int
-     */
     public function punchCount(): int
     {
         return $this->punches()->count();
     }
 
-    /**
-     * Use the AttendanceProcessingService to process attendance.
-     *
-     * @return int
-     */
     public function processAttendance(): int
     {
         $service = app(\App\Services\AttendanceProcessing\AttendanceProcessingService::class);
         $service->processAll($this);
 
         return 0; // Return count if needed
+    }
+    public static function current()
+    {
+        return self::where('start_date', '<=', now())
+            ->where('end_date', '>=', now())
+            ->first();
     }
 }
