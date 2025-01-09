@@ -17,7 +17,8 @@
                 <table class="w-full table-auto border-collapse border border-gray-300 dark:border-gray-700">
                     <thead>
                     <tr class="bg-gray-100 dark:bg-gray-800">
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee</th>
+                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Full Name</th>
+                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Payroll ID</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Date</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Clock In</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Lunch Start</th>
@@ -28,16 +29,17 @@
                     <tbody>
                     @forelse ($groupedPunches as $punch)
                         <tr>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['employee_id'] }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['punch_date'] }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['ClockIn'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['LunchStart'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['LunchStop'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['ClockOut'] ?? 'N/A' }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['FullName'] }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['PayrollID'] }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['PunchDate'] }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['ClockIn'] ?? '' }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['LunchStart'] ?? '' }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['LunchStop'] ?? '' }}</td>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $punch['ClockOut'] ?? '' }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
+                            <td colspan="7" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 No punches available.
                             </td>
                         </tr>

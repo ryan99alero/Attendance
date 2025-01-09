@@ -1,11 +1,12 @@
 <?php
 
 namespace App\Filament\Pages;
+
+use App\Models\Punch;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
-use App\Models\Punch;
 
 class PunchSummary extends Page
 {
@@ -15,6 +16,7 @@ class PunchSummary extends Page
     protected static ?string $navigationLabel = 'Punch Summary';
 
     public $payPeriodId; // Bound to the select dropdown
+    public $search = ''; // Search term for filtering punches
     public $groupedPunches;
 
     public function mount(): void
@@ -32,40 +34,66 @@ class PunchSummary extends Page
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updatePunches()) // Refresh data on selection
                 ->placeholder('All Pay Periods'),
+            Forms\Components\TextInput::make('search')
+                ->label('Search by Name or Payroll ID')
+                ->placeholder('Enter employee name or payroll ID')
+                ->reactive()
+                ->afterStateUpdated(fn () => $this->updatePunches()), // Refresh punches on search
         ];
     }
 
     protected function getPayPeriods(): array
     {
-        // Ensure PayPeriod model exists and contains data
         return \App\Models\PayPeriod::query()
             ->select('id', 'start_date', 'end_date')
             ->get()
-            ->pluck('start_date', 'id') // Make sure 'name' exists for each record
+            ->pluck('start_date', 'id')
             ->toArray();
     }
 
     public function fetchPunches(): Collection
     {
-        $query = Punch::select([
+        $query = Punch::with('employee:id,full_names,external_id') // Eager load employee relationship
+        ->select([
             'employee_id',
             DB::raw("DATE(punch_time) as punch_date"),
             DB::raw("
-                MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as ClockIn,
-                MAX(CASE WHEN punch_type_id = 3 THEN TIME(punch_time) END) as LunchStart,
-                MAX(CASE WHEN punch_type_id = 4 THEN TIME(punch_time) END) as LunchStop,
-                MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as ClockOut
-            "),
+                    MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as clock_in,
+                    MAX(CASE WHEN punch_type_id = 3 THEN TIME(punch_time) END) as lunch_start,
+                    MAX(CASE WHEN punch_type_id = 4 THEN TIME(punch_time) END) as lunch_stop,
+                    MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as clock_out
+                "),
         ])
             ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
-            ->orderBy('employee_id')
-            ->orderBy(DB::raw('DATE(punch_time)'));
+            ->orderBy('employee_id') // Sorting by employee_id
+            ->orderBy(DB::raw('DATE(punch_time)')); // Sorting by punch date
 
         if ($this->payPeriodId) {
             $query->where('pay_period_id', $this->payPeriodId);
         }
 
-        return $query->get();
+        if ($this->search) {
+            $query->whereHas('employee', function ($subQuery) {
+                $subQuery->where('full_names', 'like', '%' . $this->search . '%')
+                    ->orWhere('external_id', 'like', '%' . $this->search . '%');
+            });
+        }
+
+        $groupedPunches = $query->get();
+
+        return $groupedPunches->map(function ($punch) {
+            $employee = $punch->employee; // Access related employee data
+            return [
+                'EmployeeID' => $punch->employee_id,
+                'FullName' => $employee?->full_names ?? 'N/A',
+                'PayrollID' => $employee?->external_id ?? 'N/A',
+                'PunchDate' => $punch->punch_date,
+                'ClockIn' => $punch->clock_in,
+                'LunchStart' => $punch->lunch_start,
+                'LunchStop' => $punch->lunch_stop,
+                'ClockOut' => $punch->clock_out,
+            ];
+        });
     }
 
     public function updatePunches(): void
