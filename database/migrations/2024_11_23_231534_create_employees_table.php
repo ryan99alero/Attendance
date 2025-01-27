@@ -13,8 +13,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::disableForeignKeyConstraints();
+
         Schema::create('employees', function (Blueprint $table) {
             $table->id()->comment('Primary key of the employees table');
+            $table->string('external_id', 255)->nullable()->comment('External system identifier for the employee');
+            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing the departments table');
+            $table->string('email', 255)->nullable()->comment('Employee email address');
             $table->string('first_name', 50)->comment('First name of the employee');
             $table->string('last_name', 50)->comment('Last name of the employee');
             $table->string('address', 255)->nullable()->comment('Residential address of the employee');
@@ -23,9 +27,6 @@ return new class extends Migration
             $table->string('zip', 255)->nullable()->comment('ZIP or postal code of the employee');
             $table->string('country', 255)->nullable()->comment('Country of residence of the employee');
             $table->string('phone', 15)->nullable()->comment('Contact phone number of the employee');
-            $table->string('external_id', 255)->nullable()->comment('External system identifier for the employee');
-            $table->string('email')->primary()->comment('Employee email address of the employee');
-            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing the departments table');
             $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing the shifts table');
             $table->string('photograph', 255)->nullable()->comment('Path or URL of the employee photograph');
             $table->date('termination_date')->nullable()->comment('Date of termination, if applicable');
@@ -39,19 +40,22 @@ return new class extends Migration
             $table->string('full_names', 101)->nullable()->comment('Concatenated full name of the employee');
             $table->unsignedBigInteger('shift_schedule_id')->nullable()->comment('Foreign key referencing the shift schedules table');
             $table->unsignedBigInteger('round_group_id')->nullable()->comment('Foreign key referencing the round_groups table');
+            $table->string('external_department_id', 4)->nullable()->comment('External department identifier');
 
             // Foreign key constraints
-            $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null')->comment('Relationship with departments');
-            $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('set null')->comment('Relationship with shifts');
-            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null')->comment('User who created the record');
-            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null')->comment('User who last updated the record');
-            $table->foreign('payroll_frequency_id')->references('id')->on('payroll_frequencies')->onDelete('set null')->comment('Relationship with payroll frequencies');
-            $table->foreign('shift_schedule_id')->references('id')->on('shift_schedules')->onDelete('set null')->comment('Relationship with shift schedules');
-            $table->foreign('round_group_id')->references('id')->on('round_groups')->onDelete('set null')->onUpdate('cascade')->comment('Relationship with round groups');
+            $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null');
+            $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('set null');
+            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('payroll_frequency_id')->references('id')->on('payroll_frequencies')->onDelete('set null');
+            $table->foreign('shift_schedule_id')->references('id')->on('shift_schedules')->onDelete('set null');
+            $table->foreign('round_group_id')->references('id')->on('round_groups')->onDelete('set null')->onUpdate('cascade');
+            $table->foreign('external_department_id')->references('external_department_id')->on('departments')->onDelete('set null')->onUpdate('cascade');
 
             // Indexes for optimization
-            $table->index(['first_name', 'last_name'], 'idx_employee_name')->comment('Index for optimizing queries by employee name');
-            $table->index('department_id', 'idx_department_id')->comment('Index for optimizing queries by department');
+            $table->index(['first_name', 'last_name'], 'idx_employee_name');
+            $table->index('department_id', 'idx_department_id');
+            $table->index('external_department_id', 'idx_employees_external_department_id');
         });
 
         // Add triggers for full_names
@@ -76,6 +80,7 @@ return new class extends Migration
                 );
             END;
         ");
+
         Schema::enableForeignKeyConstraints();
     }
 

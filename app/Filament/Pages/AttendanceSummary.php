@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use Filament\Forms;
+use Filament\Pages\Actions\Action;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 use App\Models\Attendance;
@@ -17,11 +18,18 @@ class AttendanceSummary extends Page
     protected static bool $shouldRegisterNavigation = false;
 
     public $payPeriodId; // Bound to the select dropdown
+    public $search = ''; // For search functionality
     public $groupedAttendances;
+
+    // Modal data
+    public $selectedEmployee;
+    public $selectedDate;
+    public $selectedPunchType;
 
     public function mount(): void
     {
         $this->payPeriodId = null; // Default to no filter
+        $this->search = ''; // Default to empty search
         $this->groupedAttendances = $this->fetchAttendances(); // Fetch initial attendance data
     }
 
@@ -34,6 +42,11 @@ class AttendanceSummary extends Page
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances())
                 ->placeholder('All Pay Periods'),
+            Forms\Components\TextInput::make('search')
+                ->label('Search')
+                ->placeholder('Search any value...')
+                ->reactive()
+                ->afterStateUpdated(fn () => $this->updateAttendances()),
         ];
     }
 
@@ -61,12 +74,12 @@ class AttendanceSummary extends Page
                 MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as clock_out,
                 COUNT(*) as total_punches
             "),
+            DB::raw("SUM(CASE WHEN is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
         ])
             ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
             ->orderBy('employee_id')
             ->orderBy(DB::raw('DATE(punch_time)'));
 
-        // Filter by pay period (start_date and end_date)
         if ($this->payPeriodId) {
             $payPeriod = PayPeriod::find($this->payPeriodId);
 
@@ -75,7 +88,18 @@ class AttendanceSummary extends Page
             }
         }
 
-        // Retrieve results and filter incomplete rows
+        // Apply search filter
+        if ($this->search) {
+            $query->where(function ($subQuery) {
+                $subQuery->where('employee_id', 'like', '%' . $this->search . '%')
+                    ->orWhereHas('employee', function ($employeeQuery) {
+                        $employeeQuery->where('full_names', 'like', '%' . $this->search . '%')
+                            ->orWhere('external_id', 'like', '%' . $this->search . '%');
+                    })
+                    ->orWhere(DB::raw("DATE(punch_time)"), 'like', '%' . $this->search . '%');
+            });
+        }
+
         return $query->get()->filter(function ($attendance) {
             $fields = [
                 $attendance->clock_in,
@@ -87,7 +111,7 @@ class AttendanceSummary extends Page
             // Count the number of non-null fields
             $filledFields = array_filter($fields, fn($field) => !is_null($field));
 
-            // Include rows where the number of filled fields is 1 or 3
+            // Return true only if the number of filled fields is 1 or 3
             return count($filledFields) === 1 || count($filledFields) === 3;
         })->map(function ($attendance) {
             $employee = $attendance->employee;
@@ -107,6 +131,37 @@ class AttendanceSummary extends Page
     }
 
     public function updateAttendances(): void
+    {
+        $this->groupedAttendances = $this->fetchAttendances();
+    }
+
+    public function saveTimeRecord(): void
+    {
+        Attendance::create([
+            'employee_id' => $this->selectedEmployee,
+            'punch_time' => $this->selectedDate,
+            'punch_type_id' => $this->selectedPunchType,
+        ]);
+
+        $this->reset(['selectedEmployee', 'selectedDate', 'selectedPunchType']);
+        $this->groupedAttendances = $this->fetchAttendances();
+    }
+
+    protected function getActions(): array
+    {
+        return [
+            Action::make('Add Time Record')
+                ->label('Add Time Record') // Updated label
+                ->color('primary') // Optional: Set the button color
+                ->icon('heroicon-o-plus') // Optional: Add an icon
+                ->url(route('filament.admin.resources.attendances.create')) // Redirect to the specified URL
+                ->openUrlInNewTab(), // Optional: Open link in a new tab
+        ];
+    }
+
+    protected $listeners = ['timeRecordCreated' => 'refreshAttendanceData'];
+
+    public function refreshAttendanceData(): void
     {
         $this->groupedAttendances = $this->fetchAttendances();
     }

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employees
@@ -53,6 +53,7 @@ class Punch extends Model
         'device_id',
         'punch_type_id',
         'punch_time',
+        'classification_id',
         'pay_period_id', // Ensure this is included
         'attendance_id',
         'is_altered',

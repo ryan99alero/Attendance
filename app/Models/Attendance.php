@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Classification;
 use Carbon\Carbon;
 
 /**
@@ -63,6 +64,7 @@ class Attendance extends Model
         'employee_external_id',
         'device_id',
         'punch_time',
+        'classification_id',
         'punch_type_id',
         'status',
         'issue_notes',
@@ -91,7 +93,10 @@ class Attendance extends Model
     {
         return Carbon::parse($value)->format('Y-m-d H:i:s');
     }
-
+    public function classification()
+    {
+        return $this->belongsTo(Classification::class);
+    }
     /**
      * Mutator for `punch_time` to ensure it is saved in full datetime format.
      */

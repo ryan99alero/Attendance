@@ -13,7 +13,7 @@ return new class extends Migration
             $table->id();
             $table->date('start_date')->comment('Start date of the pay period');
             $table->date('end_date')->comment('End date of the pay period');
-            $table->boolean('is_processed')->default(false)->comment('Indicates if the pay period has been processed');
+            $table->boolean('is_posted')->default(false)->comment('Indicates if the pay period has been processed');
             $table->unsignedBigInteger('processed_by')->nullable()->comment('Foreign key to Users for processor');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key to Users for record creator');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key to Users for last updater');

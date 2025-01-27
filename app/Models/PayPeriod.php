@@ -77,12 +77,11 @@ class PayPeriod extends Model
     {
         return $this->hasMany(Punch::class, 'pay_period_id');
     }
-
-    public function attendanceIssues()
+    public function attendanceIssues(): \Illuminate\Database\Eloquent\Builder
     {
         return Attendance::query()
             ->whereBetween('punch_time', [$this->start_date, $this->end_date])
-            ->where('status', '!=', 'Migrated');
+            ->whereNotIn('status', ['Migrated', 'Approved']); // Example: Exclude "Approved" records too
     }
 
     // Custom Methods

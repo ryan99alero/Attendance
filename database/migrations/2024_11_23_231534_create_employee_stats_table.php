@@ -9,8 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::disableForeignKeyConstraints();
+
         Schema::create('employee_stats', function (Blueprint $table) {
-            $table->id();
+            $table->id()->comment('Primary key of the employee_stats table');
             $table->unsignedBigInteger('employee_id')->comment('Foreign key to Employees');
             $table->integer('hours_worked')->default(0)->comment('Total hours worked');
             $table->integer('overtime_hours')->default(0)->comment('Total overtime hours');
@@ -20,10 +21,12 @@ return new class extends Migration
             $table->timestamps();
 
             // Foreign key constraints
-            $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade');
-            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
-            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade')->comment('References the employees table');
+            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null')->comment('References the users table for record creator');
+            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null')->comment('References the users table for last updater');
         });
+
+        Schema::enableForeignKeyConstraints();
     }
 
     public function down(): void

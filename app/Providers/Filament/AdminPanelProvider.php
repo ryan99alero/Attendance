@@ -62,6 +62,10 @@ class AdminPanelProvider extends PanelProvider
                 // Punch & Attendance
                 NavigationItem::make('Attendances')
                     ->url('/admin/attendances')
+                    ->icon('heroicon-o-finger-print')
+                    ->group('Punch & Attendance'),
+                NavigationItem::make('Attendance Summary')
+                    ->url('/admin/attendance-summary')
                     ->icon('heroicon-o-document-text')
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Punch Summary')
@@ -75,6 +79,10 @@ class AdminPanelProvider extends PanelProvider
                 NavigationItem::make('Devices')
                     ->url('/admin/devices')
                     ->icon('heroicon-o-device-mobile')
+                    ->group('Punch & Attendance'),
+                NavigationItem::make('Cards')
+                    ->url('/admin/cards')
+                    ->icon('heroicon-o-credit-card')
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Employee Stats')
                     ->url('/admin/employee-stats')

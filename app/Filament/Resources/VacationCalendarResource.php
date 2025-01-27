@@ -86,9 +86,6 @@ class VacationCalendarResource extends Resource
             Tables\Columns\IconColumn::make('is_recorded')
                 ->label('Time Recorded')
                 ->boolean(),
-            Tables\Columns\IconColumn::make('employee.vacation_pay')
-                ->label('Group Entry')
-                ->boolean(),
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\AttendanceProcessing\ShiftScheduleService;
 use Illuminate\Support\ServiceProvider;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\View;
@@ -15,7 +16,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Correct namespace for ShiftScheduleService
+        $this->app->singleton(ShiftScheduleService::class, function ($app) {
+            return new ShiftScheduleService();
+        });
     }
 
     /**

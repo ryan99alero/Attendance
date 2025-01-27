@@ -12,6 +12,9 @@ use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
+use App\Services\AttendanceProcessing\AttendanceProcessingService;
+
 
 class PayPeriodResource extends Resource
 {
@@ -52,7 +55,7 @@ class PayPeriodResource extends Resource
                 ->label('Processed')
                 ->boolean(),
 
-            TextColumn::make('attendanceIssuesCount')
+            TextColumn::make('attendance_issues_count')
                 ->label('Attendance Issues')
                 ->state(fn ($record) => $record->attendanceIssuesCount())
                 ->sortable()
@@ -67,40 +70,66 @@ class PayPeriodResource extends Resource
                 ]), true)
                 ->color('danger'),
 
-            TextColumn::make('punchCount')
+            TextColumn::make('punch_count')
                 ->label('Punch Count')
                 ->state(fn ($record) => $record->punchCount())
                 ->sortable()
                 ->color('success'),
         ])
             ->actions([
-                Action::make('fetch_attendance')
-                    ->label('Fetch Attendance')
+                // Process Time Button
+                Action::make('process_time')
+                    ->label('Process Time')
                     ->color('primary')
                     ->icon('heroicon-o-download')
                     ->action(function ($record) {
-                        $count = $record->processAttendance();
+                        $processingService = app(AttendanceProcessingService::class);
 
-                        return \Filament\Notifications\Notification::make()
-                            ->success()
-                            ->title('Attendance Fetched')
-                            ->body("$count attendance records have been moved to the punches table.");
+                        try {
+                            $processingService->processAll($record);
+
+                            return \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Time Processed')
+                                ->body("Time records have been successfully processed for Pay Period ID: {$record->id}");
+                        } catch (\Exception $e) {
+                            return \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Processing Error')
+                                ->body("An error occurred while processing Pay Period ID: {$record->id}. Error: {$e->getMessage()}");
+                        }
                     }),
 
-                Action::make('process_vacation')
-                    ->label('Process Vacation')
+                // Post Time Button
+                Action::make('post_time')
+                    ->label('Post Time')
                     ->color('success')
-                    ->icon('heroicon-o-calendar')
+                    ->icon('heroicon-o-check-circle')
                     ->action(function ($record) {
-                        $service = app(\App\Services\AttendanceProcessing\VacationTimeProcessAttendanceService::class);
-                        $service->processVacationDays($record->start_date->format('Y-m-d H:i:s'), $record->end_date->format('Y-m-d H:i:s'));
+                        // Check for unresolved attendance issues
+                        if ($record->attendanceIssuesCount() > 0) {
+                            return \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Cannot Post Time')
+                                ->body('There are unresolved attendance issues for this pay period. Please resolve them before posting time.')
+                                ->send();
+                        }
+
+                        // Archive processed records and mark pay period as processed
+                        DB::table('attendances')
+                            ->whereBetween('punch_time', [$record->start_date, $record->end_date])
+                            ->update(['status' => 'Posted']);
+
+                        $record->update(['is_posted' => true]);
 
                         return \Filament\Notifications\Notification::make()
                             ->success()
-                            ->title('Vacation Processed')
-                            ->body("Vacation records have been successfully processed for Pay Period ID: {$record->id}");
+                            ->title('Time Posted')
+                            ->body("Time records for Pay Period ID: {$record->id} have been finalized and archived.")
+                            ->send();
                     }),
 
+                // View Punches Button
                 Action::make('view_punches')
                     ->label('View Punches')
                     ->color('secondary')

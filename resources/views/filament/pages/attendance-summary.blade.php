@@ -17,35 +17,41 @@
                 <table class="w-full table-auto border-collapse border border-gray-300 dark:border-gray-700">
                     <thead>
                     <tr class="bg-gray-100 dark:bg-gray-800">
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee ID</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Full Name</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Payroll ID</th>
+                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Date</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">First Punch</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Lunch Start</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Lunch Stop</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Last Punch</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Manual Entries</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Total Punches</th>
                     </tr>
                     </thead>
                     <tbody>
                     @forelse ($groupedAttendances as $attendance)
                         <tr>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['employee_id'] }}</td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['FullName'] }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['PayrollID'] }}</td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['attendance_date'] }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['FirstPunch'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['LunchStart'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['LunchStop'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['LastPunch'] ?? 'N/A' }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['ManualEntries'] }}</td>
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['TotalPunches'] }}</td>
+                            @foreach (['FirstPunch' => 1, 'LunchStart' => 3, 'LunchStop' => 4, 'LastPunch' => 2] as $key => $punchType)
+                                <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
+                                    @if ($attendance[$key] === null)
+                                        <x-filament::button
+                                            wire:click="$dispatch('open-modal', {
+        employeeId: '{{ $attendance['employee_id'] }}',
+        date: '{{ $attendance['attendance_date'] }}',
+        punchType: {{ $punchType }}
+    })"
+                                            x-on:click="console.log('Dispatched open-modal event for Employee ID: {{ $attendance['employee_id'] }}')"
+                                            class="text-blue-500 underline">
+                                            Input Time
+                                        </x-filament::button>
+                                    @else
+                                        {{ $attendance[$key] }}
+                                    @endif
+                                </td>
+                            @endforeach
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
+                            <td colspan="6" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 No attendance records available.
                             </td>
                         </tr>
@@ -55,4 +61,7 @@
             </div>
         </div>
     </div>
+
+    <!-- Livewire Component for the Modal -->
+    <livewire:create-time-record-modal />
 </x-filament::page>

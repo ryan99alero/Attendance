@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Livewire\Controllers;
 
 abstract class Controller
 {
     //
 }
-
