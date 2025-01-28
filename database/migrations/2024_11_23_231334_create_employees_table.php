@@ -12,6 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         Schema::disableForeignKeyConstraints();
 
         Schema::create('employees', function (Blueprint $table) {
@@ -40,7 +41,7 @@ return new class extends Migration
             $table->string('full_names', 101)->nullable()->comment('Concatenated full name of the employee');
             $table->unsignedBigInteger('shift_schedule_id')->nullable()->comment('Foreign key referencing the shift schedules table');
             $table->unsignedBigInteger('round_group_id')->nullable()->comment('Foreign key referencing the round_groups table');
-            $table->string('external_department_id', 4)->nullable()->comment('External department identifier');
+//            $table->string('external_department_id')->nullable()->comment('External department identifier');
 
             // Foreign key constraints
             $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null');
@@ -50,14 +51,14 @@ return new class extends Migration
             $table->foreign('payroll_frequency_id')->references('id')->on('payroll_frequencies')->onDelete('set null');
             $table->foreign('shift_schedule_id')->references('id')->on('shift_schedules')->onDelete('set null');
             $table->foreign('round_group_id')->references('id')->on('round_groups')->onDelete('set null')->onUpdate('cascade');
-            $table->foreign('external_department_id')->references('external_department_id')->on('departments')->onDelete('set null')->onUpdate('cascade');
+ //           $table->foreign('external_department_id')->references('external_department_id')->on('departments')->onDelete('set null')->onUpdate('cascade');
 
             // Indexes for optimization
             $table->index(['first_name', 'last_name'], 'idx_employee_name');
             $table->index('department_id', 'idx_department_id');
-            $table->index('external_department_id', 'idx_employees_external_department_id');
+ //           $table->index('external_department_id', 'idx_external_department_id');
         });
-
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         // Add triggers for full_names
         DB::unprepared("
             CREATE TRIGGER insert_full_name

@@ -12,6 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         Schema::create('attendances', function (Blueprint $table) {
             $table->id()->comment('Primary key of the attendances table');
             $table->unsignedBigInteger('employee_id')->comment('Foreign key to employees table');
@@ -42,7 +43,7 @@ return new class extends Migration
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
             $table->foreign('classification_id')->references('id')->on('classifications')->onDelete('set null');
         });
-
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         // Triggers
         DB::unprepared("
             CREATE TRIGGER validate_punch_time

@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         Schema::disableForeignKeyConstraints();
         Schema::create('vacation_balances', function (Blueprint $table) {
             $table->id();
@@ -26,6 +27,7 @@ return new class extends Migration
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
         });
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
     }
 
     public function down(): void
