@@ -1,14 +1,17 @@
 <?php
 
 namespace App\Services\AttendanceProcessing;
+
 use Illuminate\Support\Facades\DB;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 
 class PunchValidationService
 {
+    protected const OVERLAPPING_ENTRY_METHODS = ['vacation', 'holiday'];
+
     /**
-     * Validates and prepares punches for migration within a pay period.
+     * Validates punches within a pay period.
      *
      * @param PayPeriod $payPeriod
      * @return void
@@ -20,24 +23,58 @@ class PunchValidationService
             ->where('is_migrated', false)
             ->get();
 
-        $punches = $attendances->map(function ($attendance) use ($payPeriod) {
-            return [
-                'employee_id' => $attendance->employee_id,
-                'device_id' => $attendance->device_id,
-                'punch_type_id' => null, // Determine punch type logic here
-                'punch_time' => $attendance->punch_time,
-                'pay_period_id' => $payPeriod->id,
-                'is_altered' => false,
-                'attendance_id' => $attendance->id,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-        })->toArray();
+        foreach ($attendances as $attendance) {
+            // Example of validation logic
+            if (!$attendance->punch_time || !$attendance->employee_id) {
+                \Log::warning("Invalid attendance record ID: {$attendance->id}");
+                continue;
+            }
 
-        // Insert punches into the punches table
-        DB::table('punches')->insert($punches);
+            \Log::info("Validated attendance record ID: {$attendance->id} for Employee ID: {$attendance->employee_id}.");
+        }
 
-        // Mark attendances as migrated by updating the status column
-        $attendanceIds = $attendances->pluck('id')->toArray();
-        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Migrated']);                                                                                                                                                                      }
+        \Log::info("Validation completed for punches in PayPeriod ID: {$payPeriod->id}");
+    }
+
+    /**
+     * Resolves overlapping records for employees with possible extra attendance records on the same day.
+     *
+     * @param PayPeriod $payPeriod
+     * @return void
+     */
+    public function resolveOverlappingRecords(PayPeriod $payPeriod): void
+    {
+        \Log::info("resolveOverlappingRecords called for PayPeriod ID: {$payPeriod->id}");
+
+        // Step 1: Identify overlapping records
+        $overlappingRecords = Attendance::select('employee_id', DB::raw('DATE(punch_time) as punch_date'), DB::raw('COUNT(*) as record_count'))
+            ->whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+            ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
+            ->having('record_count', '>', 1)
+            ->get();
+
+        foreach ($overlappingRecords as $record) {
+            $employeeId = $record->employee_id;
+            $punchDate = $record->punch_date;
+
+           // \Log::info("Checking potential extra records for Employee ID: {$employeeId} on {$punchDate}");
+
+            // Step 2: Retrieve all attendance records for the day
+            $dailyRecords = Attendance::where('employee_id', $employeeId)
+                ->whereDate('punch_time', $punchDate)
+                ->get();
+
+            if ($dailyRecords->isEmpty()) {
+                \Log::warning("No records found for Employee ID: {$employeeId} on {$punchDate}");
+                continue;
+            }
+
+          //  \Log::info("Found {$dailyRecords->count()} attendance records for Employee ID: {$employeeId} on {$punchDate}");
+
+            // Placeholder for future logic to handle extra records
+            // Example: Validate or prioritize certain records based on business rules
+        }
+
+        \Log::info("resolveOverlappingRecords completed for PayPeriod ID: {$payPeriod->id}");
+    }
 }
