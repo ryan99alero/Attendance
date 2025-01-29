@@ -30,7 +30,7 @@ class AttendanceSummary extends Page
     {
         $this->payPeriodId = null; // Default to no filter
         $this->search = ''; // Default to empty search
-        $this->groupedAttendances = $this->fetchAttendances(); // Fetch initial attendance data
+        $this->groupedAttendances = collect(); // Set to an empty collection on initial load
     }
 
     protected function getFormSchema(): array
@@ -63,57 +63,56 @@ class AttendanceSummary extends Page
 
     public function fetchAttendances(): Collection
     {
-        $query = Attendance::with('employee:id,full_names,external_id') // Eager load employee relationship
+        if (!$this->payPeriodId) {
+            // Return empty collection if no PayPeriod is selected
+            \Log::info("No PayPeriod selected. Returning empty attendance records.");
+            return collect();
+        }
+
+        $payPeriod = PayPeriod::find($this->payPeriodId);
+
+        if (!$payPeriod) {
+            \Log::warning("Invalid PayPeriod ID: {$this->payPeriodId}. Returning empty attendance records.");
+            return collect();
+        }
+
+        \Log::info("Fetching attendances for PayPeriod: {$payPeriod->start_date} to {$payPeriod->end_date}");
+
+        $query = Attendance::with('employee') // Eager load employee relationship
         ->select([
             'employee_id',
             DB::raw("DATE(punch_time) as attendance_date"),
             DB::raw("
-                MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as clock_in,
-                MAX(CASE WHEN punch_type_id = 3 THEN TIME(punch_time) END) as lunch_start,
-                MAX(CASE WHEN punch_type_id = 4 THEN TIME(punch_time) END) as lunch_stop,
-                MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as clock_out,
-                COUNT(*) as total_punches
-            "),
+                    MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as clock_in,
+                    MAX(CASE WHEN punch_type_id = 3 THEN TIME(punch_time) END) as lunch_start,
+                    MAX(CASE WHEN punch_type_id = 4 THEN TIME(punch_time) END) as lunch_stop,
+                    MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as clock_out,
+                    COUNT(*) as total_punches
+                "),
             DB::raw("SUM(CASE WHEN is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
         ])
+            ->whereBetween(DB::raw('DATE(punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
             ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
             ->orderBy('employee_id')
             ->orderBy(DB::raw('DATE(punch_time)'));
 
-        if ($this->payPeriodId) {
-            $payPeriod = PayPeriod::find($this->payPeriodId);
-
-            if ($payPeriod) {
-                $query->whereBetween(DB::raw('DATE(punch_time)'), [$payPeriod->start_date, $payPeriod->end_date]);
-            }
-        }
-
         // Apply search filter
         if ($this->search) {
+            \Log::info("Applying search filter: {$this->search}");
             $query->where(function ($subQuery) {
                 $subQuery->where('employee_id', 'like', '%' . $this->search . '%')
                     ->orWhereHas('employee', function ($employeeQuery) {
                         $employeeQuery->where('full_names', 'like', '%' . $this->search . '%')
                             ->orWhere('external_id', 'like', '%' . $this->search . '%');
-                    })
-                    ->orWhere(DB::raw("DATE(punch_time)"), 'like', '%' . $this->search . '%');
+                    });
             });
         }
 
-        return $query->get()->filter(function ($attendance) {
-            $fields = [
-                $attendance->clock_in,
-                $attendance->lunch_start,
-                $attendance->lunch_stop,
-                $attendance->clock_out,
-            ];
+        $attendances = $query->get();
 
-            // Count the number of non-null fields
-            $filledFields = array_filter($fields, fn($field) => !is_null($field));
+        \Log::info("Fetched {$attendances->count()} attendance records.");
 
-            // Return true only if the number of filled fields is 1 or 3
-            return count($filledFields) === 1 || count($filledFields) === 3;
-        })->map(function ($attendance) {
+        return $attendances->map(function ($attendance) {
             $employee = $attendance->employee;
             return [
                 'employee_id' => $attendance->employee_id,

@@ -86,19 +86,26 @@ class AttendanceResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function ($query) {
+                $filter = request()->input('filter');
+
+                // Handle `filter_ids` if passed
                 $filterIds = request()->input('filter_ids');
                 if ($filterIds) {
                     $ids = array_filter(explode(',', $filterIds), 'is_numeric');
                     $query->whereIn('id', $ids);
                 }
 
-                // Add date range filter using PayPeriod
-                $filter = request()->input('filter');
+                // Apply date range filter
                 if ($filter && isset($filter['date_range']['start'], $filter['date_range']['end'])) {
                     $query->whereBetween('punch_time', [
                         $filter['date_range']['start'],
                         $filter['date_range']['end'],
                     ]);
+                }
+
+                // Apply `is_migrated` filter
+                if ($filter && isset($filter['is_migrated'])) {
+                    $query->where('is_migrated', $filter['is_migrated']);
                 }
             })
             ->columns([

@@ -81,7 +81,7 @@ class PayPeriod extends Model
     {
         return Attendance::query()
             ->whereBetween('punch_time', [$this->start_date, $this->end_date])
-            ->whereNotIn('status', ['Migrated', 'Approved']); // Example: Exclude "Approved" records too
+            ->where('is_migrated', false); // Only include records where is_migrated is false
     }
 
     // Custom Methods
