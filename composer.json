@@ -17,6 +17,7 @@
         "livewire/livewire": "^3.5",
         "maatwebsite/excel": "^3.1",
         "nesbot/carbon": "^3.8",
+        "php-ai/php-ml": "^0.10.0",
         "spatie/laravel-query-builder": "^5.0"
     },
     "require-dev": {

@@ -42,6 +42,7 @@ return new class extends Migration
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
             $table->foreign('classification_id')->references('id')->on('classifications')->onDelete('set null');
+            $table->foreign('holiday_id')->references('id')->on('holidays')->onDelete('cascade');
         });
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         // Triggers

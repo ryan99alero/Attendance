@@ -58,33 +58,70 @@ class PunchMigrationService
                     Log::info("Rounded punch time for Attendance ID {$attendance->id}: {$roundedPunchTime->format('Y-m-d H:i:s')}");
                 }
 
-                // Log punch creation details
-                Log::info("Creating punch record for Attendance ID {$attendance->id}");
+                // Ensure at least one Clock In and Clock Out punch exists per day before migration
+                if (!$this->hasStartAndStopTime($attendance->employee_id, $attendance->punch_time)) {
+                    Log::warning("⚠️ Skipping migration for Attendance ID {$attendance->id} due to missing Clock In or Clock Out.");
+                    continue;
+                }
 
-                // Create Punch record with the rounded time
+                // Create Punch record
                 Punch::create([
                     'employee_id' => $attendance->employee_id,
                     'device_id' => $attendance->device_id,
                     'punch_type_id' => $attendance->punch_type_id,
                     'punch_time' => $roundedPunchTime->format('Y-m-d H:i:s'),
-                    'is_altered' => true, // Mark as altered because of rounding
-                    'pay_period_id' => $payPeriod->id, // Assign pay_period_id
-                    'attendance_id' => $attendance->id, // Link to the Attendance record
+                    'is_altered' => true,
+                    'pay_period_id' => $payPeriod->id,
+                    'attendance_id' => $attendance->id,
                 ]);
 
-                Log::info("Punch record created for Attendance ID {$attendance->id}");
+                Log::info("✅ Punch record created for Attendance ID {$attendance->id}");
 
                 // Mark attendance as migrated
                 $attendance->status = 'Migrated';
-                $attendance->is_migrated = true; // Ensure the migrated flag is set
+                $attendance->is_migrated = true;
                 $attendance->save();
 
-                Log::info("Attendance ID {$attendance->id} marked as Migrated.");
             } catch (\Exception $e) {
                 Log::error("Error migrating Attendance ID {$attendance->id}: " . $e->getMessage());
             }
         }
 
         Log::info("Completed punch migration for PayPeriod ID: {$payPeriod->id}");
+    }
+
+    /**
+     * Ensure there is at least one Clock In and one Clock Out punch for a given employee and date.
+     *
+     * @param int $employeeId
+     * @param string $punchTime
+     * @return bool
+     */
+    private function hasStartAndStopTime(int $employeeId, string $punchTime): bool
+    {
+        $date = date('Y-m-d', strtotime($punchTime));
+
+        $clockInExists = Attendance::where('employee_id', $employeeId)
+            ->whereDate('punch_time', $date)
+            ->where('punch_type_id', $this->getPunchTypeId('Clock In'))
+            ->exists();
+
+        $clockOutExists = Attendance::where('employee_id', $employeeId)
+            ->whereDate('punch_time', $date)
+            ->where('punch_type_id', $this->getPunchTypeId('Clock Out'))
+            ->exists();
+
+        return $clockInExists && $clockOutExists;
+    }
+
+    /**
+     * Retrieve the punch type ID by name.
+     *
+     * @param string $type
+     * @return int|null
+     */
+    private function getPunchTypeId(string $type): ?int
+    {
+        return \DB::table('punch_types')->where('name', $type)->value('id');
     }
 }

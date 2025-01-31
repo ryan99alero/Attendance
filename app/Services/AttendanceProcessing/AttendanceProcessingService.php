@@ -13,6 +13,7 @@ class AttendanceProcessingService
     protected AttendanceCleansingService $attendanceCleansingService;
     protected PunchValidationService $punchValidationService;
     protected PunchMigrationService $punchMigrationService;
+    protected UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService;
 
     /**
      * Constructor to inject dependencies.
@@ -23,6 +24,7 @@ class AttendanceProcessingService
      * @param AttendanceCleansingService $attendanceCleansingService
      * @param PunchValidationService $punchValidationService
      * @param PunchMigrationService $punchMigrationService
+     * @param UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService
      */
     public function __construct(
         HolidayProcessingService $holidayProcessingService,
@@ -30,7 +32,8 @@ class AttendanceProcessingService
         AttendanceTimeProcessorService $attendanceTimeProcessorService,
         AttendanceCleansingService $attendanceCleansingService,
         PunchValidationService $punchValidationService,
-        PunchMigrationService $punchMigrationService
+        PunchMigrationService $punchMigrationService,
+        UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService
     ) {
         Log::info("Initializing AttendanceProcessingService...");
         $this->holidayProcessingService = $holidayProcessingService;
@@ -39,6 +42,7 @@ class AttendanceProcessingService
         $this->attendanceCleansingService = $attendanceCleansingService;
         $this->punchValidationService = $punchValidationService;
         $this->punchMigrationService = $punchMigrationService;
+        $this->unresolvedAttendanceProcessorService = $unresolvedAttendanceProcessorService;
     }
 
     /**
@@ -81,6 +85,11 @@ class AttendanceProcessingService
         Log::info("Preparing to migrate punches for PayPeriod. This step will ensure punches are migrated and attendances are marked as processed.");
         Log::info("Migrating punches for PayPeriod.");
         $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
+
+        // Step 8: Process Unresolved Partial Records
+        Log::info("Processing unresolved attendance records for PayPeriod ID: {$payPeriod->id}");
+        $this->unresolvedAttendanceProcessorService->processStalePartialRecords($payPeriod);
+        Log::info("Unresolved attendance processing completed.");
 
         Log::info("Attendance processing completed for PayPeriod ID: {$payPeriod->id}");
     }

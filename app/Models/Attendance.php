@@ -71,6 +71,7 @@ class Attendance extends Model
         'is_manual',
         'created_by',
         'updated_by',
+        'holiday_id',
     ];
 
     /**
