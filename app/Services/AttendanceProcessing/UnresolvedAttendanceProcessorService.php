@@ -128,7 +128,7 @@ class UnresolvedAttendanceProcessorService
 
         $closestType = null;
         $smallestDiff = PHP_INT_MAX;
-        $tolerance = 900; // 15-minute tolerance
+        $tolerance = 900; // 15-minute time offset tolerance
 
         foreach ($times as $type => $time) {
             $diff = abs($punchSeconds - $time);
