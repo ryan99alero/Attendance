@@ -23,6 +23,7 @@ class HolidayProcessingService
     {
         Log::info("🔍 Starting Holiday Processing for period: {$startDate} to {$endDate}");
 
+        // Ensure pay periods are valid before processing holidays
         $payPeriods = PayPeriod::whereBetween('start_date', [$startDate, $endDate])->get();
         foreach ($payPeriods as $payPeriod) {
             if ($payPeriod->attendanceIssuesCount() > 0) {
@@ -31,10 +32,11 @@ class HolidayProcessingService
             }
         }
 
+        // Fetch holidays in range, including recurring holidays
         $holidays = Holiday::whereBetween('start_date', [$startDate, $endDate])
             ->orWhere(function ($query) use ($startDate, $endDate) {
                 $query->where('is_recurring', true)
-                    ->whereBetween('start_date', [$startDate, $endDate]); // Ensure recurring holidays are in range
+                    ->whereBetween('start_date', [$startDate, $endDate]); // Ensure recurring holidays are included
             })
             ->get();
 
@@ -106,7 +108,7 @@ class HolidayProcessingService
                     'punch_type_id' => $this->getPunchTypeId('Clock In'), // ✅ Assign Clock In punch type
                     'is_manual' => true,
                     'classification_id' => $this->getClassificationId('Holiday'),
-                    'status' => 'Complete',
+                    'status' => 'NeedsReview',
                     'issue_notes' => "Generated from Holiday Processing - Start ({$holiday->name})",
                 ]);
 
@@ -118,7 +120,7 @@ class HolidayProcessingService
                     'punch_type_id' => $this->getPunchTypeId('Clock Out'), // ✅ Assign Clock Out punch type
                     'is_manual' => true,
                     'classification_id' => $this->getClassificationId('Holiday'),
-                    'status' => 'Complete',
+                    'status' => 'NeedsReview',
                     'issue_notes' => "Generated from Holiday Processing - End ({$holiday->name})",
                 ]);
 

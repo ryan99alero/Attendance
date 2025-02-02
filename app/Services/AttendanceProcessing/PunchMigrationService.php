@@ -7,6 +7,7 @@ use App\Models\PayPeriod;
 use App\Models\Punch;
 use App\Services\RoundingRuleService;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class PunchMigrationService
 {
@@ -30,33 +31,34 @@ class PunchMigrationService
      */
     public function migratePunchesWithinPayPeriod(PayPeriod $payPeriod): void
     {
-        Log::info("Starting punch migration for PayPeriod ID: {$payPeriod->id}");
+        Log::info("🔄 Starting punch migration for PayPeriod ID: {$payPeriod->id}");
 
-        // Fetch completed attendances within the pay period explicitly tied to the current pay period
-        $attendances = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+        $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
+        $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
+
+        // If the pay period includes today, exclude the last day
+        if ($endDate->greaterThanOrEqualTo(Carbon::today())) {
+            $endDate = $endDate->subDay();
+        }
+
+        // Fetch completed attendances within the pay period
+        $attendances = Attendance::whereBetween('punch_time', [$startDate, $endDate])
             ->where('status', 'Complete')
             ->get();
 
-        Log::info("Found {$attendances->count()} completed attendance records for PayPeriod ID: {$payPeriod->id}");
+        Log::info("📌 Found {$attendances->count()} completed attendance records for PayPeriod ID: {$payPeriod->id}");
 
         foreach ($attendances as $attendance) {
             try {
-                Log::info("Processing Attendance ID: {$attendance->id} for Employee ID: {$attendance->employee_id}");
+                Log::info("⏳ Processing Attendance ID: {$attendance->id} for Employee ID: {$attendance->employee_id}");
 
-                // Fetch the round group ID from the employee
+                // Determine rounding group
                 $roundGroupId = $attendance->employee->round_group_id ?? null;
+                $roundedPunchTime = $roundGroupId
+                    ? $this->roundingRuleService->getRoundedTime(new \DateTime($attendance->punch_time), $roundGroupId)
+                    : new \DateTime($attendance->punch_time);
 
-                if (!$roundGroupId) {
-                    Log::warning("No round group ID found for Employee ID: {$attendance->employee_id}. Skipping rounding.");
-                    $roundedPunchTime = new \DateTime($attendance->punch_time);
-                } else {
-                    // Get the rounded punch time using the RoundingRuleService
-                    $roundedPunchTime = $this->roundingRuleService->getRoundedTime(
-                        new \DateTime($attendance->punch_time),
-                        $roundGroupId
-                    );
-                    Log::info("Rounded punch time for Attendance ID {$attendance->id}: {$roundedPunchTime->format('Y-m-d H:i:s')}");
-                }
+                Log::info("🕒 Rounded punch time for Attendance ID {$attendance->id}: {$roundedPunchTime->format('Y-m-d H:i:s')}");
 
                 // Ensure at least one Clock In and Clock Out punch exists per day before migration
                 if (!$this->hasStartAndStopTime($attendance->employee_id, $attendance->punch_time)) {
@@ -78,16 +80,17 @@ class PunchMigrationService
                 Log::info("✅ Punch record created for Attendance ID {$attendance->id}");
 
                 // Mark attendance as migrated
-                $attendance->status = 'Migrated';
-                $attendance->is_migrated = true;
-                $attendance->save();
+                $attendance->update([
+                    'status' => 'Migrated',
+                    'is_migrated' => true,
+                ]);
 
             } catch (\Exception $e) {
-                Log::error("Error migrating Attendance ID {$attendance->id}: " . $e->getMessage());
+                Log::error("❌ Error migrating Attendance ID {$attendance->id}: " . $e->getMessage());
             }
         }
 
-        Log::info("Completed punch migration for PayPeriod ID: {$payPeriod->id}");
+        Log::info("✅ Completed punch migration for PayPeriod ID: {$payPeriod->id}");
     }
 
     /**
@@ -99,19 +102,15 @@ class PunchMigrationService
      */
     private function hasStartAndStopTime(int $employeeId, string $punchTime): bool
     {
-        $date = date('Y-m-d', strtotime($punchTime));
+        $date = Carbon::parse($punchTime)->toDateString();
 
-        $clockInExists = Attendance::where('employee_id', $employeeId)
-            ->whereDate('punch_time', $date)
-            ->where('punch_type_id', $this->getPunchTypeId('Clock In'))
-            ->exists();
-
-        $clockOutExists = Attendance::where('employee_id', $employeeId)
-            ->whereDate('punch_time', $date)
-            ->where('punch_type_id', $this->getPunchTypeId('Clock Out'))
-            ->exists();
-
-        return $clockInExists && $clockOutExists;
+        return Attendance::where('employee_id', $employeeId)
+                ->whereDate('punch_time', $date)
+                ->whereIn('punch_type_id', [
+                    $this->getPunchTypeId('Clock In'),
+                    $this->getPunchTypeId('Clock Out'),
+                ])
+                ->count() >= 2;
     }
 
     /**

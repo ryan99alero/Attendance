@@ -1,157 +1,133 @@
 <?php
 
 namespace App\Services\AttendanceProcessing;
-
+use Illuminate\Support\Facades\DB;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
-use App\Models\ShiftSchedule;
+use App\Services\ML\MlPunchTypePredictorService;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class UnresolvedAttendanceProcessorService
 {
     protected ShiftScheduleService $shiftScheduleService;
+    protected MlPunchTypePredictorService $mlPunchTypePredictorService;
 
-    /**
-     * Constructor to inject dependencies.
-     *
-     * @param ShiftScheduleService $shiftScheduleService
-     */
-    public function __construct(ShiftScheduleService $shiftScheduleService)
+    public function __construct(ShiftScheduleService $shiftScheduleService, MlPunchTypePredictorService $mlPunchTypePredictorService)
     {
         $this->shiftScheduleService = $shiftScheduleService;
+        $this->mlPunchTypePredictorService = $mlPunchTypePredictorService;
     }
 
-    /**
-     * Process all unresolved (stale) attendance records within a given PayPeriod.
-     *
-     * @param PayPeriod $payPeriod
-     * @return void
-     */
     public function processStalePartialRecords(PayPeriod $payPeriod): void
     {
-        Log::info("Starting Unresolved Attendance Processing for PayPeriod ID: {$payPeriod->id} ({$payPeriod->start_date} - {$payPeriod->end_date})");
+        Log::info("🛠 [processStalePartialRecords] Starting Unresolved Attendance Processing for PayPeriod ID: {$payPeriod->id}");
 
-        // Fetch stale partial records within the PayPeriod
+        $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
+        $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
+
+        if (Carbon::today()->equalTo($endDate->toDateString())) {
+            Log::info("⚠️ Adjusting end date: Subtracting a day.");
+            $endDate = $endDate->subDay();
+        }
+
+        Log::info("📆 [processStalePartialRecords] Processing attendance records between {$startDate} and {$endDate}");
+
         $staleAttendances = Attendance::where('status', 'Partial')
-            ->whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date]) // Filter by PayPeriod
-            ->whereDate('punch_time', '<', Carbon::yesterday()->toDateString()) // Ensure at least 1 day has passed
-            ->whereNull('punch_type_id') // Only process records missing a punch type
+            ->whereBetween('punch_time', [$startDate, $endDate])
+            ->whereNull('punch_type_id')
             ->orderBy('employee_id')
             ->orderBy('punch_time')
-            ->get()
-            ->groupBy(['employee_id', fn ($record) => Carbon::parse($record->punch_time)->toDateString()]);
+            ->get();
 
-        Log::info("Found " . $staleAttendances->count() . " employees with unresolved attendance issues in PayPeriod ID: {$payPeriod->id}.");
+        Log::info("📊 [processStalePartialRecords] Found " . $staleAttendances->count() . " stale records.");
 
-        foreach ($staleAttendances as $employeeId => $dailyPunches) {
-            foreach ($dailyPunches as $date => $punches) {
-                $this->processEmployeePunches($employeeId, $date, $punches);
-            }
-        }
+        foreach ($staleAttendances as $punch) {
+            Log::info("🔍 [processStalePartialRecords] Processing Punch ID: {$punch->id} for Employee ID: {$punch->employee_id}...");
 
-        Log::info("Completed Unresolved Attendance Processing for PayPeriod ID: {$payPeriod->id}.");
-    }
+            // ✅ Fetch classification_id instead of entry_method
+            $classificationId = DB::table('punches')
+                ->where('employee_id', $punch->employee_id)
+                ->where('punch_time', $punch->punch_time)
+                ->where('is_processed', true)
+                ->value('classification_id') ?? null;
 
-    /**
-     * Process punches for an employee on a specific date.
-     *
-     * @param int $employeeId
-     * @param string $date
-     * @param \Illuminate\Support\Collection $punches
-     * @return void
-     */
-    private function processEmployeePunches(int $employeeId, string $date, $punches): void
-    {
-        Log::info("Processing Employee ID: {$employeeId} on Date: {$date} with " . count($punches) . " punches.");
-
-        $schedule = $this->shiftScheduleService->getShiftScheduleForEmployee($employeeId);
-
-        if (!$schedule) {
-            Log::warning("No shift schedule found for Employee ID: {$employeeId}. Skipping...");
-            return;
-        }
-
-        $sortedPunches = $punches->sortBy('punch_time')->values();
-
-        // Apply refined shift matching logic
-        $this->assignPunchTypesWithTolerance($sortedPunches, $schedule);
-    }
-
-    /**
-     * Assign punch types using shift-based logic with tolerance checks.
-     *
-     * @param \Illuminate\Support\Collection $punches
-     * @param ShiftSchedule $schedule
-     * @return void
-     */
-    private function assignPunchTypesWithTolerance($punches, ShiftSchedule $schedule): void
-    {
-        Log::info("Assigning punch types using shift-based logic with tolerance on schedule: {$schedule->id}");
-
-        $punchTimes = $punches->pluck('punch_time')->map(fn($time) => Carbon::parse($time)->format('H:i:s'))->toArray();
-        Log::info("Detected punch times: " . implode(", ", $punchTimes));
-
-        foreach ($punches as $punch) {
-            $predictedPunchType = $this->predictPunchTypeWithTolerance($punch->punch_time, $schedule);
+            // ✅ Call ML model with updated parameters
+            Log::info("🔍 [processStalePartialRecords] Predicting Punch Type for Punch ID: {$punch->id}, Employee ID: {$punch->employee_id}, Punch Time: {$punch->punch_time}, Classification ID: " . ($classificationId ?? 'None'));
+            $predictedPunchType = $this->mlPunchTypePredictorService->predictPunchType(
+                $punch->employee_id,
+                $punch->punch_time,
+                $classificationId
+            );
 
             if ($predictedPunchType) {
+                Log::info("✅ [processStalePartialRecords] ML Assigned Punch Type ID {$predictedPunchType} to Punch ID: {$punch->id}");
                 $punch->punch_type_id = $predictedPunchType;
                 $punch->status = 'NeedsReview';
-                $punch->issue_notes = 'Auto-assigned via Shift Matching with Tolerance';
+                $punch->issue_notes = 'Auto-assigned via ML Model';
                 $punch->save();
-
-                Log::info("Assigned Punch Type {$predictedPunchType} to Punch ID: {$punch->id}");
             } else {
-                Log::warning("Could not determine punch type for Punch ID: {$punch->id}. Marking as Partial.");
-            }
-        }
-    }
-
-    /**
-     * Predict punch type based on shift schedule with tolerance logic.
-     *
-     * @param string $punchTime
-     * @param ShiftSchedule $schedule
-     * @return int|null
-     */
-    private function predictPunchTypeWithTolerance(string $punchTime, ShiftSchedule $schedule): ?int
-    {
-        $punchSeconds = Carbon::parse($punchTime)->secondsSinceMidnight();
-
-        $times = [
-            'Clock In' => Carbon::parse($schedule->start_time)->secondsSinceMidnight(),
-            'Lunch Start' => Carbon::parse($schedule->lunch_start_time)->secondsSinceMidnight(),
-            'Lunch Stop' => Carbon::parse($schedule->lunch_start_time)->addMinutes($schedule->lunch_duration)->secondsSinceMidnight(),
-            'Clock Out' => Carbon::parse($schedule->end_time)->secondsSinceMidnight(),
-        ];
-
-        $closestType = null;
-        $smallestDiff = PHP_INT_MAX;
-        $tolerance = 900; // 15-minute time offset tolerance
-
-        foreach ($times as $type => $time) {
-            $diff = abs($punchSeconds - $time);
-            if ($diff <= $tolerance && $diff < $smallestDiff) {
-                $smallestDiff = $diff;
-                $closestType = $type;
+                Log::warning("❌ [processStalePartialRecords] ML Model could not determine Punch Type for Punch ID: {$punch->id}");
             }
         }
 
-        if ($closestType) {
-            return $this->getPunchTypeId($closestType);
-        }
-        return null;
+        Log::info("✅ [processStalePartialRecords] Completed Unresolved Attendance Processing.");
     }
 
-    /**
-     * Retrieve the punch type ID by name.
-     *
-     * @param string $type
-     * @return int|null
-     */
-    private function getPunchTypeId(string $type): ?int
+    private function assignPunchTypesUsingFallback($punch): void
     {
-        return \DB::table('punch_types')->where('name', $type)->value('id');
+        Log::info("⚠️ Using fallback methods to determine Punch Type for Punch ID: {$punch->id}");
+
+        $schedule = $this->shiftScheduleService->getShiftScheduleForEmployee($punch->employee_id);
+        if ($schedule) {
+            Log::info("📌 Assigning Punch Type using Shift Schedule...");
+            $this->assignPunchTypesUsingShiftLogic($punch, $schedule);
+        } else {
+            Log::info("📌 Assigning Punch Type using Heuristic Analysis...");
+            $this->assignPunchTypesUsingHeuristics($punch);
+        }
+    }
+
+    private function assignPunchTypesUsingShiftLogic($punch, $schedule): void
+    {
+        Log::info("📆 Assigning punch types using shift schedule for Employee ID: {$punch->employee_id}");
+
+        $shiftStart = Carbon::parse($schedule->start_time);
+        $shiftEnd = Carbon::parse($schedule->end_time);
+        $punchTime = Carbon::parse($punch->punch_time);
+
+        if ($punchTime->equalTo($shiftStart) || $punchTime->lessThan($shiftStart->addMinutes(15))) {
+            $punch->punch_type_id = $this->getPunchTypeIdByName('Clock In');
+        } elseif ($punchTime->greaterThan($shiftEnd->subMinutes(15)) && $punchTime->lessThanOrEqualTo($shiftEnd->addMinutes(15))) {
+            $punch->punch_type_id = $this->getPunchTypeIdByName('Clock Out');
+        }
+
+        $punch->status = 'NeedsReview';
+        $punch->issue_notes = 'Auto-assigned via Shift Schedule';
+        $punch->save();
+
+        Log::info("✅ Assigned Punch Type ID {$punch->punch_type_id} to Punch ID: {$punch->id} using Shift Logic.");
+    }
+
+    private function assignPunchTypesUsingHeuristics($punch): void
+    {
+        Log::info("📌 Assigning punch types using heuristic-based logic for Employee ID: {$punch->employee_id}");
+
+        $heuristicPunchType = $this->shiftScheduleService->heuristicPunchTypeAssignment($punch->employee_id, $punch->punch_time);
+
+        if ($heuristicPunchType) {
+            $punch->punch_type_id = $this->getPunchTypeIdByName($heuristicPunchType);
+            $punch->status = 'NeedsReview';
+            $punch->issue_notes = 'Auto-assigned via Heuristic Analysis';
+            $punch->save();
+            Log::info("✅ Assigned Punch Type ID {$punch->punch_type_id} to Punch ID: {$punch->id} using Heuristics.");
+        } else {
+            Log::warning("❌ Could not determine Punch Type for Punch ID: {$punch->id} using Heuristics.");
+        }
+    }
+
+    private function getPunchTypeIdByName(string $punchTypeName): ?int
+    {
+        return DB::table('punch_types')->where('name', $punchTypeName)->value('id');
     }
 }

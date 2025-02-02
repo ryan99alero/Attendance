@@ -117,7 +117,10 @@ class PayPeriodResource extends Resource
 
                         // Archive processed records and mark pay period as processed
                         DB::table('attendances')
-                            ->whereBetween('punch_time', [$record->start_date, $record->end_date])
+                            ->whereBetween('punch_time', [
+                                Carbon::parse($record->start_date)->startOfDay(),
+                                Carbon::parse($record->end_date)->endOfDay(),
+                            ])
                             ->update(['status' => 'Posted']);
 
                         $record->update(['is_posted' => true]);
