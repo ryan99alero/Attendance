@@ -108,7 +108,7 @@ class HolidayProcessingService
                     'punch_type_id' => $this->getPunchTypeId('Clock In'), // ✅ Assign Clock In punch type
                     'is_manual' => true,
                     'classification_id' => $this->getClassificationId('Holiday'),
-                    'status' => 'NeedsReview',
+                    'status' => 'Complete',
                     'issue_notes' => "Generated from Holiday Processing - Start ({$holiday->name})",
                 ]);
 
@@ -120,7 +120,7 @@ class HolidayProcessingService
                     'punch_type_id' => $this->getPunchTypeId('Clock Out'), // ✅ Assign Clock Out punch type
                     'is_manual' => true,
                     'classification_id' => $this->getClassificationId('Holiday'),
-                    'status' => 'NeedsReview',
+                    'status' => 'Complete',
                     'issue_notes' => "Generated from Holiday Processing - End ({$holiday->name})",
                 ]);
 
