@@ -2,10 +2,16 @@
     <div>
         <!-- Filter Form -->
         <form wire:submit.prevent="updateAttendances">
-            <div class="space-y-6">
-                {{ $this->form }}
+            {{ $this->form }}
+            <div class="flex justify-between w-full py-4">
                 <x-filament::button type="submit">
                     Apply Filter
+                </x-filament::button>
+                <!-- Process Button -->
+                <x-filament::button
+                    wire:click="processSelected"
+                    class="mt-4 text-green-500 underline">
+                    Process Selected
                 </x-filament::button>
             </div>
         </form>
@@ -17,6 +23,9 @@
                 <table class="w-full table-auto border-collapse border border-gray-300 dark:border-gray-700">
                     <thead>
                     <tr class="bg-gray-100 dark:bg-gray-800">
+                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">
+                            <input type="checkbox" wire:model="selectAll">
+                        </th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Date</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">First Punch</th>
@@ -28,6 +37,9 @@
                     <tbody>
                     @forelse ($groupedAttendances as $attendance)
                         <tr>
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
+                                <input type="checkbox" wire:model="selectedAttendances" value="{{ implode(',', $attendance['attendance_ids']) }}">
+                            </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['FullName'] }}</td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">{{ $attendance['attendance_date'] }}</td>
                             @foreach (['FirstPunch' => 1, 'LunchStart' => 3, 'LunchStop' => 4, 'LastPunch' => 2] as $key => $punchType)
@@ -35,10 +47,10 @@
                                     @if ($attendance[$key] === null)
                                         <x-filament::button
                                             wire:click="$dispatch('open-modal', {
-        employeeId: '{{ $attendance['employee_id'] }}',
-        date: '{{ $attendance['attendance_date'] }}',
-        punchType: {{ $punchType }}
-    })"
+                                                    employeeId: '{{ $attendance['employee_id'] }}',
+                                                    date: '{{ $attendance['attendance_date'] }}',
+                                                    punchType: {{ $punchType }}
+                                                })"
                                             x-on:click="console.log('Dispatched open-modal event for Employee ID: {{ $attendance['employee_id'] }}')"
                                             class="text-blue-500 underline">
                                             Input Time
@@ -51,7 +63,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
+                            <td colspan="7" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 No attendance records available.
                             </td>
                         </tr>

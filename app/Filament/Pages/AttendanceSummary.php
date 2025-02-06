@@ -5,10 +5,12 @@ namespace App\Filament\Pages;
 use Filament\Forms;
 use Filament\Pages\Actions\Action;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use Illuminate\Support\Facades\DB;
+use App\Services\AttendanceProcessing\AttendanceProcessingService;
 
 class AttendanceSummary extends Page
 {
@@ -17,20 +19,18 @@ class AttendanceSummary extends Page
     protected static ?string $navigationLabel = 'Attendance Summary';
     protected static bool $shouldRegisterNavigation = false;
 
-    public $payPeriodId; // Bound to the select dropdown
-    public $search = ''; // For search functionality
+    public $payPeriodId;
+    public $search = '';
     public $groupedAttendances;
-
-    // Modal data
-    public $selectedEmployee;
-    public $selectedDate;
-    public $selectedPunchType;
+    public array $selectedAttendances = [];
+    public bool $selectAll = false; // ✅ Bulk selection property
+    public bool $autoProcess = false; // ✅ Auto-processing toggle
 
     public function mount(): void
     {
-        $this->payPeriodId = null; // Default to no filter
-        $this->search = ''; // Default to empty search
-        $this->groupedAttendances = collect(); // Set to an empty collection on initial load
+        $this->payPeriodId = null;
+        $this->search = '';
+        $this->groupedAttendances = collect();
     }
 
     protected function getFormSchema(): array
@@ -42,11 +42,16 @@ class AttendanceSummary extends Page
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances())
                 ->placeholder('All Pay Periods'),
+
             Forms\Components\TextInput::make('search')
                 ->label('Search')
                 ->placeholder('Search any value...')
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
+
+            Forms\Components\Toggle::make('autoProcess')
+                ->label('Auto-Process Completed Records')
+                ->reactive(),
         ];
     }
 
@@ -64,7 +69,6 @@ class AttendanceSummary extends Page
     public function fetchAttendances(): Collection
     {
         if (!$this->payPeriodId) {
-            // Return empty collection if no PayPeriod is selected
             \Log::info("No PayPeriod selected. Returning empty attendance records.");
             return collect();
         }
@@ -80,53 +84,45 @@ class AttendanceSummary extends Page
 
         $query = Attendance::with('employee') // Eager load employee relationship
         ->select([
-            'employee_id',
-            DB::raw("DATE(punch_time) as attendance_date"),
+            DB::raw("GROUP_CONCAT(attendances.id) as attendance_ids"), // ✅ Collect all IDs for updating
+            'attendances.employee_id',
+            'employees.full_names as FullName',
+            'employees.external_id as PayrollID',
+            DB::raw("ANY_VALUE(attendances.status) as status"),
+            DB::raw("DATE(attendances.punch_time) as attendance_date"),
             DB::raw("
-                    MAX(CASE WHEN punch_type_id = 1 THEN TIME(punch_time) END) as clock_in,
-                    MAX(CASE WHEN punch_type_id = 3 THEN TIME(punch_time) END) as lunch_start,
-                    MAX(CASE WHEN punch_type_id = 4 THEN TIME(punch_time) END) as lunch_stop,
-                    MAX(CASE WHEN punch_type_id = 2 THEN TIME(punch_time) END) as clock_out,
-                    COUNT(*) as total_punches
-                "),
-            DB::raw("SUM(CASE WHEN is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
+                MAX(CASE WHEN attendances.punch_type_id = 1 THEN TIME(attendances.punch_time) END) as clock_in,
+                MAX(CASE WHEN attendances.punch_type_id = 3 THEN TIME(attendances.punch_time) END) as lunch_start,
+                MAX(CASE WHEN attendances.punch_type_id = 4 THEN TIME(attendances.punch_time) END) as lunch_stop,
+                MAX(CASE WHEN attendances.punch_type_id = 2 THEN TIME(attendances.punch_time) END) as clock_out,
+                COUNT(*) as total_punches
+            "),
+            DB::raw("SUM(CASE WHEN attendances.is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
         ])
-            ->whereBetween(DB::raw('DATE(punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
-            ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
-            ->orderBy('employee_id')
-            ->orderBy(DB::raw('DATE(punch_time)'));
-
-        // Apply search filter
-        if ($this->search) {
-            \Log::info("Applying search filter: {$this->search}");
-            $query->where(function ($subQuery) {
-                $subQuery->where('employee_id', 'like', '%' . $this->search . '%')
-                    ->orWhereHas('employee', function ($employeeQuery) {
-                        $employeeQuery->where('full_names', 'like', '%' . $this->search . '%')
-                            ->orWhere('external_id', 'like', '%' . $this->search . '%');
-                    });
+            ->join('employees', 'employees.id', '=', 'attendances.employee_id')
+            ->whereBetween(DB::raw('DATE(attendances.punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
+            ->groupBy('attendances.employee_id', 'attendance_date')
+            ->orderBy('attendances.employee_id')
+            ->orderBy(DB::raw('DATE(attendances.punch_time)'))
+            ->get()
+            ->map(function ($attendance) {
+                return [
+                    'attendance_ids' => explode(',', $attendance->attendance_ids), // ✅ Convert concatenated IDs to array
+                    'employee_id' => $attendance->employee_id,
+                    'FullName' => $attendance->FullName ?? 'N/A',
+                    'PayrollID' => $attendance->PayrollID ?? 'N/A',
+                    'attendance_date' => $attendance->attendance_date,
+                    'FirstPunch' => $attendance->clock_in,
+                    'LunchStart' => $attendance->lunch_start,
+                    'LunchStop' => $attendance->lunch_stop,
+                    'LastPunch' => $attendance->clock_out,
+                    'ManualEntries' => $attendance->manual_entries ?? 0,
+                    'TotalPunches' => $attendance->total_punches ?? 0,
+                ];
             });
-        }
 
-        $attendances = $query->get();
-
-        \Log::info("Fetched {$attendances->count()} attendance records.");
-
-        return $attendances->map(function ($attendance) {
-            $employee = $attendance->employee;
-            return [
-                'employee_id' => $attendance->employee_id,
-                'FullName' => $employee?->full_names ?? 'N/A',
-                'PayrollID' => $employee?->external_id ?? 'N/A',
-                'attendance_date' => $attendance->attendance_date,
-                'FirstPunch' => $attendance->clock_in,
-                'LunchStart' => $attendance->lunch_start,
-                'LunchStop' => $attendance->lunch_stop,
-                'LastPunch' => $attendance->clock_out,
-                'ManualEntries' => $attendance->manual_entries ?? 0,
-                'TotalPunches' => $attendance->total_punches ?? 0,
-            ];
-        });
+        \Log::info("Fetched {$query->count()} grouped attendance records.");
+        return $query;
     }
 
     public function updateAttendances(): void
@@ -134,34 +130,83 @@ class AttendanceSummary extends Page
         $this->groupedAttendances = $this->fetchAttendances();
     }
 
-    public function saveTimeRecord(): void
+    public function toggleSelectAll(): void
     {
-        Attendance::create([
-            'employee_id' => $this->selectedEmployee,
-            'punch_time' => $this->selectedDate,
-            'punch_type_id' => $this->selectedPunchType,
-        ]);
+        if ($this->selectAll) {
+            $this->selectedAttendances = collect($this->groupedAttendances)->pluck('id')->toArray();
+        } else {
+            $this->selectedAttendances = [];
+        }
 
-        $this->reset(['selectedEmployee', 'selectedDate', 'selectedPunchType']);
-        $this->groupedAttendances = $this->fetchAttendances();
+        Log::info("📌 Select All Updated. Selected Attendances: " . json_encode($this->selectedAttendances));
+    }
+
+    public function processSelected(): void
+    {
+        Log::info("🛠 [processSelected] Button clicked. Selected records: " . json_encode($this->selectedAttendances));
+
+        if (empty($this->selectedAttendances)) {
+            Log::warning("⚠️ No records selected.");
+            return;
+        }
+
+        // ✅ Convert comma-separated IDs back into an array
+        $attendanceIds = collect($this->selectedAttendances)
+            ->map(fn($ids) => explode(',', $ids)) // Split concatenated IDs into arrays
+            ->flatten() // Flatten into a single array
+            ->unique() // Remove duplicates
+            ->toArray();
+
+        Log::info("🔍 Final Attendance IDs to update: " . json_encode($attendanceIds));
+
+        // ✅ Update the attendance records to 'Complete'
+        $this->updateAttendanceStatus($attendanceIds, 'Complete');
+
+        // ✅ Run additional processing if Auto-Process is enabled
+        if ($this->autoProcess) {
+            Log::info("🔄 Auto-Processing enabled. Running AttendanceProcessingService.");
+            app(AttendanceProcessingService::class)->processCompletedAttendanceRecords($attendanceIds);
+        }
+
+        Log::info("✅ [processSelected] Attendance records marked as Complete.");
+
+        // ✅ Refresh attendance list
+        $this->updateAttendances();
+    }
+
+    private function updateAttendanceStatus(array $attendanceIds, string $newStatus): void
+    {
+        $filteredIds = array_filter($attendanceIds);
+
+        if (empty($filteredIds)) {
+            Log::warning("⚠️ [updateAttendanceStatus] No valid attendance IDs found.");
+            return;
+        }
+
+        Attendance::whereIn('id', $filteredIds)->update(['status' => $newStatus]);
+
+        Log::info("✅ [updateAttendanceStatus] Updated " . count($filteredIds) . " attendance records to status: {$newStatus}");
     }
 
     protected function getActions(): array
     {
         return [
             Action::make('Add Time Record')
-                ->label('Add Time Record') // Updated label
-                ->color('primary') // Optional: Set the button color
-                ->icon('heroicon-o-plus') // Optional: Add an icon
-                ->url(route('filament.admin.resources.attendances.create')) // Redirect to the specified URL
-                ->openUrlInNewTab(), // Optional: Open link in a new tab
+                ->label('Add Time Record')
+                ->color('primary')
+                ->icon('heroicon-o-plus')
+                ->url(route('filament.admin.resources.attendances.create'))
+                ->openUrlInNewTab(),
         ];
     }
 
-    protected $listeners = ['timeRecordCreated' => 'refreshAttendanceData'];
+    protected $listeners = [
+        'processSelected' => 'processSelected',
+        'timeRecordCreated' => 'refreshAttendanceData',
+    ];
 
     public function refreshAttendanceData(): void
     {
-        $this->groupedAttendances = $this->fetchAttendances();
+        $this->updateAttendances();
     }
 }
