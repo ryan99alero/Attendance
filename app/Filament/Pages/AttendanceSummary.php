@@ -21,10 +21,11 @@ class AttendanceSummary extends Page
 
     public $payPeriodId;
     public $search = '';
+    public $statusFilter = 'NeedsReview'; // Default filter
     public $groupedAttendances;
     public array $selectedAttendances = [];
-    public bool $selectAll = false; // ✅ Bulk selection property
-    public bool $autoProcess = false; // ✅ Auto-processing toggle
+    public bool $selectAll = false;
+    public bool $autoProcess = false;
 
     public function mount(): void
     {
@@ -46,6 +47,21 @@ class AttendanceSummary extends Page
             Forms\Components\TextInput::make('search')
                 ->label('Search')
                 ->placeholder('Search any value...')
+                ->reactive()
+                ->afterStateUpdated(fn () => $this->updateAttendances()),
+
+            Forms\Components\Select::make('statusFilter')
+                ->label('Filter by Status')
+                ->options([
+                    'all' => 'All',
+                    'NeedsReview' => 'Needs Review',
+                    'Incomplete' => 'Incomplete',
+                    'Complete' => 'Complete',
+                    'Partial' => 'Partial',
+                    'Error' => 'Error',
+                    'Migrated' => 'Migrated',
+                ])
+                ->default('NeedsReview')
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
 
@@ -82,47 +98,47 @@ class AttendanceSummary extends Page
 
         \Log::info("Fetching attendances for PayPeriod: {$payPeriod->start_date} to {$payPeriod->end_date}");
 
-        $query = Attendance::with('employee') // Eager load employee relationship
-        ->select([
-            DB::raw("GROUP_CONCAT(attendances.id) as attendance_ids"), // ✅ Collect all IDs for updating
-            'attendances.employee_id',
-            'employees.full_names as FullName',
-            'employees.external_id as PayrollID',
-            DB::raw("ANY_VALUE(attendances.status) as status"),
-            DB::raw("DATE(attendances.punch_time) as attendance_date"),
-            DB::raw("
+        $query = Attendance::with('employee')
+            ->select([
+                DB::raw("GROUP_CONCAT(attendances.id) as attendance_ids"),
+                'attendances.employee_id',
+                'employees.full_names as FullName',
+                'employees.external_id as PayrollID',
+                DB::raw("ANY_VALUE(attendances.status) as status"),
+                DB::raw("DATE(attendances.punch_time) as attendance_date"),
+                DB::raw("
                 MAX(CASE WHEN attendances.punch_type_id = 1 THEN TIME(attendances.punch_time) END) as clock_in,
                 MAX(CASE WHEN attendances.punch_type_id = 3 THEN TIME(attendances.punch_time) END) as lunch_start,
                 MAX(CASE WHEN attendances.punch_type_id = 4 THEN TIME(attendances.punch_time) END) as lunch_stop,
                 MAX(CASE WHEN attendances.punch_type_id = 2 THEN TIME(attendances.punch_time) END) as clock_out,
                 COUNT(*) as total_punches
             "),
-            DB::raw("SUM(CASE WHEN attendances.is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
-        ])
+                DB::raw("SUM(CASE WHEN attendances.is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
+            ])
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
             ->whereBetween(DB::raw('DATE(attendances.punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
+            ->when($this->statusFilter !== 'all', fn ($q) => $q->where('attendances.status', $this->statusFilter))
             ->groupBy('attendances.employee_id', 'attendance_date')
             ->orderBy('attendances.employee_id')
             ->orderBy(DB::raw('DATE(attendances.punch_time)'))
-            ->get()
-            ->map(function ($attendance) {
-                return [
-                    'attendance_ids' => explode(',', $attendance->attendance_ids), // ✅ Convert concatenated IDs to array
-                    'employee_id' => $attendance->employee_id,
-                    'FullName' => $attendance->FullName ?? 'N/A',
-                    'PayrollID' => $attendance->PayrollID ?? 'N/A',
-                    'attendance_date' => $attendance->attendance_date,
-                    'FirstPunch' => $attendance->clock_in,
-                    'LunchStart' => $attendance->lunch_start,
-                    'LunchStop' => $attendance->lunch_stop,
-                    'LastPunch' => $attendance->clock_out,
-                    'ManualEntries' => $attendance->manual_entries ?? 0,
-                    'TotalPunches' => $attendance->total_punches ?? 0,
-                ];
-            });
+            ->get();
 
-        \Log::info("Fetched {$query->count()} grouped attendance records.");
-        return $query;
+        \Log::info("Fetched {$query->count()} attendance records.");
+
+        return $query->map(fn ($attendance) => [
+            'attendance_ids' => explode(',', $attendance->attendance_ids),
+            'employee_id' => $attendance->employee_id,
+            'FullName' => $attendance->FullName ?? 'N/A',
+            'PayrollID' => $attendance->PayrollID ?? 'N/A',
+            'attendance_date' => $attendance->attendance_date,
+            'FirstPunch' => $attendance->clock_in,
+            'LunchStart' => $attendance->lunch_start,
+            'LunchStop' => $attendance->lunch_stop,
+            'LastPunch' => $attendance->clock_out,
+            'ManualEntries' => $attendance->manual_entries ?? 0,
+            'TotalPunches' => $attendance->total_punches ?? 0,
+            'status' => $attendance->status,
+        ]);
     }
 
     public function updateAttendances(): void
@@ -143,21 +159,28 @@ class AttendanceSummary extends Page
 
     public function processSelected(): void
     {
-        Log::info("🛠 [processSelected] Button clicked. Selected records: " . json_encode($this->selectedAttendances));
+        Log::info("🛠 [processSelected] Button clicked. Raw Selected Records: " . json_encode($this->selectedAttendances));
 
         if (empty($this->selectedAttendances)) {
             Log::warning("⚠️ No records selected.");
             return;
         }
 
-        // ✅ Convert comma-separated IDs back into an array
+        // ✅ Flatten and convert selected IDs into an array of integers
         $attendanceIds = collect($this->selectedAttendances)
-            ->map(fn($ids) => explode(',', $ids)) // Split concatenated IDs into arrays
-            ->flatten() // Flatten into a single array
-            ->unique() // Remove duplicates
+            ->map(fn ($idString) => explode(',', $idString)) // Split comma-separated strings into arrays
+            ->flatten() // Flatten to a single-dimensional array
+            ->map(fn ($id) => (int) trim($id)) // Convert all values to integers
+            ->unique() // Ensure uniqueness
+            ->values()
             ->toArray();
 
-        Log::info("🔍 Final Attendance IDs to update: " . json_encode($attendanceIds));
+        Log::info("🔍 [processSelected] Processed Attendance IDs: " . json_encode($attendanceIds));
+
+        if (empty($attendanceIds)) {
+            Log::warning("⚠️ No valid attendance IDs extracted.");
+            return;
+        }
 
         // ✅ Update the attendance records to 'Complete'
         $this->updateAttendanceStatus($attendanceIds, 'Complete');

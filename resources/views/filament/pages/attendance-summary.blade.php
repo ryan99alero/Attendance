@@ -1,16 +1,14 @@
 <x-filament::page>
     <div>
-        <!-- Filter Form -->
+        <!-- Filter Form -->processSelected
         <form wire:submit.prevent="updateAttendances">
-            {{ $this->form }}
-            <div class="flex justify-between w-full py-4">
-                <x-filament::button type="submit">
-                    Apply Filter
-                </x-filament::button>
-                <!-- Process Button -->
+            <div class="flex items-center justify-between space-x-4">
+                {{ $this->form }}
+
+                <!-- Process Selected Button -->
                 <x-filament::button
                     wire:click="processSelected"
-                    class="mt-4 text-green-500 underline">
+                    color="success">
                     Process Selected
                 </x-filament::button>
             </div>
@@ -51,7 +49,6 @@
                                                     date: '{{ $attendance['attendance_date'] }}',
                                                     punchType: {{ $punchType }}
                                                 })"
-                                            x-on:click="console.log('Dispatched open-modal event for Employee ID: {{ $attendance['employee_id'] }}')"
                                             class="text-blue-500 underline">
                                             Input Time
                                         </x-filament::button>

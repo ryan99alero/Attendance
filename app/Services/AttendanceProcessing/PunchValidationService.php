@@ -4,6 +4,7 @@ namespace App\Services\AttendanceProcessing;
 
 use Illuminate\Support\Facades\DB;
 use App\Models\Attendance;
+use Illuminate\Support\Facades\Log;
 use App\Models\PayPeriod;
 
 class PunchValidationService
@@ -16,6 +17,29 @@ class PunchValidationService
      * @param PayPeriod $payPeriod
      * @return void
      */
+    public function validateAndProcessCompletedRecords(array $attendanceIds): void
+    {
+        Log::info("🔍 [PunchValidationService] Validating and processing completed records: " . json_encode($attendanceIds));
+
+        if (empty($attendanceIds)) {
+            Log::warning("⚠️ No attendance records provided for validation and processing.");
+            return;
+        }
+
+        // Step 1: Validate punches before processing
+        $this->validatePunches($attendanceIds);
+
+        // Step 2: Migrate valid records to the punches table
+        app(PunchMigrationService::class)->migrateCompletedPunches();
+
+        Log::info("✅ [PunchValidationService] Attendance records successfully validated and migrated.");
+    }
+    public function processCompletedAttendanceRecords(array $attendanceIds): void
+    {
+        Log::info("🛠 [processCompletedAttendanceRecords] Calling PunchValidationService for processing.");
+
+        app(PunchValidationService::class)->validateAndProcessCompletedRecords($attendanceIds);
+    }
     public function validatePunchesWithinPayPeriod(PayPeriod $payPeriod): void
     {
         $attendances = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
