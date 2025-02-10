@@ -6,9 +6,11 @@ use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BooleanColumn;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 
@@ -32,16 +34,24 @@ class ShiftResource extends Resource
                 ->label('Shift Name')
                 ->required()
                 ->maxLength(100),
+
             TimePicker::make('start_time')
                 ->label('Start Time')
                 ->required(),
+
             TimePicker::make('end_time')
                 ->label('End Time')
                 ->required(),
+
             TextInput::make('base_hours_per_period')
                 ->label('Base Hours Per Period')
                 ->numeric()
                 ->nullable(),
+
+            Toggle::make('multi_day_shift')
+                ->label('Multi-Day Shift')
+                ->helperText('Enable if this shift crosses midnight.')
+                ->default(false),
         ]);
     }
 
@@ -58,14 +68,22 @@ class ShiftResource extends Resource
                 ->label('Shift Name')
                 ->sortable()
                 ->searchable(),
+
             TextColumn::make('start_time')
                 ->label('Start Time')
-                ->time('H:i'), // Format as time
+                ->time('H:i'),
+
             TextColumn::make('end_time')
                 ->label('End Time')
-                ->time('H:i'), // Format as time
+                ->time('H:i'),
+
             TextColumn::make('base_hours_per_period')
                 ->label('Base Hours Per Period'),
+
+            BooleanColumn::make('multi_day_shift')
+                ->label('Multi-Day Shift')
+                ->trueIcon('heroicon-o-check')
+                ->falseIcon('heroicon-o-x'),
         ]);
     }
 

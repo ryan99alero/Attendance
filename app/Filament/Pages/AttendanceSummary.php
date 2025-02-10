@@ -11,6 +11,7 @@ use App\Models\Attendance;
 use App\Models\PayPeriod;
 use Illuminate\Support\Facades\DB;
 use App\Services\AttendanceProcessing\AttendanceProcessingService;
+use App\Services\AttendanceProcessing\AttendanceStatusUpdateService;
 
 class AttendanceSummary extends Page
 {
@@ -54,20 +55,12 @@ class AttendanceSummary extends Page
                 ->label('Filter by Status')
                 ->options([
                     'all' => 'All',
-                    'NeedsReview' => 'Needs Review',
-                    'Incomplete' => 'Incomplete',
-                    'Complete' => 'Complete',
-                    'Partial' => 'Partial',
-                    'Error' => 'Error',
                     'Migrated' => 'Migrated',
+                    'problem' => 'Problem (All Except Migrated)', // No actual "Problem" status
                 ])
-                ->default('NeedsReview')
+                ->default('problem') // Default to show only problem records
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
-
-            Forms\Components\Toggle::make('autoProcess')
-                ->label('Auto-Process Completed Records')
-                ->reactive(),
         ];
     }
 
@@ -85,18 +78,18 @@ class AttendanceSummary extends Page
     public function fetchAttendances(): Collection
     {
         if (!$this->payPeriodId) {
-            \Log::info("No PayPeriod selected. Returning empty attendance records.");
+            Log::info("No PayPeriod selected. Returning empty attendance records.");
             return collect();
         }
 
         $payPeriod = PayPeriod::find($this->payPeriodId);
 
         if (!$payPeriod) {
-            \Log::warning("Invalid PayPeriod ID: {$this->payPeriodId}. Returning empty attendance records.");
+            Log::warning("Invalid PayPeriod ID: {$this->payPeriodId}. Returning empty attendance records.");
             return collect();
         }
 
-        \Log::info("Fetching attendances for PayPeriod: {$payPeriod->start_date} to {$payPeriod->end_date}");
+        Log::info("Fetching attendances for PayPeriod: {$payPeriod->start_date} to {$payPeriod->end_date}");
 
         $query = Attendance::with('employee')
             ->select([
@@ -117,13 +110,19 @@ class AttendanceSummary extends Page
             ])
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
             ->whereBetween(DB::raw('DATE(attendances.punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
-            ->when($this->statusFilter !== 'all', fn ($q) => $q->where('attendances.status', $this->statusFilter))
+            ->when($this->statusFilter !== 'all', function ($q) {
+                if ($this->statusFilter === 'problem') {
+                    $q->where('attendances.status', '!=', 'Migrated'); // Show all EXCEPT Migrated
+                } else {
+                    $q->where('attendances.status', $this->statusFilter);
+                }
+            })
             ->groupBy('attendances.employee_id', 'attendance_date')
             ->orderBy('attendances.employee_id')
             ->orderBy(DB::raw('DATE(attendances.punch_time)'))
             ->get();
 
-        \Log::info("Fetched {$query->count()} attendance records.");
+        Log::info("Fetched {$query->count()} attendance records.");
 
         return $query->map(fn ($attendance) => [
             'attendance_ids' => explode(',', $attendance->attendance_ids),
@@ -146,69 +145,37 @@ class AttendanceSummary extends Page
         $this->groupedAttendances = $this->fetchAttendances();
     }
 
-    public function toggleSelectAll(): void
-    {
-        if ($this->selectAll) {
-            $this->selectedAttendances = collect($this->groupedAttendances)->pluck('id')->toArray();
-        } else {
-            $this->selectedAttendances = [];
-        }
-
-        Log::info("📌 Select All Updated. Selected Attendances: " . json_encode($this->selectedAttendances));
-    }
-
     public function processSelected(): void
     {
-        Log::info("🛠 [processSelected] Button clicked. Raw Selected Records: " . json_encode($this->selectedAttendances));
+        Log::info("🛠 [processSelected] Button clicked. Selected records: " . json_encode($this->selectedAttendances));
 
         if (empty($this->selectedAttendances)) {
             Log::warning("⚠️ No records selected.");
             return;
         }
 
-        // ✅ Flatten and convert selected IDs into an array of integers
         $attendanceIds = collect($this->selectedAttendances)
-            ->map(fn ($idString) => explode(',', $idString)) // Split comma-separated strings into arrays
-            ->flatten() // Flatten to a single-dimensional array
-            ->map(fn ($id) => (int) trim($id)) // Convert all values to integers
-            ->unique() // Ensure uniqueness
-            ->values()
+            ->map(fn ($ids) => explode(',', $ids)) // Split the string into an array
+            ->flatten()
+            ->unique()
+            ->map(fn ($id) => (int) $id) // Ensure IDs are integers
             ->toArray();
 
-        Log::info("🔍 [processSelected] Processed Attendance IDs: " . json_encode($attendanceIds));
+        Log::info("🔍 [processSelected] Final Attendance IDs: " . json_encode($attendanceIds));
 
-        if (empty($attendanceIds)) {
-            Log::warning("⚠️ No valid attendance IDs extracted.");
-            return;
-        }
-
-        // ✅ Update the attendance records to 'Complete'
-        $this->updateAttendanceStatus($attendanceIds, 'Complete');
+        // ✅ Use the new service to mark records as Complete
+        app(AttendanceStatusUpdateService::class)->markRecordsAsComplete($attendanceIds);
 
         // ✅ Run additional processing if Auto-Process is enabled
         if ($this->autoProcess) {
             Log::info("🔄 Auto-Processing enabled. Running AttendanceProcessingService.");
-            app(AttendanceProcessingService::class)->processCompletedAttendanceRecords($attendanceIds);
+            app(AttendanceProcessingService::class)->processCompletedAttendanceRecords($attendanceIds, $this->autoProcess);
         }
 
         Log::info("✅ [processSelected] Attendance records marked as Complete.");
 
         // ✅ Refresh attendance list
         $this->updateAttendances();
-    }
-
-    private function updateAttendanceStatus(array $attendanceIds, string $newStatus): void
-    {
-        $filteredIds = array_filter($attendanceIds);
-
-        if (empty($filteredIds)) {
-            Log::warning("⚠️ [updateAttendanceStatus] No valid attendance IDs found.");
-            return;
-        }
-
-        Attendance::whereIn('id', $filteredIds)->update(['status' => $newStatus]);
-
-        Log::info("✅ [updateAttendanceStatus] Updated " . count($filteredIds) . " attendance records to status: {$newStatus}");
     }
 
     protected function getActions(): array

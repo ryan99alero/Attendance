@@ -14,17 +14,10 @@ class AttendanceProcessingService
     protected PunchValidationService $punchValidationService;
     protected PunchMigrationService $punchMigrationService;
     protected UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService;
+    protected AttendanceStatusUpdateService $attendanceStatusUpdateService; // ✅ NEW
 
     /**
      * Constructor to inject dependencies.
-     *
-     * @param HolidayProcessingService $holidayProcessingService
-     * @param VacationTimeProcessAttendanceService $vacationTimeProcessAttendanceService
-     * @param AttendanceTimeProcessorService $attendanceTimeProcessorService
-     * @param AttendanceCleansingService $attendanceCleansingService
-     * @param PunchValidationService $punchValidationService
-     * @param PunchMigrationService $punchMigrationService
-     * @param UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService
      */
     public function __construct(
         HolidayProcessingService $holidayProcessingService,
@@ -33,7 +26,8 @@ class AttendanceProcessingService
         AttendanceCleansingService $attendanceCleansingService,
         PunchValidationService $punchValidationService,
         PunchMigrationService $punchMigrationService,
-        UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService
+        UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService,
+        AttendanceStatusUpdateService $attendanceStatusUpdateService // ✅ Inject Service
     ) {
         Log::info("Initializing AttendanceProcessingService...");
         $this->holidayProcessingService = $holidayProcessingService;
@@ -43,13 +37,11 @@ class AttendanceProcessingService
         $this->punchValidationService = $punchValidationService;
         $this->punchMigrationService = $punchMigrationService;
         $this->unresolvedAttendanceProcessorService = $unresolvedAttendanceProcessorService;
+        $this->attendanceStatusUpdateService = $attendanceStatusUpdateService; // ✅ Store Service
     }
 
     /**
      * Process all attendance records for the given PayPeriod.
-     *
-     * @param PayPeriod $payPeriod
-     * @return void
      */
     public function processAll(PayPeriod $payPeriod): void
     {
@@ -92,5 +84,27 @@ class AttendanceProcessingService
         Log::info("Unresolved attendance processing completed.");
 
         Log::info("Attendance processing completed for PayPeriod ID: {$payPeriod->id}");
+    }
+
+    /**
+     * Process completed attendance records by marking them as "Complete".
+     */
+    public function processCompletedAttendanceRecords(array $attendanceIds, bool $autoProcess): void
+    {
+        Log::info("🛠 [processCompletedAttendanceRecords] Calling AttendanceStatusUpdateService.");
+
+        // ✅ Mark records as Complete
+        $this->attendanceStatusUpdateService->markRecordsAsComplete($attendanceIds);
+
+        Log::info("✅ [processCompletedAttendanceRecords] Attendance records marked as Complete.");
+
+        // ✅ Only trigger migration if Auto-Process is enabled
+        if ($autoProcess) {
+            Log::info("🚀 [processCompletedAttendanceRecords] Auto-Process is enabled. Triggering Punch Migration Service.");
+            $this->punchMigrationService->migratePunchesForAttendances($attendanceIds);
+            Log::info("✅ [processCompletedAttendanceRecords] Punch migration completed.");
+        } else {
+            Log::info("⏸ [processCompletedAttendanceRecords] Auto-Process is disabled. Skipping Punch Migration.");
+        }
     }
 }

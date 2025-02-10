@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $shift_name Name of the shift
@@ -42,6 +42,7 @@ class Shift extends Model
     protected $fillable = [
         'shift_name',
         'start_time',
+        'multi_day_shift',
         'end_time',
         'base_hours_per_period',
         'created_by',

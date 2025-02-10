@@ -92,7 +92,20 @@ class PunchMigrationService
 
         Log::info("✅ Completed punch migration for PayPeriod ID: {$payPeriod->id}");
     }
+    public function migratePunchesForAttendances(array $attendanceIds): void
+    {
+        Log::info("🛠 [PunchMigrationService] Migrating punches for Attendance IDs: " . json_encode($attendanceIds));
 
+        if (empty($attendanceIds)) {
+            Log::warning("⚠️ No valid attendance IDs provided for migration.");
+            return;
+        }
+
+        // ✅ Perform the actual migration logic
+        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Migrated']);
+
+        Log::info("✅ [PunchMigrationService] Successfully migrated " . count($attendanceIds) . " attendance records.");
+    }
     /**
      * Ensure there is at least one Clock In and one Clock Out punch for a given employee and date.
      *
