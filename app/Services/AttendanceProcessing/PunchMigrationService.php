@@ -13,11 +13,6 @@ class PunchMigrationService
 {
     protected RoundingRuleService $roundingRuleService;
 
-    /**
-     * Constructor to inject RoundingRuleService.
-     *
-     * @param RoundingRuleService $roundingRuleService
-     */
     public function __construct(RoundingRuleService $roundingRuleService)
     {
         $this->roundingRuleService = $roundingRuleService;
@@ -25,9 +20,6 @@ class PunchMigrationService
 
     /**
      * Migrate punches to the Punches table and mark as migrated.
-     *
-     * @param PayPeriod $payPeriod
-     * @return void
      */
     public function migratePunchesWithinPayPeriod(PayPeriod $payPeriod): void
     {
@@ -36,12 +28,11 @@ class PunchMigrationService
         $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
         $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
 
-        // If the pay period includes today, exclude the last day
         if ($endDate->greaterThanOrEqualTo(Carbon::today())) {
             $endDate = $endDate->subDay();
         }
 
-        // Fetch completed attendances within the pay period
+        // ✅ Fetch completed attendance records (include Holidays)
         $attendances = Attendance::whereBetween('punch_time', [$startDate, $endDate])
             ->where('status', 'Complete')
             ->get();
@@ -52,7 +43,12 @@ class PunchMigrationService
             try {
                 Log::info("⏳ Processing Attendance ID: {$attendance->id} for Employee ID: {$attendance->employee_id}");
 
-                // Determine rounding group
+                // ✅ Identify Holiday Attendance
+                $isHolidayRecord = !is_null($attendance->holiday_id);
+                if ($isHolidayRecord) {
+                    Log::info("🎉 Attendance ID: {$attendance->id} is a Holiday record.");
+                }
+
                 $roundGroupId = $attendance->employee->round_group_id ?? null;
                 $roundedPunchTime = $roundGroupId
                     ? $this->roundingRuleService->getRoundedTime(new \DateTime($attendance->punch_time), $roundGroupId)
@@ -60,26 +56,35 @@ class PunchMigrationService
 
                 Log::info("🕒 Rounded punch time for Attendance ID {$attendance->id}: {$roundedPunchTime->format('Y-m-d H:i:s')}");
 
-                // Ensure at least one Clock In and Clock Out punch exists per day before migration
-                if (!$this->hasStartAndStopTime($attendance->employee_id, $attendance->punch_time)) {
+                // ✅ Skip migration if Clock In or Clock Out is missing (except for Holidays)
+                if (!$isHolidayRecord && !$this->hasStartAndStopTime($attendance->employee_id, $attendance->punch_time)) {
                     Log::warning("⚠️ Skipping migration for Attendance ID {$attendance->id} due to missing Clock In or Clock Out.");
                     continue;
                 }
 
-                // Create Punch record
+                // ✅ Ensure external_group_id and shift_date are available
+                if (empty($attendance->external_group_id) || empty($attendance->shift_date)) {
+                    Log::warning("⚠️ Skipping Attendance ID {$attendance->id} due to missing external_group_id or shift_date.");
+                    continue;
+                }
+
+                // ✅ Create Punch record with `external_group_id` & `shift_date`
                 Punch::create([
-                    'employee_id' => $attendance->employee_id,
-                    'device_id' => $attendance->device_id,
-                    'punch_type_id' => $attendance->punch_type_id,
-                    'punch_time' => $roundedPunchTime->format('Y-m-d H:i:s'),
-                    'is_altered' => true,
-                    'pay_period_id' => $payPeriod->id,
-                    'attendance_id' => $attendance->id,
+                    'employee_id'       => $attendance->employee_id,
+                    'device_id'         => $attendance->device_id,
+                    'punch_type_id'     => $attendance->punch_type_id,
+                    'punch_time'        => $roundedPunchTime->format('Y-m-d H:i:s'),
+                    'is_altered'        => true,
+                    'pay_period_id'     => $payPeriod->id,
+                    'attendance_id'     => $attendance->id,
+                    'external_group_id' => $attendance->external_group_id,
+                    'shift_date'        => $attendance->shift_date,
+                    'holiday_id'        => $attendance->holiday_id, // ✅ Ensure holiday data is retained
                 ]);
 
                 Log::info("✅ Punch record created for Attendance ID {$attendance->id}");
 
-                // Mark attendance as migrated
+                // ✅ Mark attendance as migrated
                 $attendance->update([
                     'status' => 'Migrated',
                     'is_migrated' => true,
@@ -92,31 +97,26 @@ class PunchMigrationService
 
         Log::info("✅ Completed punch migration for PayPeriod ID: {$payPeriod->id}");
     }
-    public function migratePunchesForAttendances(array $attendanceIds): void
-    {
-        Log::info("🛠 [PunchMigrationService] Migrating punches for Attendance IDs: " . json_encode($attendanceIds));
 
-        if (empty($attendanceIds)) {
-            Log::warning("⚠️ No valid attendance IDs provided for migration.");
-            return;
-        }
-
-        // ✅ Perform the actual migration logic
-        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Migrated']);
-
-        Log::info("✅ [PunchMigrationService] Successfully migrated " . count($attendanceIds) . " attendance records.");
-    }
     /**
-     * Ensure there is at least one Clock In and one Clock Out punch for a given employee and date.
-     *
-     * @param int $employeeId
-     * @param string $punchTime
-     * @return bool
+     * Ensure at least one Clock In and one Clock Out punch exists per day before migration (excluding Holidays).
      */
     private function hasStartAndStopTime(int $employeeId, string $punchTime): bool
     {
         $date = Carbon::parse($punchTime)->toDateString();
 
+        // ✅ If the record is a Holiday, skip this check
+        $isHolidayRecord = Attendance::where('employee_id', $employeeId)
+            ->whereDate('punch_time', $date)
+            ->whereNotNull('holiday_id')
+            ->exists();
+
+        if ($isHolidayRecord) {
+            Log::info("🎉 Skipping Clock In/Out check for Holiday Attendance on {$date}");
+            return true;
+        }
+
+        // ✅ Regular attendance requires both Clock In & Clock Out
         return Attendance::where('employee_id', $employeeId)
                 ->whereDate('punch_time', $date)
                 ->whereIn('punch_type_id', [
@@ -128,9 +128,6 @@ class PunchMigrationService
 
     /**
      * Retrieve the punch type ID by name.
-     *
-     * @param string $type
-     * @return int|null
      */
     private function getPunchTypeId(string $type): ?int
     {

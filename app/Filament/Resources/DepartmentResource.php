@@ -24,7 +24,6 @@ class DepartmentResource extends Resource
 
     public static function form(Form $form): Form
     {
-        Log::info('TACO: Loading form for DepartmentResource');
 
         return $form->schema([
             TextInput::make('name')
@@ -58,7 +57,6 @@ class DepartmentResource extends Resource
 
     public static function table(Table $table): Table
     {
-        Log::info('TACO3: Loading table for DepartmentResource');
 
         return $table->columns([
             TextColumn::make('id')
@@ -80,14 +78,12 @@ class DepartmentResource extends Resource
         ])->actions([
             EditAction::make()
                 ->after(function ($record) {
-                    Log::info("TACO4: Edited record with ID: {$record->id}");
                 }),
         ]);
     }
 
     public static function getRelations(): array
     {
-        Log::info('TACO5: Loading relations for DepartmentResource');
         return [
             EmployeesRelationManager::class,
         ];
@@ -95,7 +91,6 @@ class DepartmentResource extends Resource
 
     public static function getPages(): array
     {
-        Log::info('TACO6: Loading pages for DepartmentResource');
 
         return [
             'index' => Pages\ListDepartments::route('/'),

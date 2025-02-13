@@ -72,6 +72,8 @@ class Attendance extends Model
         'created_by',
         'updated_by',
         'holiday_id',
+        'external_group_id',
+        'shift_date',
     ];
 
     /**

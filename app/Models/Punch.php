@@ -60,6 +60,8 @@ class Punch extends Model
         'is_late',
         'created_by',
         'updated_by',
+        'external_group_id',
+        'shift_date',
     ];
 
     protected $casts = [

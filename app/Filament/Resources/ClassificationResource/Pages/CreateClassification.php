@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Resources\ClassificationsResource\Pages;
+namespace App\Filament\Resources\ClassificationResource\Pages;
 
-use App\Filament\Resources\ClassificationsResource;
+use App\Filament\Resources\ClassificationResource;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateClassification extends CreateRecord
 {
-    protected static string $resource = ClassificationsResource::class;
+    protected static string $resource = ClassificationResource::class;
 }

@@ -23,20 +23,18 @@ class HolidayProcessingService
     {
         Log::info("🔍 Starting Holiday Processing for period: {$startDate} to {$endDate}");
 
-        // Ensure pay periods are valid before processing holidays
         $payPeriods = PayPeriod::whereBetween('start_date', [$startDate, $endDate])->get();
         foreach ($payPeriods as $payPeriod) {
             if ($payPeriod->attendanceIssuesCount() > 0) {
-                Log::warning("⚠️ PayPeriod ID {$payPeriod->id} has unresolved attendance issues. Holidays will not be processed.");
+                Log::warning("⚠️ PayPeriod ID {$payPeriod->id} has unresolved attendance issues. Skipping holidays.");
                 continue;
             }
         }
 
-        // Fetch holidays in range, including recurring holidays
         $holidays = Holiday::whereBetween('start_date', [$startDate, $endDate])
             ->orWhere(function ($query) use ($startDate, $endDate) {
                 $query->where('is_recurring', true)
-                    ->whereBetween('start_date', [$startDate, $endDate]); // Ensure recurring holidays are included
+                    ->whereBetween('start_date', [$startDate, $endDate]);
             })
             ->get();
 
@@ -69,7 +67,6 @@ class HolidayProcessingService
     {
         Log::info("📌 Processing holiday attendance for '{$holiday->name}' on date: {$date}");
 
-        // Fetch employees eligible for holiday pay
         $employees = Employee::where('full_time', true)
             ->where('vacation_pay', true)
             ->get();
@@ -79,49 +76,47 @@ class HolidayProcessingService
         foreach ($employees as $employee) {
             Log::info("🛠 Processing Employee ID: {$employee->id} for Holiday '{$holiday->name}' on {$date}");
 
-            // Fetch employee's shift schedule
-            $shiftSchedule = $this->shiftScheduleService->getShiftScheduleForEmployee($employee->id);
+            $attendanceGroup = DB::table('attendance_time_groups')
+                ->where('employee_id', $employee->id)
+                ->where('shift_date', $date)
+                ->first();
 
-            if (!$shiftSchedule) {
-                Log::warning("⚠️ No shift schedule found for Employee ID: {$employee->id}. Defaulting to midnight shift.");
-                $shift_start = "$date 00:00:00";
-                $shift_end = "$date 08:00:00"; // Default to 8-hour workday
-            } else {
-                $shift_start = "$date " . Carbon::parse($shiftSchedule->start_time)->format('H:i:s');
-                $shift_end = "$date " . Carbon::parse($shiftSchedule->end_time)->format('H:i:s');
-                Log::info("✅ Employee ID: {$employee->id} - Holiday Shift: {$shift_start} to {$shift_end}");
-            }
+            $externalGroupId = $attendanceGroup->external_group_id ?? null;
+            $shiftStart = $attendanceGroup->shift_window_start ?? "$date 00:00:00";
+            $shiftEnd = $attendanceGroup->shift_window_end ?? "$date 08:00:00";
 
-            // Check if holiday attendance already exists for this employee & holiday
             $exists = Attendance::where('employee_id', $employee->id)
-                ->where('holiday_id', $holiday->id) // Ensure it's linked to the correct holiday
+                ->where('holiday_id', $holiday->id)
+                ->where('shift_date', $date)
                 ->exists();
 
             if (!$exists) {
                 Log::info("🆕 Creating Holiday Attendance Records for Employee ID: {$employee->id} on {$date}");
 
-                // Create Clock In Record for Holiday
                 $startRecord = Attendance::create([
                     'employee_id' => $employee->id,
-                    'holiday_id' => $holiday->id,  // ✅ Linking the holiday to attendance
-                    'punch_time' => $shift_start,
-                    'punch_type_id' => $this->getPunchTypeId('Clock In'), // ✅ Assign Clock In punch type
+                    'holiday_id' => $holiday->id,
+                    'punch_time' => $shiftStart,
+                    'punch_type_id' => $this->getPunchTypeId('Clock In'),
                     'is_manual' => true,
                     'classification_id' => $this->getClassificationId('Holiday'),
                     'status' => 'Complete',
                     'issue_notes' => "Generated from Holiday Processing - Start ({$holiday->name})",
+                    'external_group_id' => $externalGroupId,
+                    'shift_date' => $date,
                 ]);
 
-                // Create Clock Out Record for Holiday
                 $endRecord = Attendance::create([
                     'employee_id' => $employee->id,
-                    'holiday_id' => $holiday->id,  // ✅ Linking the holiday to attendance
-                    'punch_time' => $shift_end,
-                    'punch_type_id' => $this->getPunchTypeId('Clock Out'), // ✅ Assign Clock Out punch type
+                    'holiday_id' => $holiday->id,
+                    'punch_time' => $shiftEnd,
+                    'punch_type_id' => $this->getPunchTypeId('Clock Out'),
                     'is_manual' => true,
                     'classification_id' => $this->getClassificationId('Holiday'),
                     'status' => 'Complete',
                     'issue_notes' => "Generated from Holiday Processing - End ({$holiday->name})",
+                    'external_group_id' => $externalGroupId,
+                    'shift_date' => $date,
                 ]);
 
                 Log::info("✅ Successfully inserted Holiday Attendance - Start Record ID: " . ($startRecord->id ?? 'NULL'));

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $frequency_name Name of the payroll frequency
@@ -91,7 +91,7 @@ class PayrollFrequency extends Model
     }
 
     /**
-     * Helper: Description for Weekly Frequency.
+     * Helpers: Description for Weekly Frequency.
      *
      * @return string|null
      */
@@ -113,7 +113,7 @@ class PayrollFrequency extends Model
     }
 
     /**
-     * Helper: Description for Semimonthly Frequency.
+     * Helpers: Description for Semimonthly Frequency.
      *
      * @return string|null
      */
@@ -127,7 +127,7 @@ class PayrollFrequency extends Model
     }
 
     /**
-     * Helper: Description for Monthly Frequency.
+     * Helpers: Description for Monthly Frequency.
      *
      * @return string|null
      */

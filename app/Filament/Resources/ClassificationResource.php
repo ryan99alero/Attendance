@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ClassificationsResource\Pages;
+use App\Filament\Resources\ClassificationResource\Pages;
 use App\Models\Classification;
 use Filament\Forms;
 use Filament\Forms\Components\TextInput;
@@ -13,7 +13,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Resources\Resource;
 
-class ClassificationsResource extends Resource
+class ClassificationResource extends Resource
 {
     protected static ?string $model = Classification::class;
 
