@@ -4,40 +4,50 @@ namespace App\Services\AttendanceProcessing;
 
 use App\Models\PayPeriod;
 use Illuminate\Support\Facades\Log;
+use App\Services\HolidayProcessing\{
+    HolidayProcessingService,
+    HolidayAttendanceProcessor
+};
+use App\Services\VacationProcessing\VacationTimeProcessAttendanceService;
+use App\Services\TimeGrouping\{
+    AttendanceTimeProcessorService,
+    AttendanceTimeGroupService
+};
+
 
 class AttendanceProcessingService
 {
-    protected HolidayProcessingService $holidayProcessingService;
+    protected HolidayAttendanceProcessor $holidayAttendanceProcessor;
     protected VacationTimeProcessAttendanceService $vacationTimeProcessAttendanceService;
     protected AttendanceTimeProcessorService $attendanceTimeProcessorService;
     protected AttendanceCleansingService $attendanceCleansingService;
     protected PunchValidationService $punchValidationService;
     protected PunchMigrationService $punchMigrationService;
     protected UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService;
-    protected AttendanceStatusUpdateService $attendanceStatusUpdateService; // ✅ NEW
+    protected AttendanceStatusUpdateService $attendanceStatusUpdateService;
 
     /**
      * Constructor to inject dependencies.
      */
     public function __construct(
-        HolidayProcessingService $holidayProcessingService,
+        HolidayAttendanceProcessor $holidayAttendanceProcessor,
         VacationTimeProcessAttendanceService $vacationTimeProcessAttendanceService,
         AttendanceTimeProcessorService $attendanceTimeProcessorService,
         AttendanceCleansingService $attendanceCleansingService,
         PunchValidationService $punchValidationService,
         PunchMigrationService $punchMigrationService,
         UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService,
-        AttendanceStatusUpdateService $attendanceStatusUpdateService // ✅ Inject Service
+        AttendanceStatusUpdateService $attendanceStatusUpdateService
     ) {
         Log::info("Initializing AttendanceProcessingService...");
-        $this->holidayProcessingService = $holidayProcessingService;
+        $this->holidayAttendanceProcessor = $holidayAttendanceProcessor;
         $this->vacationTimeProcessAttendanceService = $vacationTimeProcessAttendanceService;
         $this->attendanceTimeProcessorService = $attendanceTimeProcessorService;
         $this->attendanceCleansingService = $attendanceCleansingService;
         $this->punchValidationService = $punchValidationService;
         $this->punchMigrationService = $punchMigrationService;
         $this->unresolvedAttendanceProcessorService = $unresolvedAttendanceProcessorService;
-        $this->attendanceStatusUpdateService = $attendanceStatusUpdateService; // ✅ Store Service
+        $this->attendanceStatusUpdateService = $attendanceStatusUpdateService;
     }
 
     /**
@@ -45,45 +55,53 @@ class AttendanceProcessingService
      */
     public function processAll(PayPeriod $payPeriod): void
     {
-        Log::info("Starting attendance processing for PayPeriod ID: {$payPeriod->id}");
+        Log::info("🚀 Starting attendance processing for PayPeriod ID: {$payPeriod->id}");
 
         // Step 1: Run Attendance Cleansing Service
-        Log::info("Running AttendanceCleansingService to remove duplicates.");
+        Log::info("🔍 Step 1: Running AttendanceCleansingService to remove duplicates.");
         $this->attendanceCleansingService->cleanUpDuplicates();
-        Log::info("AttendanceCleansingService completed.");
+        Log::info("✅ Step 1: AttendanceCleansingService completed.");
 
         // Step 2: Process Vacation Records
-        Log::info("Processing vacation attendance records.");
+        Log::info("🔍 Step 2: Processing vacation attendance records.");
         $this->vacationTimeProcessAttendanceService->processVacationDays($payPeriod->start_date, $payPeriod->end_date);
+        Log::info("✅ Step 2: Vacation processing completed.");
 
         // Step 3: Process Holiday Records
-        Log::info("Processing holiday attendance records.");
-        $this->holidayProcessingService->processHolidays($payPeriod->start_date, $payPeriod->end_date);
+        Log::info("🔍 Step 3: Processing holiday attendance records.");
+        if (method_exists($this->holidayAttendanceProcessor, 'processHolidaysForPayPeriod')) {
+            $this->holidayAttendanceProcessor->processHolidaysForPayPeriod($payPeriod);
+            Log::info("✅ Step 3: Holiday processing completed.");
+        } else {
+            Log::error("🚨 [processHolidaysForPayPeriod] method does not exist in HolidayAttendanceProcessor.");
+        }
 
         // Step 4: Process Attendance Time Records
-        Log::info("Processing attendance time records for PayPeriod.");
+        Log::info("🔍 Step 4: Processing attendance time records.");
         $this->attendanceTimeProcessorService->processAttendanceForPayPeriod($payPeriod);
-        Log::info("Attendance time processing completed.");
+        Log::info("✅ Step 4: Attendance time processing completed.");
 
         // Step 5: Validate Punches
-        Log::info("Validating punches for PayPeriod.");
+        Log::info("🔍 Step 5: Validating punches.");
         $this->punchValidationService->validatePunchesWithinPayPeriod($payPeriod);
+        Log::info("✅ Step 5: Punch validation completed.");
 
         // Step 6: Resolve overlapping records
-        Log::info("Resolving overlapping attendance records.");
+        Log::info("🔍 Step 6: Resolving overlapping attendance records.");
         $this->punchValidationService->resolveOverlappingRecords($payPeriod);
+        Log::info("✅ Step 6: Overlapping records resolved.");
 
         // Step 7: Migrate Punches
-        Log::info("Preparing to migrate punches for PayPeriod. This step will ensure punches are migrated and attendances are marked as processed.");
-        Log::info("Migrating punches for PayPeriod.");
+        Log::info("🔍 Step 7: .");
         $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
+        Log::info("✅ Step 7: Punch migration completed.");
 
         // Step 8: Process Unresolved Partial Records
-        Log::info("Processing unresolved attendance records for PayPeriod ID: {$payPeriod->id}");
+        Log::info("🔍 Step 8: Processing unresolved attendance records.");
         $this->unresolvedAttendanceProcessorService->processStalePartialRecords($payPeriod);
-        Log::info("Unresolved attendance processing completed.");
+        Log::info("✅ Step 8: Unresolved attendance processing completed.");
 
-        Log::info("Attendance processing completed for PayPeriod ID: {$payPeriod->id}");
+        Log::info("🎯 Attendance processing completed for PayPeriod ID: {$payPeriod->id}");
     }
 
     /**
@@ -95,14 +113,20 @@ class AttendanceProcessingService
 
         // ✅ Mark records as Complete
         $this->attendanceStatusUpdateService->markRecordsAsComplete($attendanceIds);
-
         Log::info("✅ [processCompletedAttendanceRecords] Attendance records marked as Complete.");
 
         // ✅ Only trigger migration if Auto-Process is enabled
         if ($autoProcess) {
             Log::info("🚀 [processCompletedAttendanceRecords] Auto-Process is enabled. Triggering Punch Migration Service.");
-            $this->punchMigrationService->migratePunchesForAttendances($attendanceIds);
-            Log::info("✅ [processCompletedAttendanceRecords] Punch migration completed.");
+
+            // ✅ Fix PayPeriod fetch logic
+            $payPeriod = PayPeriod::find($attendanceIds[0] ?? 0);
+            if ($payPeriod instanceof PayPeriod) {
+                $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
+                Log::info("✅ [processCompletedAttendanceRecords] Punch migration completed.");
+            } else {
+                Log::warning("⚠️ No valid PayPeriod found for Attendance IDs: " . json_encode($attendanceIds));
+            }
         } else {
             Log::info("⏸ [processCompletedAttendanceRecords] Auto-Process is disabled. Skipping Punch Migration.");
         }

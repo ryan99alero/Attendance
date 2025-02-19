@@ -46,6 +46,17 @@ class CompanySetupResource extends Resource
                     ->default('error')
                     ->required()
                     ->label('Logging Level'),
+                            // Temporary Debug Mode in  for Development (None, Error, Warning, Info, Debug)
+                Forms\Components\Select::make('debug_punch_assignment_mode')
+                    ->options([
+                        'shift_schedule' => 'Shift Schedule',      // No logging
+                        'heuristic' => 'Heuristic',    // Only critical errors
+                        'ml' => 'Machine Learning',// Errors + potential issues
+                        'full' => 'All',      // General system events
+                    ])
+                    ->default('error')
+                    ->required()
+                    ->label('Logging Level'),
 
                 // Whether to automatically adjust punch types for incomplete records
                 Forms\Components\Toggle::make('auto_adjust_punches')
@@ -85,7 +96,8 @@ class CompanySetupResource extends Resource
 
                 Tables\Columns\TextColumn::make('logging_level')->sortable()
                     ->label('Logging Level'),
-
+                Tables\Columns\TextColumn::make('debug_punch_assignment_mode')->sortable()
+                    ->label('debug punch assignment mode'),
                 Tables\Columns\IconColumn::make('auto_adjust_punches')->boolean()
                     ->label('Auto Adjust Punches'),
 
@@ -106,9 +118,6 @@ class CompanySetupResource extends Resource
 
                 Tables\Columns\TextColumn::make('updated_at')->dateTime()
                     ->label('Updated At'),
-            ])
-            ->filters([
-                TrashedFilter::make(), // Allows viewing soft-deleted records if enabled
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

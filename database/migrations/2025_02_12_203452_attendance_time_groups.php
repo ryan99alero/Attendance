@@ -17,7 +17,7 @@ return new class extends Migration
 
             // Core fields
             $table->unsignedBigInteger('employee_id')->comment('Foreign key to employees table');
-            $table->string('external_group_id', 20)->unique()->comment('Unique ID for this time group, format: employee_external_id + shift_date');
+            $table->string('external_group_id', 40)->unique()->comment('Unique ID for this time group, format: employee_external_id + shift_date');
             $table->date('shift_date')->nullable()->comment('The official workday this shift is assigned to');
             $table->dateTime('shift_window_start')->nullable()->comment('Start of the work period for this shift group');
             $table->dateTime('shift_window_end')->nullable()->comment('End of the work period for this shift group');

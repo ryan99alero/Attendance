@@ -23,6 +23,12 @@ return new class extends Migration {
                 ->comment('Allow admins to manually edit time records');
             $table->integer('max_shift_length')->default(12)
                 ->comment('Maximum shift length in hours before requiring admin approval');
+
+            // NEW FIELD: Debug mode for punch assignment
+            $table->enum('debug_punch_assignment_mode', ['shift_schedule', 'heuristic', 'ml', 'full'])
+                ->default('full')
+                ->comment('Controls which Punch Type Assignment service runs for debugging');
+
             $table->timestamps();
         });
     }

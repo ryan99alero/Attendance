@@ -19,7 +19,7 @@ return new class extends Migration
 
             // Employee and device references
             $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key referencing the employee who made the punch');
-            $table->string('external_group_id', 20)->nullable()->comment('Links to attendance_time_groups.external_group_id');
+            $table->string('external_group_id', 40)->nullable()->comment('Links to attendance_time_groups.external_group_id');
             $table->date('shift_date')->nullable()->comment('The assigned workday for this punch record');
             $table->unsignedBigInteger('device_id')->nullable()->comment('Foreign key referencing the device used for the punch');
 

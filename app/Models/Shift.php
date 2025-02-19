@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- *
+ * 
  *
  * @property int $id
  * @property string $shift_name Name of the shift
@@ -33,6 +33,8 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereStartTime($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereUpdatedBy($value)
+ * @property int $multi_day_shift Indicates if the shift spans multiple calendar days
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereMultiDayShift($value)
  * @mixin \Eloquent
  */
 class Shift extends Model

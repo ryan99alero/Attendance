@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employees
  * @property int|null $department_id Foreign key to Departments
  * @property string $schedule_name Name of the schedule
  * @property \Illuminate\Support\Carbon|null $lunch_start_time
+ * @property \Illuminate\Support\Carbon|null $lunch_stop_time
  * @property \Illuminate\Support\Carbon|null $start_time
  * @property int $lunch_duration Lunch duration in minutes
  * @property int $daily_hours
@@ -66,6 +67,7 @@ class ShiftSchedule extends Model
         'department_id',
         'schedule_name',
         'lunch_start_time',
+        'lunch_stop_time',
         'start_time',
         'lunch_duration',
         'daily_hours',
@@ -93,6 +95,7 @@ class ShiftSchedule extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'lunch_start_time' => 'datetime:H:i', // HH:MM format
+        'lunch_stop_time' => 'datetime:H:i', // HH:MM format
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
         'grace_period' => 'integer',

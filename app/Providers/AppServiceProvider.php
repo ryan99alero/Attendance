@@ -2,7 +2,8 @@
 
 namespace App\Providers;
 
-use App\Services\AttendanceProcessing\ShiftScheduleService;
+use App\Services\Shift\ShiftScheduleService;
+use App\Services\Logging\AutoLogger;
 use Illuminate\Support\ServiceProvider;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\View;
@@ -27,28 +28,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Define a custom Carbon macro for the desired format
+        // Define a custom Carbon macro for formatting
         Carbon::macro('toCustomFormat', function () {
             return $this->format('Y-m-d H:i:s');
         });
 
-        // Set the default serialization format to the custom format
-        Carbon::serializeUsing(function ($carbon) {
-            return $carbon->toCustomFormat();
-        });
-
-        // Log every view that is loaded
+        // Intelligent logging for views (Only logs if `company_setup.logging_level` is `debug` or `info`)
         View::composer('*', function ($view) {
-            Log::channel('view_log')->info("View Loaded: " . $view->getName(), $view->getData());
+            AutoLogger::log('info', "View Loaded: " . $view->getName(), $view->getData());
         });
 
-        // Log all SQL queries executed
+        // Intelligent SQL Query Logging (Only logs if `company_setup.logging_level` is `debug`)
         DB::listen(function ($query) {
-            Log::channel('sql')->info('SQL Query Executed:', [
-                'sql' => $query->sql,
-                'bindings' => $query->bindings,
-                'time' => $query->time . ' ms',
-            ]);
+            AutoLogger::logDatabaseQuery($query->sql, $query->bindings, $query->time);
         });
     }
 }

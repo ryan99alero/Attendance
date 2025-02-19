@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- *
+ * 
  *
  * @property int $id
  * @property string $name Department name
@@ -34,6 +34,8 @@ use Illuminate\Support\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereName($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereUpdatedBy($value)
+ * @property string|null $external_department_id ID from external Department systems
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereExternalDepartmentId($value)
  * @mixin \Eloquent
  */
 class Department extends Model

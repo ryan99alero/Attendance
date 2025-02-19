@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- *
+ * 
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employees
@@ -43,6 +43,16 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch wherePunchTypeId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereUpdatedBy($value)
+ * @property int|null $classification_id Foreign key referencing the classifications table
+ * @property int $is_processed
+ * @property string $external_group_id Links to attendance_time_groups.external_group_id
+ * @property string|null $shift_date The assigned workday for this punch record
+ * @property int $is_archived Indicates if record is archived
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereClassificationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereExternalGroupId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereIsArchived($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereIsProcessed($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereShiftDate($value)
  * @mixin \Eloquent
  */
 class Punch extends Model

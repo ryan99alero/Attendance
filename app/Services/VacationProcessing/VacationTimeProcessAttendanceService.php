@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\AttendanceProcessing;
+namespace App\Services\VacationProcessing;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;

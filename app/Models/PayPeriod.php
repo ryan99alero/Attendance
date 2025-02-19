@@ -36,6 +36,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereStartDate($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereUpdatedBy($value)
+ * @property int $is_posted Indicates if the pay period has been processed
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereIsPosted($value)
  * @mixin \Eloquent
  */
 class PayPeriod extends Model

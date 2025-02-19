@@ -27,7 +27,7 @@ return new class extends Migration
             $table->boolean('is_manual')->default(false)->comment('Indicates if the attendance was manually recorded');
 
             // Shift-related fields
-            $table->string('external_group_id', 20)->nullable()->comment('Links to attendance_time_groups.external_group_id');
+            $table->string('external_group_id', 40)->nullable()->comment('Links to attendance_time_groups.external_group_id');
             $table->date('shift_date')->nullable()->comment('The assigned workday for this attendance record');
 
             // Processing status and categorization

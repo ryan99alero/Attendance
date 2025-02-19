@@ -33,6 +33,48 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property-read \App\Models\PayrollFrequency|null $payrollFrequency
  * @property-read \App\Models\User|null $user
  * @property-read \App\Models\ShiftSchedule|null $schedule
+ * @property string $external_department_id
+ * @property string|null $email Employee email address
+ * @property int|null $shift_id Foreign key referencing the shifts table
+ * @property string|null $photograph Path or URL of the employee photograph
+ * @property int|null $created_by Foreign key referencing the user who created the record
+ * @property int|null $updated_by Foreign key referencing the user who last updated the record
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string|null $full_names Concatenated full name of the employee
+ * @property int|null $shift_schedule_id Foreign key referencing the shift schedules table
+ * @property-read \App\Models\RoundGroup|null $roundGroup
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereAddress($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereCity($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereCountry($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereCreatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereDepartmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereEmail($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereExternalDepartmentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereExternalId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereFirstName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereFullNames($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereFullTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereIsActive($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereLastName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee wherePayrollFrequencyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee wherePhone($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee wherePhotograph($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereRoundGroupId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereShiftId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereShiftScheduleId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereState($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereTerminationDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereUpdatedBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereVacationPay($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereZip($value)
+ * @mixin \Eloquent
  */
 class Employee extends Model
 {

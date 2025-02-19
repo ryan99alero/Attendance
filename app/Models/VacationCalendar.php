@@ -32,6 +32,8 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationCalendar whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationCalendar whereUpdatedBy($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationCalendar whereVacationDate($value)
+ * @property int $is_recorded Indicates if this vacation has been recorded in the Attendance table
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationCalendar whereIsRecorded($value)
  * @mixin \Eloquent
  */
 class VacationCalendar extends Model

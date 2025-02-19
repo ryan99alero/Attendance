@@ -32,6 +32,10 @@ class ShiftScheduleResource extends Resource
                 ->label('Lunch Start Time')
                 ->nullable()
                 ->seconds(false),
+            Forms\Components\TimePicker::make('lunch_stop_time')
+                ->label('Lunch Stop Time')
+                ->nullable()
+                ->seconds(false),
             Forms\Components\TextInput::make('lunch_duration')
                 ->label('Lunch Duration (Minutes)')
                 ->numeric()
@@ -88,6 +92,10 @@ class ShiftScheduleResource extends Resource
                 ->dateTime('H:i'),
             Tables\Columns\TextColumn::make('lunch_start_time')
                 ->label('Lunch Start Time')
+                ->dateTime('H:i')
+                ->placeholder('N/A'),
+            Tables\Columns\TextColumn::make('lunch_stop_time')
+                ->label('Lunch Stop Time')
                 ->dateTime('H:i')
                 ->placeholder('N/A'),
             Tables\Columns\TextColumn::make('end_time')

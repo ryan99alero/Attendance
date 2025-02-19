@@ -10,7 +10,7 @@ use App\Models\Classification;
 use Carbon\Carbon;
 
 /**
- *
+ * 
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employees
@@ -48,6 +48,20 @@ use Carbon\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereUpdatedBy($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance withinTimeRange(string $startTime, string $endTime)
+ * @property string|null $employee_external_id External ID of the employee for mapping
+ * @property int|null $classification_id Foreign key to classification table
+ * @property int|null $holiday_id
+ * @property string|null $external_group_id Links to attendance_time_groups.external_group_id
+ * @property string|null $shift_date The assigned workday for this attendance record
+ * @property int $is_archived Indicates if record is archived
+ * @property-read Classification|null $classification
+ * @property-read \App\Models\Employee|null $employeeByExternalId
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereClassificationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereEmployeeExternalId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereExternalGroupId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereHolidayId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereIsArchived($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Attendance whereShiftDate($value)
  * @mixin \Eloquent
  */
 class Attendance extends Model

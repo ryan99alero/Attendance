@@ -1,5 +1,5 @@
 <?php
-namespace App\Services\AttendanceProcessing;
+namespace App\Services\Shift;
 
 use App\Models\Employee;
 use App\Models\ShiftSchedule;
