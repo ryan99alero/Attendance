@@ -15,6 +15,8 @@ return new class extends Migration {
                 ->comment('Defines the level of logging in the system');
             $table->boolean('auto_adjust_punches')->default(false)
                 ->comment('Whether to automatically adjust punch types for incomplete records');
+            $table->integer('heuristic_min_punch_gap')->default(6)
+                ->comment('Minimum hours required between punches for auto-classification');
             $table->boolean('use_ml_for_punch_matching')->default(true)
                 ->comment('Enable ML-based punch classification');
             $table->boolean('enforce_shift_schedules')->default(true)

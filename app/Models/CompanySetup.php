@@ -44,6 +44,7 @@ class CompanySetup extends Model
         'logging_level',
         'debug_punch_assignment_mode',
         'auto_adjust_punches',
+        'heuristic_min_punch_gap',
         'use_ml_for_punch_matching',
         'enforce_shift_schedules',
         'allow_manual_time_edits',

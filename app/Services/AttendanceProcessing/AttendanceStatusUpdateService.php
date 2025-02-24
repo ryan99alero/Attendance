@@ -9,15 +9,26 @@ class AttendanceStatusUpdateService
 {
     public function markRecordsAsComplete(array $attendanceIds): void
     {
-        Log::info("🛠 [AttendanceStatusUpdateService] Marking records as Complete: " . json_encode($attendanceIds));
+        Log::info("[AttendanceStatusUpdateService] 🛠 Marking records as Complete: " . json_encode($attendanceIds));
 
         if (empty($attendanceIds)) {
-            Log::warning("⚠️ No valid attendance IDs provided.");
+            Log::warning("[AttendanceStatusUpdateService] ⚠️ No valid attendance IDs provided.");
             return;
         }
 
-        Attendance::whereIn('id', $attendanceIds)->update(['status' => 'Complete']);
+        // Ensure all records have a valid punch_state before marking them as complete
+        $validRecords = Attendance::whereIn('id', $attendanceIds)
+            ->whereNotNull('punch_type_id')
+            ->whereNotNull('punch_state')
+            ->get();
 
-        Log::info("✅ [AttendanceStatusUpdateService] Updated " . count($attendanceIds) . " attendance records to status: Complete.");
+        if ($validRecords->isEmpty()) {
+            Log::warning("[AttendanceStatusUpdateService] ⚠️ No records were updated because they are missing a punch_type_id or punch_state.");
+            return;
+        }
+
+        Attendance::whereIn('id', $validRecords->pluck('id'))->update(['status' => 'Complete']);
+
+        Log::info("[AttendanceStatusUpdateService] ✅ Updated " . $validRecords->count() . " attendance records to status: Complete.");
     }
 }

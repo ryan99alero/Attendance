@@ -25,6 +25,10 @@ return new class extends Migration
             $table->unsignedBigInteger('device_id')->nullable()->comment('Foreign key to devices table');
             $table->unsignedBigInteger('punch_type_id')->nullable()->comment('Foreign key to punch types table');
             $table->boolean('is_manual')->default(false)->comment('Indicates if the attendance was manually recorded');
+            $table->enum('punch_state', ['start', 'stop', 'unknown'])
+                ->after('punch_type_id')
+                ->default('unknown')
+                ->comment('Indicates whether the punch is a start or stop event');
 
             // Shift-related fields
             $table->string('external_group_id', 40)->nullable()->comment('Links to attendance_time_groups.external_group_id');
@@ -80,11 +84,22 @@ return new class extends Migration
             BEFORE INSERT ON attendances
             FOR EACH ROW
             BEGIN
+                -- If employee_id is missing, find it using employee_external_id
                 IF NEW.employee_id IS NULL AND NEW.employee_external_id IS NOT NULL THEN
                     SET NEW.employee_id = (
                         SELECT id
                         FROM employees
                         WHERE external_id = NEW.employee_external_id
+                        LIMIT 1
+                    );
+                END IF;
+
+                -- If employee_external_id is missing, find it using employee_id
+                IF NEW.employee_external_id IS NULL AND NEW.employee_id IS NOT NULL THEN
+                    SET NEW.employee_external_id = (
+                        SELECT external_id
+                        FROM employees
+                        WHERE id = NEW.employee_id
                         LIMIT 1
                     );
                 END IF;

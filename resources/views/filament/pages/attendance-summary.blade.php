@@ -26,21 +26,24 @@
             </div>
         </form>
 
-        <!-- Table -->
+        <!-- Attendance Table -->
         <div class="mt-6">
-            <div class="overflow-x-auto mt-4">
+            <div class="overflow-x-auto">
                 <table class="w-full table-auto border-collapse border border-gray-300 dark:border-gray-700">
                     <thead>
                     <tr class="bg-gray-100 dark:bg-gray-800">
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                             <input type="checkbox" wire:model="selectAll">
                         </th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Date</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">First Punch</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Lunch Start</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Lunch Stop</th>
-                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Last Punch</th>
+                        @foreach (['FullName' => 'Employee', 'attendance_date' => 'Date', 'FirstPunch' => 'First Punch', 'LunchStart' => 'Lunch Start', 'LunchStop' => 'Lunch Stop', 'LastPunch' => 'Last Punch'] as $field => $label)
+                            <th class="border border-gray-300 px-4 py-2 dark:border-gray-700 cursor-pointer"
+                                wire:click="sortBy('{{ $field }}')">
+                                {{ $label }}
+                                @if ($sortColumn === $field)
+                                    <span>{{ $sortDirection === 'asc' ? '🔼' : '🔽' }}</span>
+                                @endif
+                            </th>
+                        @endforeach
                     </tr>
                     </thead>
                     <tbody>
@@ -61,15 +64,23 @@
                                     @if ($attendance[$key] === null)
                                         <x-filament::button
                                             wire:click="$dispatch('open-modal', {
-                                                        employeeId: '{{ $attendance['employee_id'] }}',
-                                                        date: '{{ $attendance['attendance_date'] }}',
-                                                        punchType: {{ $punchType }}
-                                                    })"
+                                                employeeId: '{{ $attendance['employee_id'] }}',
+                                                date: '{{ $attendance['attendance_date'] }}',
+                                                punchType: {{ $punchType }}
+                                            })"
                                             class="text-blue-500 underline">
                                             Input Time
                                         </x-filament::button>
                                     @else
-                                        {{ $attendance[$key] }}
+                                        <span wire:click="$dispatch('open-modal', {
+                                                employeeId: '{{ $attendance['employee_id'] }}',
+                                                date: '{{ $attendance['attendance_date'] }}',
+                                                punchType: {{ $punchType }},
+                                                existingTime: '{{ $attendance[$key] }}'
+                                            })"
+                                              class="cursor-pointer text-blue-500 underline">
+                                            {{ $attendance[$key] }}
+                                        </span>
                                     @endif
                                 </td>
                             @endforeach

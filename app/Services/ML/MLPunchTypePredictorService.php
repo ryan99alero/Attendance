@@ -17,7 +17,7 @@ class MLPunchTypePredictorService
 
     public function __construct()
     {
-        Log::info("🛠 Initializing MLPunchTypePredictorService...");
+        Log::info("[ML] Initializing MLPunchTypePredictorService...");
 
         $this->modelPath = storage_path('ml/punch_model.serialized');
         $this->classifier = new KNearestNeighbors(3); // Default classifier with k=3
@@ -30,47 +30,44 @@ class MLPunchTypePredictorService
         $modelManager = new ModelManager();
 
         if (file_exists($this->modelPath)) {
-            Log::info("✅ ML Model file found. Attempting to restore...");
+            Log::info("[ML] Model file found. Attempting to restore...");
 
             $model = $modelManager->restoreFromFile($this->modelPath);
 
             if ($model instanceof KNearestNeighbors) {
                 $this->classifier = $model;
-                Log::info("✅ ML Model successfully restored.");
+                Log::info("[ML] Model successfully restored.");
             } else {
-                Log::warning("⚠️ Restored model is not a valid KNearestNeighbors instance. Retraining...");
+                Log::warning("[ML] Invalid model detected. Retraining...");
                 $this->trainModel();
             }
         } else {
-            Log::warning("⚠️ No saved model found. Training a new one...");
+            Log::warning("[ML] No saved model found. Training a new one...");
             $this->trainModel();
         }
     }
 
     public function trainModel(): void
     {
-        Log::info("🔍 [ML] Training model...");
+        Log::info("[ML] Training model...");
 
-        // Ensure the ML model storage directory exists
         if (!File::exists(storage_path('ml'))) {
             File::makeDirectory(storage_path('ml'), 0755, true);
-            Log::info("📂 Created missing ML model directory.");
+            Log::info("[ML] Created missing ML model directory.");
         }
 
-        // Fetch **only processed** punch records for training
         $punchData = Attendance::whereNotNull('punch_type_id')
-            ->where('is_processed', true) // Ensuring only verified punches are used
+            ->where('is_processed', true)
             ->orderBy('punch_time', 'asc')
             ->get();
 
-        Log::info("📊 [ML] Training on " . $punchData->count() . " punch records.");
+        Log::info("[ML] Training on " . $punchData->count() . " punch records.");
 
         if ($punchData->isEmpty()) {
-            Log::warning("⚠️ [ML] Insufficient data to train model.");
+            Log::warning("[ML] Insufficient data for training.");
             return;
         }
 
-        // Prepare training data
         $samples = [];
         $labels = [];
 
@@ -83,48 +80,45 @@ class MLPunchTypePredictorService
         }
 
         if (empty($samples) || empty($labels)) {
-            Log::warning("⚠️ [ML] No valid samples found for training.");
+            Log::warning("[ML] No valid samples found for training.");
             return;
         }
 
         $this->classifier->train($samples, $labels);
 
-        // Save the trained model to disk
         $modelManager = new ModelManager();
         $modelManager->saveToFile($this->classifier, $this->modelPath);
 
-        Log::info("✅ [ML] Model trained and saved.");
+        Log::info("[ML] Model trained and saved.");
     }
 
-    /**
-     * Assign punch types using ML prediction.
-     * This method aligns with `assignPunchTypes` in other services.
-     *
-     * @param $punches
-     * @param int $employeeId
-     * @return bool
-     */
-    public function assignPunchTypes($punches, int $employeeId): bool
+    public function assignPunchTypes($punches, int $employeeId, &$punchEvaluations): void
     {
-        $success = false;
+        // ✅ Skip ML if no training data exists
+        if ($this->isTrainingDataInsufficient()) {
+            Log::warning("⚠️ [ML] Skipping ML Processing for Employee ID: {$employeeId} due to insufficient training data.");
+            return;
+        }
 
         foreach ($punches as $punch) {
             $predictedTypeId = $this->predictPunchType($employeeId, $punch->punch_time, $punch->shift_date, $punch->external_group_id);
 
             if ($predictedTypeId) {
-                $punch->punch_type_id = $predictedTypeId;
-                $punch->status = 'Complete';
-                $punch->issue_notes = "Assigned by ML Model";
-                $punch->save();
-
+                $punchEvaluations[$punch->id]['ml'] = [
+                    'punch_type_id' => $predictedTypeId,
+                    'punch_state' => $this->determinePunchState($predictedTypeId),
+                ];
                 Log::info("🤖 [ML] Assigned Predicted Punch Type ID: {$predictedTypeId} to Punch ID: {$punch->id}");
-                $success = true;
             } else {
                 Log::warning("⚠️ [ML] No reliable prediction for Punch ID: {$punch->id}");
             }
         }
+    }
 
-        return $success;
+// ✅ New Function: Check if Training Data Exists
+    private function isTrainingDataInsufficient(): bool
+    {
+        return \DB::table('punches')->where('is_processed', true)->count() < 10;
     }
 
     public function predictPunchType(int $employeeId, string $punchTime, ?string $shiftDate = null, ?string $externalGroupId = null): ?int
@@ -134,7 +128,7 @@ class MLPunchTypePredictorService
 
         try {
             if (empty($this->classifier)) {
-                Log::warning("⚠️ [ML] Classifier is uninitialized. Training now...");
+                Log::warning("[ML] Classifier is uninitialized. Training now...");
                 $this->trainModel();
             }
 
@@ -145,13 +139,24 @@ class MLPunchTypePredictorService
 
             return is_numeric($predicted) ? (int) $predicted : null;
         } catch (\Exception $e) {
-            Log::error("❌ [ML] Prediction failed. Error: " . $e->getMessage());
+            Log::error("[ML] Prediction failed. Error: " . $e->getMessage());
             return null;
         }
     }
 
-    private function getPunchTypeId(string $type): ?int
+    private function determinePunchState(int $punchTypeId): string
     {
-        return DB::table('punch_types')->where('name', $type)->value('id');
+        $startTypes = ['Clock In', 'Lunch Start', 'Shift Start', 'Manual Start'];
+        $stopTypes = ['Clock Out', 'Lunch Stop', 'Shift Stop', 'Manual Stop'];
+
+        $punchTypeName = DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+
+        if (in_array($punchTypeName, $startTypes)) {
+            return 'start';
+        } elseif (in_array($punchTypeName, $stopTypes)) {
+            return 'stop';
+        }
+
+        return 'unknown';
     }
 }

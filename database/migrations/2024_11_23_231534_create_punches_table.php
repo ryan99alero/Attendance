@@ -28,6 +28,10 @@ return new class extends Migration
             $table->dateTime('punch_time')->comment('Exact time of the punch');
             $table->boolean('is_altered')->default(false)->comment('Indicates if the punch was manually altered after recording');
             $table->boolean('is_late')->default(false)->comment('Indicates if the punch is considered late');
+            $table->enum('punch_state', ['start', 'stop', 'unknown'])
+                ->after('punch_type_id')
+                ->default('unknown')
+                ->comment('Indicates whether the punch is a start or stop event');
 
             // Processing and classification
             $table->unsignedBigInteger('pay_period_id')->nullable()->comment('Foreign key referencing the associated pay period');

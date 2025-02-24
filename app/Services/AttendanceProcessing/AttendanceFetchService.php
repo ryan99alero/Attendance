@@ -5,6 +5,8 @@ namespace App\Services\AttendanceProcessing;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\QueryException;
+use Carbon\Carbon;
 
 class AttendanceFetchService
 {
@@ -13,16 +15,7 @@ class AttendanceFetchService
      */
     public function fetchHoursWorked(string $startDate, string $endDate): array
     {
-        try {
-            $results = DB::select('CALL GetHoursWorked(?, ?)', [$startDate, $endDate]);
-
-            Log::info("Fetched hours worked using stored procedure", ['count' => count($results)]);
-
-            return $results;
-        } catch (\Exception $e) {
-            Log::error("Failed to fetch hours worked: " . $e->getMessage());
-            return [];
-        }
+        return $this->executeStoredProcedure('CALL GetHoursWorked(?, ?)', [$startDate, $endDate], 'hours worked');
     }
 
     /**
@@ -30,16 +23,7 @@ class AttendanceFetchService
      */
     public function fetchTimeOff(string $startDate, string $endDate): array
     {
-        try {
-            $results = DB::select('CALL GetTimeOff(?, ?)', [$startDate, $endDate]);
-
-            Log::info("Fetched time-off data using stored procedure", ['count' => count($results)]);
-
-            return $results;
-        } catch (\Exception $e) {
-            Log::error("Failed to fetch time-off data: " . $e->getMessage());
-            return [];
-        }
+        return $this->executeStoredProcedure('CALL GetTimeOff(?, ?)', [$startDate, $endDate], 'time-off data');
     }
 
     /**
@@ -47,14 +31,33 @@ class AttendanceFetchService
      */
     public function fetchPayPeriodSummary(string $startDate, string $endDate): array
     {
+        return $this->executeStoredProcedure('CALL GetPayPeriodSummary(?, ?)', [$startDate, $endDate], 'pay period summary');
+    }
+
+    /**
+     * Generic method to execute stored procedures with enhanced error handling.
+     */
+    private function executeStoredProcedure(string $query, array $params, string $processType): array
+    {
         try {
-            $results = DB::select('CALL GetPayPeriodSummary(?, ?)', [$startDate, $endDate]);
+            $startTime = Carbon::now();
 
-            Log::info("Fetched pay period summary using stored procedure", ['count' => count($results)]);
+            $results = DB::select($query, $params);
+            $duration = $startTime->diffInMilliseconds(Carbon::now());
 
-            return $results;
+            Log::info("[AttendanceFetchService] ✅ Successfully fetched {$processType} using stored procedure.", [
+                'count' => count($results),
+                'execution_time_ms' => $duration
+            ]);
+
+            return $results ?? [];
+
+        } catch (QueryException $qe) {
+            Log::error("[AttendanceFetchService] ❌ SQL Error fetching {$processType}: " . $qe->getMessage());
+            return [];
+
         } catch (\Exception $e) {
-            Log::error("Failed to fetch pay period summary: " . $e->getMessage());
+            Log::error("[AttendanceFetchService] ❌ General Error fetching {$processType}: " . $e->getMessage());
             return [];
         }
     }

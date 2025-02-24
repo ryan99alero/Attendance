@@ -56,12 +56,19 @@ class CompanySetupResource extends Resource
                     ])
                     ->default('error')
                     ->required()
-                    ->label('Logging Level'),
+                    ->label('PunchType Debug Mode'),
 
                 // Whether to automatically adjust punch types for incomplete records
                 Forms\Components\Toggle::make('auto_adjust_punches')
                     ->default(false)
                     ->label('Auto Adjust Punches'),
+
+                // Defines the minimum hours required between two punches for auto-assigning Clock In/Out instead of Needs Review.
+                Forms\Components\TextInput::make('heuristic_min_punch_gap')
+                    ->numeric()
+                    ->default(6)
+                    ->required()
+                    ->label('heuristic Min Punch Gap'),
 
                 // Enable ML-based punch classification for better accuracy in punch assignments
                 Forms\Components\Toggle::make('use_ml_for_punch_matching')
@@ -96,10 +103,15 @@ class CompanySetupResource extends Resource
 
                 Tables\Columns\TextColumn::make('logging_level')->sortable()
                     ->label('Logging Level'),
+
                 Tables\Columns\TextColumn::make('debug_punch_assignment_mode')->sortable()
                     ->label('debug punch assignment mode'),
+
                 Tables\Columns\IconColumn::make('auto_adjust_punches')->boolean()
                     ->label('Auto Adjust Punches'),
+
+                Tables\Columns\TextColumn::make('heuristic_min_punch_gap')->sortable()
+                    ->label('Heuristic Min Punch Gap'),
 
                 Tables\Columns\IconColumn::make('use_ml_for_punch_matching')->boolean()
                     ->label('Use ML for Punch Matching'),

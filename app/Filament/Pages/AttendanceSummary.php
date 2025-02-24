@@ -22,11 +22,14 @@ class AttendanceSummary extends Page
 
     public $payPeriodId;
     public $search = '';
-    public $statusFilter = 'NeedsReview'; // Default filter
+    public $statusFilter = 'NeedsReview';
     public $groupedAttendances;
     public array $selectedAttendances = [];
     public bool $selectAll = false;
     public bool $autoProcess = false;
+
+    public $sortColumn = 'attendance_date';
+    public $sortDirection = 'asc';
 
     public function mount(): void
     {
@@ -56,9 +59,9 @@ class AttendanceSummary extends Page
                 ->options([
                     'all' => 'All',
                     'Migrated' => 'Migrated',
-                    'problem' => 'Problem (All Except Migrated)', // No actual "Problem" status
+                    'problem' => 'Problem (All Except Migrated)',
                 ])
-                ->default('problem') // Default to show only problem records
+                ->default('problem')
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
         ];
@@ -78,18 +81,25 @@ class AttendanceSummary extends Page
     public function fetchAttendances(): Collection
     {
         if (!$this->payPeriodId) {
-            Log::info("No PayPeriod selected. Returning empty attendance records.");
             return collect();
         }
 
         $payPeriod = PayPeriod::find($this->payPeriodId);
 
         if (!$payPeriod) {
-            Log::warning("Invalid PayPeriod ID: {$this->payPeriodId}. Returning empty attendance records.");
             return collect();
         }
 
-        Log::info("Fetching attendances for PayPeriod: {$payPeriod->start_date} to {$payPeriod->end_date}");
+        $columnMap = [
+            'FullName' => 'employees.full_names',
+            'attendance_date' => 'attendance_date',
+            'FirstPunch' => 'clock_in',   // SQL alias
+            'LunchStart' => 'lunch_start',
+            'LunchStop' => 'lunch_stop',
+            'LastPunch' => 'clock_out',
+        ];
+
+        $sortColumn = $columnMap[$this->sortColumn] ?? 'attendance_date';
 
         $query = Attendance::with('employee')
             ->select([
@@ -99,30 +109,25 @@ class AttendanceSummary extends Page
                 'employees.external_id as PayrollID',
                 DB::raw("ANY_VALUE(attendances.status) as status"),
                 DB::raw("DATE(attendances.punch_time) as attendance_date"),
-                DB::raw("
-                MAX(CASE WHEN attendances.punch_type_id = 1 THEN TIME(attendances.punch_time) END) as clock_in,
-                MAX(CASE WHEN attendances.punch_type_id = 3 THEN TIME(attendances.punch_time) END) as lunch_start,
-                MAX(CASE WHEN attendances.punch_type_id = 4 THEN TIME(attendances.punch_time) END) as lunch_stop,
-                MAX(CASE WHEN attendances.punch_type_id = 2 THEN TIME(attendances.punch_time) END) as clock_out,
-                COUNT(*) as total_punches
-            "),
+                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 1 THEN TIME(attendances.punch_time) END) as clock_in"),
+                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 3 THEN TIME(attendances.punch_time) END) as lunch_start"),
+                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 4 THEN TIME(attendances.punch_time) END) as lunch_stop"),
+                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 2 THEN TIME(attendances.punch_time) END) as clock_out"),
+                DB::raw("COUNT(*) as total_punches"),
                 DB::raw("SUM(CASE WHEN attendances.is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
             ])
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
             ->whereBetween(DB::raw('DATE(attendances.punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
             ->when($this->statusFilter !== 'all', function ($q) {
                 if ($this->statusFilter === 'problem') {
-                    $q->where('attendances.status', '!=', 'Migrated'); // Show all EXCEPT Migrated
+                    $q->where('attendances.status', '!=', 'Migrated');
                 } else {
                     $q->where('attendances.status', $this->statusFilter);
                 }
             })
             ->groupBy('attendances.employee_id', 'attendance_date')
-            ->orderBy('attendances.employee_id')
-            ->orderBy(DB::raw('DATE(attendances.punch_time)'))
+            ->orderBy($sortColumn, $this->sortDirection) // ✅ Correct sorting logic
             ->get();
-
-        Log::info("Fetched {$query->count()} attendance records.");
 
         return $query->map(fn ($attendance) => [
             'attendance_ids' => explode(',', $attendance->attendance_ids),
@@ -134,8 +139,6 @@ class AttendanceSummary extends Page
             'LunchStart' => $attendance->lunch_start,
             'LunchStop' => $attendance->lunch_stop,
             'LastPunch' => $attendance->clock_out,
-            'ManualEntries' => $attendance->manual_entries ?? 0,
-            'TotalPunches' => $attendance->total_punches ?? 0,
             'status' => $attendance->status,
         ]);
     }
@@ -145,38 +148,30 @@ class AttendanceSummary extends Page
         $this->groupedAttendances = $this->fetchAttendances();
     }
 
-    public function processSelected(): void
+    public function sortBy($field): void
     {
-        Log::info("🛠 [processSelected] Button clicked. Selected records: " . json_encode($this->selectedAttendances));
+        $columnMap = [
+            'FullName' => 'employees.full_names',
+            'attendance_date' => 'attendance_date',
+            'FirstPunch' => 'clock_in',   // Actual alias in the SQL query
+            'LunchStart' => 'lunch_start',
+            'LunchStop' => 'lunch_stop',
+            'LastPunch' => 'clock_out',
+        ];
 
-        if (empty($this->selectedAttendances)) {
-            Log::warning("⚠️ No records selected.");
-            return;
+        if (!isset($columnMap[$field])) {
+            return; // Ignore sorting if the column isn't mapped
         }
 
-        $attendanceIds = collect($this->selectedAttendances)
-            ->map(fn ($ids) => explode(',', $ids)) // Split the string into an array
-            ->flatten()
-            ->unique()
-            ->map(fn ($id) => (int) $id) // Ensure IDs are integers
-            ->toArray();
-
-        Log::info("🔍 [processSelected] Final Attendance IDs: " . json_encode($attendanceIds));
-
-        // ✅ Use the new service to mark records as Complete
-        app(AttendanceStatusUpdateService::class)->markRecordsAsComplete($attendanceIds);
-
-        // ✅ Run additional processing if Auto-Process is enabled
-        if ($this->autoProcess) {
-            Log::info("🔄 Auto-Processing enabled. Running AttendanceProcessingService.");
-            app(AttendanceProcessingService::class)->processCompletedAttendanceRecords($attendanceIds, $this->autoProcess);
-        }
-
-        Log::info("✅ [processSelected] Attendance records marked as Complete.");
-
-        // ✅ Refresh attendance list
+        $this->sortDirection = ($this->sortColumn === $field && $this->sortDirection === 'asc') ? 'desc' : 'asc';
+        $this->sortColumn = $columnMap[$field]; // Use mapped column
         $this->updateAttendances();
     }
+
+//    public function openEditModal($attendanceId)
+//    {
+//        $this->dispatch('open-time-record-modal', ['attendanceId' => $attendanceId]);
+//    }
 
     protected function getActions(): array
     {
@@ -185,14 +180,14 @@ class AttendanceSummary extends Page
                 ->label('Add Time Record')
                 ->color('primary')
                 ->icon('heroicon-o-plus')
-                ->url(route('filament.admin.resources.attendances.create'))
-                ->openUrlInNewTab(),
+                ->dispatch('open-time-record-modal', ['attendanceId' => null]),
         ];
     }
 
     protected $listeners = [
         'processSelected' => 'processSelected',
         'timeRecordCreated' => 'refreshAttendanceData',
+        'open-time-record-modal' => 'openEditModal',
     ];
 
     public function refreshAttendanceData(): void

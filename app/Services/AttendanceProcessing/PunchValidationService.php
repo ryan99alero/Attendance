@@ -19,10 +19,10 @@ class PunchValidationService
      */
     public function validateAndProcessCompletedRecords(array $attendanceIds): void
     {
-        Log::info("🔍 [PunchValidationService] Validating and processing completed records: " . json_encode($attendanceIds));
+        Log::info("[PunchValidationService] Validating and processing completed records: " . json_encode($attendanceIds));
 
         if (empty($attendanceIds)) {
-            Log::warning("⚠️ No attendance records provided for validation and processing.");
+            Log::warning("[PunchValidationService] No attendance records provided for validation and processing.");
             return;
         }
 
@@ -32,14 +32,16 @@ class PunchValidationService
         // Step 2: Migrate valid records to the punches table
         app(PunchMigrationService::class)->migrateCompletedPunches();
 
-        Log::info("✅ [PunchValidationService] Attendance records successfully validated and migrated.");
+        Log::info("[PunchValidationService] Attendance records successfully validated and migrated.");
     }
+
     public function processCompletedAttendanceRecords(array $attendanceIds): void
     {
-        Log::info("🛠 [processCompletedAttendanceRecords] Calling PunchValidationService for processing.");
+        Log::info("[PunchValidationService] Processing completed attendance records.");
 
         app(PunchValidationService::class)->validateAndProcessCompletedRecords($attendanceIds);
     }
+
     public function validatePunchesWithinPayPeriod(PayPeriod $payPeriod): void
     {
         $attendances = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
@@ -48,16 +50,22 @@ class PunchValidationService
             ->get();
 
         foreach ($attendances as $attendance) {
-            // Example of validation logic
-            if (!$attendance->punch_time || !$attendance->employee_id) {
-                \Log::warning("Invalid attendance record ID: {$attendance->id}");
+            // Ensure punch time, employee ID, and punch_state are valid
+            if (!$attendance->punch_time || !$attendance->employee_id || !$attendance->punch_state) {
+                Log::warning("[PunchValidationService] Invalid attendance record - Missing fields. ID: {$attendance->id}");
                 continue;
             }
 
-            \Log::info("Validated attendance record ID: {$attendance->id} for Employee ID: {$attendance->employee_id}.");
+            // Ensure punch_state is properly assigned (must be 'start' or 'stop')
+            if (!in_array($attendance->punch_state, ['start', 'stop'])) {
+                Log::warning("[PunchValidationService] Invalid punch_state for Attendance ID: {$attendance->id}. Expected 'start' or 'stop', found '{$attendance->punch_state}'");
+                continue;
+            }
+
+            Log::info("[PunchValidationService] Validated attendance record ID: {$attendance->id} for Employee ID: {$attendance->employee_id}.");
         }
 
-        \Log::info("Validation completed for punches in PayPeriod ID: {$payPeriod->id}");
+        Log::info("[PunchValidationService] Validation completed for PayPeriod ID: {$payPeriod->id}");
     }
 
     /**
@@ -68,7 +76,7 @@ class PunchValidationService
      */
     public function resolveOverlappingRecords(PayPeriod $payPeriod): void
     {
-        \Log::info("resolveOverlappingRecords called for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[PunchValidationService] Resolving overlapping records for PayPeriod ID: {$payPeriod->id}");
 
         // Step 1: Identify overlapping records
         $overlappingRecords = Attendance::select('employee_id', DB::raw('DATE(punch_time) as punch_date'), DB::raw('COUNT(*) as record_count'))
@@ -81,24 +89,30 @@ class PunchValidationService
             $employeeId = $record->employee_id;
             $punchDate = $record->punch_date;
 
-           // \Log::info("Checking potential extra records for Employee ID: {$employeeId} on {$punchDate}");
-
             // Step 2: Retrieve all attendance records for the day
             $dailyRecords = Attendance::where('employee_id', $employeeId)
                 ->whereDate('punch_time', $punchDate)
                 ->get();
 
             if ($dailyRecords->isEmpty()) {
-                \Log::warning("No records found for Employee ID: {$employeeId} on {$punchDate}");
+                Log::warning("[PunchValidationService] No records found for Employee ID: {$employeeId} on {$punchDate}");
                 continue;
             }
 
-          //  \Log::info("Found {$dailyRecords->count()} attendance records for Employee ID: {$employeeId} on {$punchDate}");
+            Log::info("[PunchValidationService] Found {$dailyRecords->count()} attendance records for Employee ID: {$employeeId} on {$punchDate}");
 
-            // Placeholder for future logic to handle extra records
-            // Example: Validate or prioritize certain records based on business rules
+            // Ensure an equal number of start/stop punches
+            $startPunches = $dailyRecords->where('punch_state', 'start')->count();
+            $stopPunches = $dailyRecords->where('punch_state', 'stop')->count();
+
+            if ($startPunches !== $stopPunches) {
+                Log::warning("[PunchValidationService] Imbalanced start/stop punches for Employee ID: {$employeeId} on {$punchDate}. Start: {$startPunches}, Stop: {$stopPunches}");
+                continue;
+            }
+
+            Log::info("[PunchValidationService] Resolved overlapping records for Employee ID: {$employeeId} on {$punchDate}");
         }
 
-        \Log::info("resolveOverlappingRecords completed for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[PunchValidationService] Overlapping record resolution completed for PayPeriod ID: {$payPeriod->id}");
     }
 }

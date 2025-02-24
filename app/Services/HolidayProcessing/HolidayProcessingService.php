@@ -12,12 +12,9 @@ use Carbon\Carbon;
 
 class HolidayProcessingService
 {
-    /**
-     * ✅ New Method: Process Holidays Only for the Given Pay Period
-     */
     public function processHolidaysForPayPeriod(PayPeriod $payPeriod): void
     {
-        Log::info("🔍 [HolidayProcessingService] Processing Holidays for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[Holiday] Processing Holidays for PayPeriod ID: {$payPeriod->id}");
 
         $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
         $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
@@ -29,41 +26,35 @@ class HolidayProcessingService
             })
             ->get();
 
-        Log::info("📆 Found " . $holidays->count() . " holidays within this pay period.");
+        Log::info("[Holiday] Found " . $holidays->count() . " holidays within this pay period.");
 
         foreach ($holidays as $holiday) {
             $this->processHolidayForEmployees($holiday);
         }
 
-        Log::info("✅ [HolidayProcessingService] Completed processing Holidays for PayPeriod ID: {$payPeriod->id}.");
+        Log::info("[Holiday] Completed processing Holidays for PayPeriod ID: {$payPeriod->id}.");
     }
 
-    /**
-     * ✅ Handles Processing of Holiday Attendance for Eligible Employees
-     */
     public function processHolidayForEmployees(Holiday $holiday): void
     {
-        Log::info("🔍 [HolidayProcessingService] Processing Holiday: {$holiday->name}");
+        Log::info("[Holiday] Processing Holiday: {$holiday->name}");
 
         $eligibleEmployees = Employee::where('full_time', true)
             ->where('vacation_pay', true)
             ->get();
 
-        Log::info("👥 Found " . $eligibleEmployees->count() . " eligible employees for holiday pay.");
+        Log::info("[Holiday] Found " . $eligibleEmployees->count() . " eligible employees.");
 
         foreach ($eligibleEmployees as $employee) {
             $this->processEmployeeHolidayAttendance($employee, $holiday);
         }
 
-        Log::info("✅ [HolidayProcessingService] Completed processing for Holiday: {$holiday->name}.");
+        Log::info("[Holiday] Completed processing for Holiday: {$holiday->name}.");
     }
 
-    /**
-     * ✅ Handles per-employee holiday attendance.
-     */
     private function processEmployeeHolidayAttendance(Employee $employee, Holiday $holiday): void
     {
-        Log::info("🛠 Processing Employee ID: {$employee->id} for Holiday '{$holiday->name}'");
+        Log::info("[Holiday] Processing Employee ID: {$employee->id} for Holiday '{$holiday->name}'");
 
         $holidayDates = $this->generateHolidayDates($holiday);
 
@@ -85,7 +76,7 @@ class HolidayProcessingService
             if (!$exists) {
                 $this->createHolidayAttendanceRecords($employee, $holiday, $date, $externalGroupId, $shiftStart, $shiftEnd);
             } else {
-                Log::info("⏩ Skipping existing holiday attendance for Employee ID: {$employee->id} on {$date}");
+                Log::info("[Holiday] Skipping existing holiday attendance for Employee ID: {$employee->id} on {$date}");
             }
         }
     }
@@ -106,13 +97,14 @@ class HolidayProcessingService
 
     private function createHolidayAttendanceRecords(Employee $employee, Holiday $holiday, string $date, ?string $externalGroupId, string $shiftStart, string $shiftEnd): void
     {
-        Log::info("🆕 Creating Holiday Attendance Records for Employee ID: {$employee->id} on {$date}");
+        Log::info("[Holiday] Creating Attendance Records for Employee ID: {$employee->id} on {$date}");
 
         $startRecord = Attendance::create([
             'employee_id' => $employee->id,
             'holiday_id' => $holiday->id,
             'punch_time' => $shiftStart,
             'punch_type_id' => $this->getPunchTypeId('Clock In'),
+            'punch_state' => 'start',
             'is_manual' => true,
             'classification_id' => $this->getClassificationId('Holiday'),
             'status' => 'Complete',
@@ -126,6 +118,7 @@ class HolidayProcessingService
             'holiday_id' => $holiday->id,
             'punch_time' => $shiftEnd,
             'punch_type_id' => $this->getPunchTypeId('Clock Out'),
+            'punch_state' => 'stop',
             'is_manual' => true,
             'classification_id' => $this->getClassificationId('Holiday'),
             'status' => 'Complete',
@@ -134,8 +127,8 @@ class HolidayProcessingService
             'shift_date' => $date,
         ]);
 
-        Log::info("✅ Successfully inserted Holiday Attendance - Start ID: " . ($startRecord->id ?? 'NULL'));
-        Log::info("✅ Successfully inserted Holiday Attendance - End ID: " . ($endRecord->id ?? 'NULL'));
+        Log::info("[Holiday] Inserted Holiday Attendance - Start ID: " . ($startRecord->id ?? 'NULL'));
+        Log::info("[Holiday] Inserted Holiday Attendance - End ID: " . ($endRecord->id ?? 'NULL'));
     }
 
     private function getClassificationId(string $classification): ?int

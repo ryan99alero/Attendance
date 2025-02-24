@@ -20,11 +20,11 @@ class HolidayAttendanceProcessor
      */
     public function processHolidaysForPayPeriod(PayPeriod $payPeriod): void
     {
-        Log::info("🔍 [HolidayAttendanceProcessor] Processing Holidays for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[HolidayAttendanceProcessor] 🔍 Starting Holiday Processing for PayPeriod ID: {$payPeriod->id}");
 
-        // ✅ Call `processHolidaysForPayPeriod` instead of `processHolidayForEmployees`
+        // ✅ Ensure holidays are processed only once per pay period
         $this->holidayProcessingService->processHolidaysForPayPeriod($payPeriod);
 
-        Log::info("✅ [HolidayAttendanceProcessor] Completed Holiday Processing.");
+        Log::info("[HolidayAttendanceProcessor] ✅ Successfully Completed Holiday Processing for PayPeriod ID: {$payPeriod->id}");
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Livewire;
 
 use Livewire\Component;
 use App\Models\Attendance;
+use App\Filament\Pages\AttendanceSummary;
 
 class CreateTimeRecordModal extends Component
 {
@@ -44,18 +45,21 @@ class CreateTimeRecordModal extends Component
 
         Attendance::create([
             'employee_id' => $this->employeeId,
-            'punch_time' => $this->date . ' ' . $this->punchTime, // Combine date and time
+            'punch_time' => $this->date . ' ' . $this->punchTime,
             'punch_type_id' => $this->punchType,
         ]);
 
-        // Emit event to refresh parent component
-        $this->dispatch('timeRecordCreated');
+        // Emit event to refresh the AttendanceSummary page
+        $this->dispatch('timeRecordCreated')->to(AttendanceSummary::class);
+
+        // Force Livewire to refresh all components
+        $this->dispatch('$refresh');
 
         // Close the modal
         $this->closeModal();
     }
 
-    public function render()
+    public function render(): \Illuminate\Contracts\View\View|\Illuminate\Contracts\View\Factory|\Illuminate\Foundation\Application
     {
         return view('livewire.create-time-record-modal');
     }

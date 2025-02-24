@@ -10,7 +10,7 @@ use App\Models\Classification;
 use Carbon\Carbon;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employees
@@ -80,6 +80,7 @@ class Attendance extends Model
         'punch_time',
         'classification_id',
         'punch_type_id',
+        'punch_state',
         'status',
         'issue_notes',
         'is_manual',
