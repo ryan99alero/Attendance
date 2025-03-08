@@ -16,11 +16,7 @@
                     </div>
                 </div>
 
-                <!-- Process Selected Button -->
-                <x-filament::button
-                    wire:click="processSelected"
-                    color="success"
-                    class="mt-6">
+                <x-filament::button wire:click="processSelected" color="success" class="mt-6">
                     Process Selected
                 </x-filament::button>
             </div>
@@ -35,7 +31,15 @@
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                             <input type="checkbox" wire:model="selectAll">
                         </th>
-                        @foreach (['FullName' => 'Employee', 'attendance_date' => 'Date', 'FirstPunch' => 'First Punch', 'LunchStart' => 'Lunch Start', 'LunchStop' => 'Lunch Stop', 'LastPunch' => 'Last Punch'] as $field => $label)
+                        @foreach ([
+                            'FullName' => 'Employee',
+                            'attendance_date' => 'Date',
+                            'FirstPunch' => 'First Punch',
+                            'LunchStart' => 'Lunch Start',
+                            'LunchStop' => 'Lunch Stop',
+                            'LastPunch' => 'Last Punch',
+                            'UnclassifiedPunch' => 'Unclassified'
+                        ] as $field => $label)
                             <th class="border border-gray-300 px-4 py-2 dark:border-gray-700 cursor-pointer"
                                 wire:click="sortBy('{{ $field }}')">
                                 {{ $label }}
@@ -51,7 +55,7 @@
                         <tr>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 <input type="checkbox" wire:model="selectedAttendances"
-                                       value="{{ implode(',', $attendance['attendance_ids']) }}">
+                                       value="{{ $attendance['employee_id'] }}">
                             </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 {{ $attendance['FullName'] }}
@@ -59,35 +63,65 @@
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 {{ $attendance['attendance_date'] }}
                             </td>
+
+                            <!-- Punch Type Columns -->
                             @foreach (['FirstPunch' => 1, 'LunchStart' => 3, 'LunchStop' => 4, 'LastPunch' => 2] as $key => $punchType)
                                 <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                    @if ($attendance[$key] === null)
+                                    @if (empty($attendance[$key]))
                                         <x-filament::button
-                                            wire:click="$dispatch('open-modal', {
-                                                employeeId: '{{ $attendance['employee_id'] }}',
-                                                date: '{{ $attendance['attendance_date'] }}',
-                                                punchType: {{ $punchType }}
-                                            })"
+                                            x-data
+                                            @click="
+                                                Livewire.dispatch('open-create-modal', {
+                                                    employeeId: '{{ $attendance['employee_id'] }}',
+                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
+                                                    punchType: '{{ $punchType }}'
+                                                });
+                                            "
                                             class="text-blue-500 underline">
                                             Input Time
                                         </x-filament::button>
                                     @else
-                                        <span wire:click="$dispatch('open-modal', {
-                                                employeeId: '{{ $attendance['employee_id'] }}',
-                                                date: '{{ $attendance['attendance_date'] }}',
-                                                punchType: {{ $punchType }},
-                                                existingTime: '{{ $attendance[$key] }}'
-                                            })"
+                                        <span x-data
+                                              @click="
+                                                Livewire.dispatch('open-update-modal', {
+                                                    employeeId: '{{ $attendance['employee_id'] }}',
+                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
+                                                    punchType: '{{ $punchType }}',
+                                                    existingTime: '{{ $attendance[$key] ?? '' }}',
+                                                    punchState: '{{ $attendance['punch_state'] ?? '' }}'
+                                                });
+                                              "
                                               class="cursor-pointer text-blue-500 underline">
                                             {{ $attendance[$key] }}
                                         </span>
                                     @endif
                                 </td>
                             @endforeach
+
+                            <!-- ✅ Unclassified Punch Column -->
+                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
+                                @if (!empty($attendance['UnclassifiedPunch']))
+                                    <span x-data
+                                          @click="
+                                            Livewire.dispatch('open-update-modal', {
+                                                employeeId: '{{ $attendance['employee_id'] }}',
+                                                date: '{{ $attendance['attendance_date'] ?? '' }}',
+                                                punchType: '',
+                                                existingTime: '{{ $attendance['UnclassifiedPunch'] ?? '' }}',
+                                                punchState: '{{ $attendance['punch_state'] ?? '' }}'
+                                            });
+                                          "
+                                          class="cursor-pointer text-blue-500 underline">
+                                        {{ $attendance['UnclassifiedPunch'] }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-500">None</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
+                            <td colspan="8" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 No attendance records available.
                             </td>
                         </tr>
@@ -98,6 +132,7 @@
         </div>
     </div>
 
-    <!-- Livewire Component for the Modal -->
+    <!-- Livewire Components -->
     <livewire:create-time-record-modal />
+    <livewire:update-time-record-modal />
 </x-filament::page>
