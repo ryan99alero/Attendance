@@ -14,7 +14,7 @@ class CreateTimeRecordModal extends Component
     public ?string $punchTime = null;
     public bool $isOpen = false;
 
-    protected $listeners = ['open-modal' => 'openModal'];
+    protected $listeners = ['open-create-modal' => 'openModal'];
 
     // Validation rules
     protected array $rules = [
@@ -26,10 +26,12 @@ class CreateTimeRecordModal extends Component
 
     public function openModal($employeeId, $date, $punchType): void
     {
+        \Log::info('CreateTimeRecordModal Opened', compact('employeeId', 'date', 'punchType'));
+
         $this->employeeId = $employeeId;
         $this->date = $date;
         $this->punchType = $punchType;
-        $this->punchTime = null; // Reset punch time
+        $this->punchTime = null;
         $this->isOpen = true;
     }
 
