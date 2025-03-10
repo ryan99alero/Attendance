@@ -63,7 +63,6 @@
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 {{ $attendance['attendance_date'] }}
                             </td>
-
                             <!-- Punch Type Columns -->
                             @foreach (['FirstPunch' => 1, 'LunchStart' => 3, 'LunchStop' => 4, 'LastPunch' => 2] as $key => $punchType)
                                 <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
@@ -71,6 +70,11 @@
                                         <x-filament::button
                                             x-data
                                             @click="
+                                                console.log('[Blade] Dispatching open-create-modal:', {
+                                                    employeeId: '{{ $attendance['employee_id'] }}',
+                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
+                                                    punchType: '{{ $punchType }}'
+                                                });
                                                 Livewire.dispatch('open-create-modal', {
                                                     employeeId: '{{ $attendance['employee_id'] }}',
                                                     date: '{{ $attendance['attendance_date'] ?? '' }}',
@@ -83,8 +87,19 @@
                                     @else
                                         <span x-data
                                               @click="
-                                                Livewire.dispatch('open-update-modal', {
+                                                console.log('[Blade] Dispatching open-update-modal:', {
+                                                    attendanceId: '{{ $attendance['attendanceId'] }}',
                                                     employeeId: '{{ $attendance['employee_id'] }}',
+                                                    deviceId: '{{ $attendance['device_id'] ?? '' }}', // ✅ Ensure device_id is passed
+                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
+                                                    punchType: '{{ $punchType }}',
+                                                    existingTime: '{{ $attendance[$key] ?? '' }}',
+                                                    punchState: '{{ $attendance['punch_state'] ?? '' }}'
+                                                });
+                                                Livewire.dispatch('open-update-modal', {
+                                                    attendanceId: '{{ $attendance['attendanceId'] }}',
+                                                    employeeId: '{{ $attendance['employee_id'] }}',
+                                                    deviceId: '{{ $attendance['device_id'] ?? '' }}', // ✅ Ensure device_id is passed
                                                     date: '{{ $attendance['attendance_date'] ?? '' }}',
                                                     punchType: '{{ $punchType }}',
                                                     existingTime: '{{ $attendance[$key] ?? '' }}',
@@ -98,12 +113,21 @@
                                 </td>
                             @endforeach
 
-                            <!-- ✅ Unclassified Punch Column -->
+                            <!-- Unclassified Punch Column -->
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 @if (!empty($attendance['UnclassifiedPunch']))
                                     <span x-data
                                           @click="
+                                            console.log('[Blade] Dispatching open-update-modal for Unclassified:', {
+                                                attendanceId: '{{ $attendance['attendanceId'] }}',
+                                                employeeId: '{{ $attendance['employee_id'] }}',
+                                                date: '{{ $attendance['attendance_date'] ?? '' }}',
+                                                punchType: '',
+                                                existingTime: '{{ $attendance['UnclassifiedPunch'] ?? '' }}',
+                                                punchState: '{{ $attendance['punch_state'] ?? '' }}'
+                                            });
                                             Livewire.dispatch('open-update-modal', {
+                                                attendanceId: '{{ $attendance['attendanceId'] }}',
                                                 employeeId: '{{ $attendance['employee_id'] }}',
                                                 date: '{{ $attendance['attendance_date'] ?? '' }}',
                                                 punchType: '',
@@ -135,4 +159,4 @@
     <!-- Livewire Components -->
     <livewire:create-time-record-modal />
     <livewire:update-time-record-modal />
-</x-filament::page>
+</x-filament::page>ddv

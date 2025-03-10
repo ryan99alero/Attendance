@@ -9,10 +9,28 @@
                 <form wire:submit.prevent="updateTimeRecord">
 
                     <div class="mb-4">
+                        <label class="block text-md font-medium text-gray-700">ID</label>
+                        <input
+                            type="text"
+                            wire:model="attendanceId"
+                            class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                            readonly
+                            style="color: #1a202c; background-color: #fff;">
+                    </div>
+                    <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Employee</label>
                         <input
                             type="text"
                             wire:model="employeeId"
+                            class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                            readonly
+                            style="color: #1a202c; background-color: #fff;">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-md font-medium text-gray-700">Device ID</label>
+                        <input
+                            type="text"
+                            wire:model="deviceId"
                             class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
                             readonly
                             style="color: #1a202c; background-color: #fff;">
