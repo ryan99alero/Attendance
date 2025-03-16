@@ -51,47 +51,47 @@ class UpdateTimeRecordModal extends Component
 
     public function updateTimeRecord(): void
     {
-        try {
-            $validatedData = $this->validate();
-            Log::info('Validation Passed', ['validatedData' => $validatedData]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            session()->flash('error', 'Validation failed. Please check your inputs.');
-            return;
-        }
-
-        if (!$this->attendanceId) {
-            session()->flash('error', 'No attendance record selected for update.');
-            return;
-        }
-
-        $attendance = Attendance::find($this->attendanceId);
-        if (!$attendance) {
-            session()->flash('error', 'Attendance record not found.');
-            return;
-        }
-
-        $formattedPunchTime = "{$this->date} {$this->punchTime}";
-
-        $attendance->update([
-            'punch_time' => $formattedPunchTime,
-            'punch_type_id' => $this->punchType,
-            'punch_state' => $this->punchState,
+        $validatedData = $this->validate([
+            'employeeId' => 'required|integer',
+            'deviceId' => 'nullable|integer',
+            'date' => 'required|date',
+            'punchType' => 'required|string',
+            'punchState' => 'required|string',
+            'punchTime' => 'required|date_format:H:i:s',
         ]);
 
-        Log::info('Update Successful', [
-            'attendanceId' => $this->attendanceId,
-            'employeeId' => $this->employeeId,
-            'deviceId' => $this->deviceId,
-            'date' => $this->date,
-            'punchType' => $this->punchType,
-            'punchState' => $this->punchState,
-            'punchTime' => $this->punchTime,
+        $punchTypeMapping = [
+            'start_time' => 1,
+            'stop_time' => 2,
+            'lunch_start' => 3,
+            'lunch_stop' => 4,
+            'unclassified' => 5,
+        ];
+
+        if (!isset($punchTypeMapping[$validatedData['punchType']])) {
+            Log::error("[UpdateTimeRecordModal] Invalid Punch Type: " . $validatedData['punchType']);
+            return;
+        }
+
+        $punchTypeId = $punchTypeMapping[$validatedData['punchType']];
+
+        Attendance::where('id', $this->attendanceId)->update([
+            'punch_time' => "{$validatedData['date']} {$validatedData['punchTime']}",
+            'punch_type_id' => $punchTypeId,
+            'updated_at' => now(),
         ]);
 
-        $this->dispatch('timeRecordUpdated');
-        $this->dispatch('$refresh');
+        Log::info("[UpdateTimeRecordModal] Updated Record ID: {$this->attendanceId}");
 
-        $this->closeModal();
+        // Dispatch event to refresh data and close modal
+        $this->dispatch('timeRecordUpdated'); // Refresh data
+        $this->dispatch('close-update-modal'); // Close modal
+
+        // Explicitly reset modal fields
+        $this->reset();
+
+        // Dispatch event to Livewire to close the modal explicitly
+        $this->dispatch('closeModal');
     }
 
     public function render()
