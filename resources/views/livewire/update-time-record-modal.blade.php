@@ -59,8 +59,8 @@
                             <option value="stop_time">Clock Out</option>
                             <option value="lunch_start">Lunch Start</option>
                             <option value="lunch_stop">Lunch Stop</option>
-                            <option value="unclassified">Unclassified</option>
                         </select>
+                        @error('punchType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="mb-4">
@@ -74,6 +74,12 @@
                             <option value="stop">Stop</option>
                             <option value="unknown">Unknown</option>
                         </select>
+                        @error('punchState')
+                        <span class="block mt-1 text-white text-sm px-2 py-1 rounded-md"
+                              style="background-color: red; border-color: darkred;">
+            {{ $message }}
+        </span>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
@@ -84,6 +90,7 @@
                             wire:model="punchTime"
                             class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
                             style="color: #1a202c; background-color: #fff;">
+                        @error('punchTime') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
 
                     <!-- Button Styling -->

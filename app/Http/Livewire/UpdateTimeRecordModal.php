@@ -5,6 +5,8 @@ namespace App\Http\Livewire;
 use App\Models\Attendance;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use App\Services\PunchStateService;
+use Illuminate\Validation\Rule;
 
 class UpdateTimeRecordModal extends Component
 {
@@ -13,59 +15,78 @@ class UpdateTimeRecordModal extends Component
     public ?string $deviceId = null;
     public ?string $date = null;
     public ?string $punchType = null;
-    public ?string $punchState = null;
     public ?string $punchTime = null;
     public bool $isOpen = false;
+    public ?string $punchState = 'unknown';
 
     protected $listeners = ['open-update-modal' => 'openUpdateModal'];
 
-    // Validation rules
-    protected array $rules = [
-        'employeeId' => 'required|exists:employees,id',
-        'deviceId' => 'nullable|exists:devices,id',
-        'date' => 'required|date',
-        'punchType' => 'required|in:start_time,stop_time,lunch_start,lunch_stop,unclassified',
-        'punchState' => 'required|in:start,stop,unknown',
-        'punchTime' => 'required|date_format:H:i:s',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'employeeId' => 'required|exists:employees,id',
+            'deviceId' => 'nullable|exists:devices,id',
+            'date' => 'required|date',
+            'punchType' => [
+                'required',
+                Rule::in(['start_time', 'stop_time', 'lunch_start', 'lunch_stop']),
+            ],
+            'punchState' => [
+                'required',
+                Rule::in(['start', 'stop', 'unknown']),
+                function ($attribute, $value, $fail) {
+                    if ($value === 'unknown') {
+                        $fail('You must select Start or Stop before saving.');
+                    }
+                },
+            ],
+            'punchTime' => 'required|date_format:H:i:s',
+        ];
+    }
+
+    public function updated($propertyName): void
+    {
+        if ($propertyName === 'punchType') {
+            Log::info("[UpdateTimeRecordModal] PunchType changed: {$this->punchType}");
+
+            // Force updating the PunchState
+            $newPunchState = PunchStateService::determinePunchState($this->punchType, 'unknown');
+
+            Log::info("[UpdateTimeRecordModal] Old PunchState: {$this->punchState} | New PunchState: {$newPunchState}");
+
+            $this->punchState = $newPunchState;
+        }
+    }
 
     public function openUpdateModal($attendanceId, $employeeId, $deviceId, $date, $punchType, $punchState, $existingTime): void
     {
-        Log::info('UpdateTimeRecordModal Opened', compact('attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'existingTime'));
+        Log::info('[UpdateTimeRecordModal] Opened', compact('attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'existingTime'));
 
         $this->attendanceId = $attendanceId;
         $this->employeeId = $employeeId;
-        $this->deviceId = $deviceId ?: null; // Ensure null if empty
+        $this->deviceId = $deviceId ?: null;
         $this->date = $date;
         $this->punchType = $punchType;
-        $this->punchState = $punchState ?: 'unknown'; // Default to 'unknown' if empty
-        $this->punchTime = $existingTime ?: '00:00:00'; // Default to a safe value
+        $this->punchState = $punchState ?: 'unknown';
+        $this->punchTime = $existingTime ?: '00:00:00';
         $this->isOpen = true;
     }
 
     public function closeModal(): void
     {
-        $this->reset(['attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'punchTime']);
+        $this->reset();
         $this->isOpen = false;
     }
 
     public function updateTimeRecord(): void
     {
-        $validatedData = $this->validate([
-            'employeeId' => 'required|integer',
-            'deviceId' => 'nullable|integer',
-            'date' => 'required|date',
-            'punchType' => 'required|string',
-            'punchState' => 'required|string',
-            'punchTime' => 'required|date_format:H:i:s',
-        ]);
+        $validatedData = $this->validate();
 
         $punchTypeMapping = [
             'start_time' => 1,
             'stop_time' => 2,
             'lunch_start' => 3,
             'lunch_stop' => 4,
-            'unclassified' => 5,
         ];
 
         if (!isset($punchTypeMapping[$validatedData['punchType']])) {
@@ -75,23 +96,25 @@ class UpdateTimeRecordModal extends Component
 
         $punchTypeId = $punchTypeMapping[$validatedData['punchType']];
 
-        Attendance::where('id', $this->attendanceId)->update([
-            'punch_time' => "{$validatedData['date']} {$validatedData['punchTime']}",
-            'punch_type_id' => $punchTypeId,
-            'updated_at' => now(),
-        ]);
+        try {
+            Attendance::where('id', $this->attendanceId)->update([
+                'punch_time' => "{$validatedData['date']} {$validatedData['punchTime']}",
+                'punch_type_id' => $punchTypeId,
+                'punch_state' => $validatedData['punchState'],
+                'device_id' => $validatedData['deviceId'],
+                'updated_at' => now(),
+            ]);
 
-        Log::info("[UpdateTimeRecordModal] Updated Record ID: {$this->attendanceId}");
+            Log::info("[UpdateTimeRecordModal] Successfully Updated Record ID: {$this->attendanceId}");
 
-        // Dispatch event to refresh data and close modal
-        $this->dispatch('timeRecordUpdated'); // Refresh data
-        $this->dispatch('close-update-modal'); // Close modal
+        } catch (\Exception $e) {
+            Log::error("[UpdateTimeRecordModal] Update Failed", ['error' => $e->getMessage()]);
+        }
 
-        // Explicitly reset modal fields
+        $this->dispatch('timeRecordUpdated');
+        $this->dispatch('close-update-modal');
+
         $this->reset();
-
-        // Dispatch event to Livewire to close the modal explicitly
-        $this->dispatch('closeModal');
     }
 
     public function render()

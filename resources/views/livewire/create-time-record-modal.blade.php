@@ -9,62 +9,63 @@
                 <form wire:submit.prevent="saveTimeRecord">
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Employee</label>
-                        <input
-                            type="text"
-                            wire:model="employeeId"
-                            class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                            readonly
-                            style="color: #1a202c; background-color: #fff;">
+                        <input type="text" wire:model="employeeId"
+                               class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                               readonly style="color: #1a202c; background-color: #fff;">
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Date</label>
-                        <input
-                            type="text"
-                            wire:model="date"
-                            class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                            readonly
-                            style="color: #1a202c; background-color: #fff;">
+                        <input type="text" wire:model="date"
+                               class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                               readonly style="color: #1a202c; background-color: #fff;">
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Punch Type</label>
-                        <select
-                            wire:model="punchType"
-                            class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                            style="color: #1a202c; background-color: #fff;">
+                        <select wire:model="punchType"
+                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                                style="color: #1a202c; background-color: #fff;">
                             <option value="">Select Punch Type</option>
-                            <option value="1">Clock In</option>
-                            <option value="2">Clock Out</option>
-                            <option value="3">Lunch Start</option>
-                            <option value="4">Lunch Stop</option>
+                            <option value="start_time">Clock In</option>
+                            <option value="stop_time">Clock Out</option>
+                            <option value="lunch_start">Lunch Start</option>
+                            <option value="lunch_stop">Lunch Stop</option>
                         </select>
+                    </div>
+
+                    <!-- ✅ Single Punch State Field -->
+                    <div class="mb-4">
+                        <label class="block text-md font-medium text-gray-700">Punch State</label>
+                        <select wire:model="punchState"
+                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                                style="color: #1a202c; background-color: #fff;">
+                            <option value="start">Start</option>
+                            <option value="stop">Stop</option>
+                        </select>
+                        @error('punchState')
+                        <p class="mt-1 text-sm font-semibold" style="color: red; border-color: darkred;">
+                            {{ $message }}
+                        </p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Punch Time</label>
-                        <input
-                            type="time"
-                            wire:model="punchTime"
-                            class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                            style="color: #1a202c; background-color: #fff;">
+                        <input type="time" wire:model="punchTime"
+                               class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
+                               style="color: #1a202c; background-color: #fff;">
                     </div>
 
-                    <!-- Button Styling -->
                     <div class="flex justify-between">
-                        <button
-                            type="button"
-                            wire:click="closeModal"
-                            class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
+                        <button type="button" wire:click="closeModal"
+                                class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
                             Cancel
                         </button>
-                        <button
-                            type="button"
-                            wire:click="saveTimeRecord"
-                            class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
+                        <button type="submit"
+                                class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
                             Save Record
                         </button>
-                    </div>
                     </div>
                 </form>
             </div>
