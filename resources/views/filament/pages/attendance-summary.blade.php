@@ -5,17 +5,6 @@
             <div class="space-y-6">
                 {{ $this->form }}
 
-                <!-- Auto-Process Checkbox -->
-                <div class="flex flex-col items-start space-y-4">
-                    <div class="flex items-center space-x-2">
-                        <input type="checkbox" id="autoProcess" wire:model="autoProcess"
-                               class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
-                        <label for="autoProcess" class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Auto-Process
-                        </label>
-                    </div>
-                </div>
-
                 <x-filament::button wire:click="processSelected" color="success" class="mt-6">
                     Process Selected
                 </x-filament::button>
@@ -31,19 +20,13 @@
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                             <input type="checkbox" wire:model="selectAll">
                         </th>
-                        @foreach ([
-                            'FullName' => 'Employee',
-                            'attendance_date' => 'Date',
-                            'FirstPunch' => 'First Punch',
-                            'LunchStart' => 'Lunch Start',
-                            'LunchStop' => 'Lunch Stop',
-                            'LastPunch' => 'Last Punch',
-                            'UnclassifiedPunch' => 'Unclassified'
-                        ] as $field => $label)
+                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee</th>
+                        <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Shift Date</th>
+                        @foreach (['start_time' => 'Clock In', 'lunch_start' => 'Lunch Start', 'lunch_stop' => 'Lunch Stop', 'stop_time' => 'Clock Out', 'unclassified' => 'Unclassified'] as $key => $label)
                             <th class="border border-gray-300 px-4 py-2 dark:border-gray-700 cursor-pointer"
-                                wire:click="sortBy('{{ $field }}')">
+                                wire:click="sortBy('{{ $key }}')">
                                 {{ $label }}
-                                @if ($sortColumn === $field)
+                                @if ($sortColumn === $key)
                                     <span>{{ $sortDirection === 'asc' ? '🔼' : '🔽' }}</span>
                                 @endif
                             </th>
@@ -51,105 +34,57 @@
                     </tr>
                     </thead>
                     <tbody>
-                    @forelse ($groupedAttendances as $attendance)
+                    @foreach ($groupedAttendances as $attendance)
                         <tr>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                <input type="checkbox" wire:model="selectedAttendances"
-                                       value="{{ $attendance['employee_id'] }}">
+                                <input type="checkbox" wire:model="selectedAttendances" value="{{ $attendance['employee']['employee_id'] }}">
                             </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                {{ $attendance['FullName'] }}
+                                {{ $attendance['employee']['FullName'] }}
                             </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                {{ $attendance['attendance_date'] }}
+                                {{ $attendance['employee']['shift_date'] }}
                             </td>
-                            <!-- Punch Type Columns -->
-                            @foreach (['FirstPunch' => 1, 'LunchStart' => 3, 'LunchStop' => 4, 'LastPunch' => 2] as $key => $punchType)
+
+                            @foreach (['start_time', 'lunch_start', 'lunch_stop', 'stop_time', 'unclassified'] as $type)
                                 <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                    @if (empty($attendance[$key]))
-                                        <x-filament::button
-                                            x-data
-                                            @click="
-                                                console.log('[Blade] Dispatching open-create-modal:', {
-                                                    employeeId: '{{ $attendance['employee_id'] }}',
-                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
-                                                    punchType: '{{ $punchType }}'
-                                                });
-                                                Livewire.dispatch('open-create-modal', {
-                                                    employeeId: '{{ $attendance['employee_id'] }}',
-                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
-                                                    punchType: '{{ $punchType }}'
-                                                });
-                                            "
-                                            class="text-blue-500 underline">
+                                    @php
+                                        $punches = $attendance['punches'][$type] ?? [];
+                                    @endphp
+
+                                    @if (!empty($punches))
+                                        @foreach ($punches as $punch)
+                                            <div>
+                            <span x-data
+                                  @click="
+                                        $dispatch('open-update-modal', {
+                                            attendanceId: '{{ $punch['attendance_id'] ?? '' }}',
+                                            employeeId: '{{ $attendance['employee']['employee_id'] }}',
+                                            deviceId: '{{ $punch['device_id'] ?? '' }}',
+                                            date: '{{ $attendance['employee']['shift_date'] }}',
+                                            punchType: '{{ $type }}',
+                                            existingTime: '{{ $punch['punch_time'] ?? '' }}',
+                                            punchState: '{{ $punch['punch_state'] ?? '' }}'
+                                        })"
+                                  class="cursor-pointer text-blue-500 underline">
+                                {{ $punch['punch_time'] ?? 'N/A' }}
+                            </span>
+
+                                                @if ($punch['multiple'])
+                                                    <span class="ml-2 text-red-600 font-bold">(Multiple: {{ implode(', ', $punch['multiples_list']) }})</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <x-filament::button class="bg-yellow-500 hover:bg-yellow-600"
+                                                            x-data @click="$dispatch('open-create-modal', {employeeId: '{{ $attendance['employee']['employee_id'] }}', date: '{{ $attendance['employee']['shift_date'] }}', punchType: '{{ $type }}'})">
                                             Input Time
                                         </x-filament::button>
-                                    @else
-                                        <span x-data
-                                              @click="
-                                                console.log('[Blade] Dispatching open-update-modal:', {
-                                                    attendanceId: '{{ $attendance['attendanceId'] }}',
-                                                    employeeId: '{{ $attendance['employee_id'] }}',
-                                                    deviceId: '{{ $attendance['device_id'] ?? '' }}', // ✅ Ensure device_id is passed
-                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
-                                                    punchType: '{{ $punchType }}',
-                                                    existingTime: '{{ $attendance[$key] ?? '' }}',
-                                                    punchState: '{{ $attendance['punch_state'] ?? '' }}'
-                                                });
-                                                Livewire.dispatch('open-update-modal', {
-                                                    attendanceId: '{{ $attendance['attendanceId'] }}',
-                                                    employeeId: '{{ $attendance['employee_id'] }}',
-                                                    deviceId: '{{ $attendance['device_id'] ?? '' }}', // ✅ Ensure device_id is passed
-                                                    date: '{{ $attendance['attendance_date'] ?? '' }}',
-                                                    punchType: '{{ $punchType }}',
-                                                    existingTime: '{{ $attendance[$key] ?? '' }}',
-                                                    punchState: '{{ $attendance['punch_state'] ?? '' }}'
-                                                });
-                                              "
-                                              class="cursor-pointer text-blue-500 underline">
-                                            {{ $attendance[$key] }}
-                                        </span>
                                     @endif
                                 </td>
                             @endforeach
-
-                            <!-- Unclassified Punch Column -->
-                            <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                @if (!empty($attendance['UnclassifiedPunch']))
-                                    <span x-data
-                                          @click="
-                                            console.log('[Blade] Dispatching open-update-modal for Unclassified:', {
-                                                attendanceId: '{{ $attendance['attendanceId'] }}',
-                                                employeeId: '{{ $attendance['employee_id'] }}',
-                                                date: '{{ $attendance['attendance_date'] ?? '' }}',
-                                                punchType: '',
-                                                existingTime: '{{ $attendance['UnclassifiedPunch'] ?? '' }}',
-                                                punchState: '{{ $attendance['punch_state'] ?? '' }}'
-                                            });
-                                            Livewire.dispatch('open-update-modal', {
-                                                attendanceId: '{{ $attendance['attendanceId'] }}',
-                                                employeeId: '{{ $attendance['employee_id'] }}',
-                                                date: '{{ $attendance['attendance_date'] ?? '' }}',
-                                                punchType: '',
-                                                existingTime: '{{ $attendance['UnclassifiedPunch'] ?? '' }}',
-                                                punchState: '{{ $attendance['punch_state'] ?? '' }}'
-                                            });
-                                          "
-                                          class="cursor-pointer text-blue-500 underline">
-                                        {{ $attendance['UnclassifiedPunch'] }}
-                                    </span>
-                                @else
-                                    <span class="text-gray-500">None</span>
-                                @endif
-                            </td>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="text-center border border-gray-300 px-4 py-2 dark:border-gray-700">
-                                No attendance records available.
-                            </td>
-                        </tr>
-                    @endforelse
+                    @endforeach
                     </tbody>
                 </table>
             </div>
@@ -159,4 +94,4 @@
     <!-- Livewire Components -->
     <livewire:create-time-record-modal />
     <livewire:update-time-record-modal />
-</x-filament::page>ddv
+</x-filament::page>

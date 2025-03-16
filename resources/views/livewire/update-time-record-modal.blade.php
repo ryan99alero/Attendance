@@ -17,6 +17,7 @@
                             readonly
                             style="color: #1a202c; background-color: #fff;">
                     </div>
+
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Employee</label>
                         <input
@@ -26,6 +27,7 @@
                             readonly
                             style="color: #1a202c; background-color: #fff;">
                     </div>
+
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Device ID</label>
                         <input
@@ -53,12 +55,14 @@
                             class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
                             style="color: #1a202c; background-color: #fff;">
                             <option value="">Select Punch Type</option>
-                            <option value="1">Clock In</option>
-                            <option value="2">Clock Out</option>
-                            <option value="3">Lunch Start</option>
-                            <option value="4">Lunch Stop</option>
+                            <option value="start_time">Clock In</option>
+                            <option value="stop_time">Clock Out</option>
+                            <option value="lunch_start">Lunch Start</option>
+                            <option value="lunch_stop">Lunch Stop</option>
+                            <option value="unclassified">Unclassified</option>
                         </select>
                     </div>
+
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Punch State</label>
                         <select
@@ -71,6 +75,7 @@
                             <option value="unknown">Unknown</option>
                         </select>
                     </div>
+
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Punch Time</label>
                         <input

@@ -10,8 +10,6 @@ use Illuminate\Support\Collection;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use Illuminate\Support\Facades\DB;
-use App\Services\AttendanceProcessing\AttendanceProcessingService;
-use App\Services\AttendanceProcessing\AttendanceStatusUpdateService;
 
 class AttendanceSummary extends Page
 {
@@ -28,14 +26,12 @@ class AttendanceSummary extends Page
     public bool $selectAll = false;
     public bool $autoProcess = false;
 
-    public $sortColumn = 'attendance_date';
+    public $sortColumn = 'shift_date';
     public $sortDirection = 'asc';
 
     public function mount(): void
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
+        Log::info("[AttendanceSummary] mount() called - Initializing component.");
         $this->payPeriodId = null;
         $this->search = '';
         $this->groupedAttendances = collect();
@@ -43,9 +39,6 @@ class AttendanceSummary extends Page
 
     protected function getFormSchema(): array
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
         return [
             Forms\Components\Select::make('payPeriodId')
                 ->label('Select Pay Period')
@@ -75,9 +68,6 @@ class AttendanceSummary extends Page
 
     protected function getPayPeriods(): array
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
         return PayPeriod::query()
             ->select('id', 'start_date', 'end_date')
             ->get()
@@ -89,50 +79,33 @@ class AttendanceSummary extends Page
 
     public function fetchAttendances(): Collection
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
         if (!$this->payPeriodId) {
             return collect();
         }
 
         $payPeriod = PayPeriod::find($this->payPeriodId);
-
         if (!$payPeriod) {
             return collect();
         }
 
-        $columnMap = [
-            'FullName' => 'employees.full_names',
-            'attendance_date' => 'attendance_date',
-            'FirstPunch' => 'clock_in',
-            'LunchStart' => 'lunch_start',
-            'LunchStop' => 'lunch_stop',
-            'LastPunch' => 'clock_out',
-        ];
+        Log::info("[AttendanceSummary] Fetching attendance records for PayPeriod ID: {$this->payPeriodId} ({$payPeriod->start_date} to {$payPeriod->end_date})");
 
-        $sortColumn = $columnMap[$this->sortColumn] ?? 'attendance_date';
-
-        return Attendance::with('employee')
+        // Fetch all attendance records within the date range
+        $attendances = Attendance::with('employee')
             ->select([
-                DB::raw("GROUP_CONCAT(attendances.id) as attendance_ids"),
-                DB::raw("ANY_VALUE(attendances.id) as attendanceId"),
+                'attendances.id as attendance_id',
                 'attendances.employee_id',
-                DB::raw("ANY_VALUE(attendances.device_id) as device_id"), // ✅ Ensure device_id is fetched
+                'attendances.device_id',
+                'attendances.shift_date',
+                'attendances.punch_time',
+                'attendances.punch_type_id',
+                'attendances.punch_state',
                 'employees.full_names as FullName',
                 'employees.external_id as PayrollID',
                 DB::raw("ANY_VALUE(attendances.status) as status"),
-                DB::raw("ANY_VALUE(attendances.punch_state) as punch_state"), // ✅ Ensure punch_state is fetched
-                DB::raw("DATE(attendances.punch_time) as attendance_date"),
-                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 1 THEN TIME(attendances.punch_time) END) as clock_in"),
-                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 3 THEN TIME(attendances.punch_time) END) as lunch_start"),
-                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 4 THEN TIME(attendances.punch_time) END) as lunch_stop"),
-                DB::raw("MAX(CASE WHEN attendances.punch_type_id = 2 THEN TIME(attendances.punch_time) END) as clock_out"),
-                DB::raw("COUNT(*) as total_punches"),
-                DB::raw("SUM(CASE WHEN attendances.is_manual = 1 THEN 1 ELSE 0 END) as manual_entries")
             ])
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
-            ->whereBetween(DB::raw('DATE(attendances.punch_time)'), [$payPeriod->start_date, $payPeriod->end_date])
+            ->whereBetween('attendances.shift_date', [$payPeriod->start_date, $payPeriod->end_date])
             ->when($this->statusFilter !== 'all', function ($q) {
                 if ($this->statusFilter === 'problem') {
                     $q->where('attendances.status', '!=', 'Migrated');
@@ -140,46 +113,91 @@ class AttendanceSummary extends Page
                     $q->where('attendances.status', $this->statusFilter);
                 }
             })
-            ->groupBy('attendances.employee_id', 'attendance_date')
-            ->orderBy($sortColumn, $this->sortDirection)
-            ->get()
-            ->map(fn ($attendance) => [
-                'attendance_ids' => explode(',', $attendance->attendance_ids),
-                'attendanceId' => $attendance->attendanceId,
-                'employee_id' => $attendance->employee_id,
-                'device_id' => $attendance->device_id ?? null, // ✅ Ensuring it is available
-                'FullName' => $attendance->FullName ?? 'N/A',
-                'PayrollID' => $attendance->PayrollID ?? 'N/A',
-                'attendance_date' => $attendance->attendance_date,
-                'FirstPunch' => $attendance->clock_in,
-                'LunchStart' => $attendance->lunch_start,
-                'LunchStop' => $attendance->lunch_stop,
-                'LastPunch' => $attendance->clock_out,
-                'punch_state' => $attendance->punch_state ?? null, // ✅ Ensuring punch_state is available
-                'status' => $attendance->status,
-            ]);
+            ->orderBy('attendances.employee_id')
+            ->orderBy('attendances.shift_date')
+            ->orderBy('attendances.punch_time')
+            ->get();
+
+        Log::info("[AttendanceSummary] Retrieved {$attendances->count()} attendance records.");
+
+        // Identify employees with duplicate punches for the same punch_type_id on the same shift_date
+        $duplicates = $attendances
+            ->groupBy(fn ($p) => "{$p->employee_id}|{$p->shift_date}|{$p->punch_type_id}")
+            ->filter(fn ($punches) => $punches->count() > 1)
+            ->mapWithKeys(fn ($punches, $key) => [$key => $punches->pluck('attendance_id')->toArray()]);
+
+        if ($duplicates->isNotEmpty()) {
+            Log::info("[AttendanceSummary] Duplicate punches detected:", $duplicates->toArray());
+        } else {
+            Log::info("[AttendanceSummary] No duplicates found.");
+        }
+
+        // Group data per employee and shift date
+        $grouped = $attendances->groupBy(function ($attendance) {
+            return "{$attendance->employee_id}|{$attendance->shift_date}";
+        })->map(function ($punchesPerDay) use ($duplicates) {
+            $punchesSorted = [
+                'start_time' => [],
+                'lunch_start' => [],
+                'lunch_stop' => [],
+                'stop_time' => [],
+                'unclassified' => [],
+            ];
+
+            foreach ($punchesPerDay as $punch) {
+                $type = match ($punch->punch_type_id) {
+                    1 => 'start_time',
+                    2 => 'stop_time',
+                    3 => 'lunch_start',
+                    4 => 'lunch_stop',
+                    default => 'unclassified'
+                };
+
+                $key = "{$punch->employee_id}|{$punch->shift_date}|{$punch->punch_type_id}";
+                $hasMultiple = isset($duplicates[$key]);
+
+                $punchesSorted[$type][] = [
+                    'attendance_id' => $punch->attendance_id,
+                    'punch_time' => \Carbon\Carbon::parse($punch->punch_time)->format('H:i:s'),
+                    'punch_state' => $punch->punch_state,
+                    'device_id' => $punch->device_id,
+                    'punch_type' => $type,
+                    'multiple' => $hasMultiple,
+                ];
+            }
+
+            return [
+                'employee' => [
+                    'employee_id' => $punchesPerDay->first()->employee_id,
+                    'FullName' => $punchesPerDay->first()->FullName,
+                    'PayrollID' => $punchesPerDay->first()->PayrollID,
+                    'shift_date' => $punchesPerDay->first()->shift_date,
+                    'status' => $punchesPerDay->first()->status,
+                ],
+                'punches' => $punchesSorted,
+            ];
+        });
+
+        return $grouped->values();
     }
 
     public function updateAttendances(): void
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
+        Log::info("[AttendanceSummary] updateAttendances() called.");
         $this->groupedAttendances = $this->fetchAttendances();
+        $this->dispatch('$refresh');
+        Log::info("[AttendanceSummary] updateAttendances() completed.");
     }
 
     public function sortBy($field): void
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
         $columnMap = [
             'FullName' => 'employees.full_names',
-            'attendance_date' => 'attendance_date',
-            'FirstPunch' => 'clock_in',
-            'LunchStart' => 'lunch_start',
-            'LunchStop' => 'lunch_stop',
-            'LastPunch' => 'clock_out',
+            'shift_date' => 'shift_date',
+            'start_time' => 'start_time',
+            'lunch_start' => 'lunch_start',
+            'lunch_stop' => 'lunch_stop',
+            'stop_time' => 'stop_time',
         ];
 
         if (!isset($columnMap[$field])) {
@@ -191,55 +209,8 @@ class AttendanceSummary extends Page
         $this->updateAttendances();
     }
 
-//    public function openEditModal(array $data = []): void
-//    {
-//        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-//            'parameters' => func_get_args()
-//        ]);
-//        $attendanceId = $data['attendanceId'] ?? null;
-//        $employeeId = $data['employeeId'] ?? null;
-//        $date = $data['date'] ?? null;
-//        $punchType = $data['punchType'] ?? null;
-//        $existingTime = $data['existingTime'] ?? null;
-//        $punchState = $data['punchState'] ?? null; // ✅ Added punchState
-//
-//        if (!$attendanceId || !$employeeId || !$date || !$punchType) {
-//            Log::error('[AttendanceSummary] Missing required parameters for openEditModal', [
-//                'attendanceId' => $attendanceId,
-//                'employeeId' => $employeeId,
-//                'date' => $date,
-//                'punchType' => $punchType,
-//                'existingTime' => $existingTime,
-//                'punchState' => $punchState, // ✅ Log punchState
-//                'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5)
-//            ]);
-//            return;
-//        }
-//
-//        Log::info('[AttendanceSummary] Opening Edit Modal with', [
-//            'attendanceId' => $attendanceId,
-//            'employeeId' => $employeeId,
-//            'date' => $date,
-//            'punchType' => $punchType,
-//            'existingTime' => $existingTime,
-//            'punchState' => $punchState, // ✅ Log punchState
-//        ]);
-//
-//        $this->dispatch('open-update-modal', [
-//            'attendanceId' => $attendanceId,
-//            'employeeId' => $employeeId,
-//            'date' => $date,
-//            'punchType' => $punchType,
-//            'existingTime' => $existingTime,
-//            'punchState' => $punchState, // ✅ Now passing punchState
-//        ]);
-//    }
-
     protected function getActions(): array
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
         return [
             Action::make('Add Time Record')
                 ->label('Add Time Record')
@@ -247,26 +218,18 @@ class AttendanceSummary extends Page
                 ->icon('heroicon-o-plus')
                 ->dispatch('open-create-modal'),
         ];
-
     }
 
     protected $listeners = [
         'processSelected' => 'processSelected',
         'timeRecordCreated' => 'refreshAttendanceData',
         'timeRecordUpdated' => 'refreshAttendanceData',
-        'open-update-modal' => 'openUpdateModal', // ✅ No need to change, this dispatches to UpdateTimeRecordModal
-        'open-create-modal' => 'openCreateModal', // ✅ No need to change, this dispatches to CreateTimeRecordModal
+        'open-update-modal' => 'openUpdateModal',
+        'open-create-modal' => 'openCreateModal',
     ];
 
     public function refreshAttendanceData(): void
     {
-        Log::info('[AttendanceSummary] Entering function: ' . __FUNCTION__, [
-            'parameters' => func_get_args()
-        ]);
         $this->updateAttendances();
-        Log::info('[AttendanceSummary] Exiting function: ' . __FUNCTION__, [
-            'finalState' => $this->someVariable ?? 'N/A'
-        ]);
-        $this->dispatch('$refresh');
     }
 }
