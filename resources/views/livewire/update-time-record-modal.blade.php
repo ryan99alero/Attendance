@@ -108,7 +108,7 @@
                         </button>
                         <button
                             type="button"
-                            wire:click="deleteTimeRecord"
+                            wire:click="deleteTimeRecord('{{ $attendanceId }}')"
                             class="px-4 py-2 rounded-md text-white"
                             style="background-color: red; border-color: darkred;">
                             Delete

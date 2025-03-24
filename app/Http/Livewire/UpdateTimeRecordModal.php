@@ -19,7 +19,10 @@ class UpdateTimeRecordModal extends Component
     public bool $isOpen = false;
     public ?string $punchState = 'unknown';
 
-    protected $listeners = ['open-update-modal' => 'openUpdateModal'];
+    protected $listeners = [
+        'open-update-modal' => 'openUpdateModal',
+        'deleteTimeRecord' => 'deleteTimeRecord',
+    ];
 
     protected function rules(): array
     {
@@ -115,6 +118,19 @@ class UpdateTimeRecordModal extends Component
         $this->dispatch('close-update-modal');
 
         $this->reset();
+    }
+
+    public function deleteTimeRecord($attendanceId): void
+    {
+        try {
+            Attendance::findOrFail($attendanceId)->delete();
+            Log::info("[UpdateTimeRecordModal] Deleted attendance record: $attendanceId");
+
+            $this->dispatch('timeRecordUpdated');
+            $this->dispatch('$refresh');
+        } catch (\Exception $e) {
+            Log::error("[UpdateTimeRecordModal] Failed to delete record", ['error' => $e->getMessage()]);
+        }
     }
 
     public function render()

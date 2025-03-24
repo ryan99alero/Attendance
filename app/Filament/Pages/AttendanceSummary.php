@@ -156,7 +156,7 @@ class AttendanceSummary extends Page
                 $key = "{$punch->employee_id}|{$punch->shift_date}|{$punch->punch_type_id}";
                 $hasMultiple = isset($duplicates[$key]);
 
-                $punchesSorted[$type][] = [
+                $entry = [
                     'attendance_id' => $punch->attendance_id,
                     'punch_time' => \Carbon\Carbon::parse($punch->punch_time)->format('H:i:s'),
                     'punch_state' => $punch->punch_state,
@@ -164,6 +164,24 @@ class AttendanceSummary extends Page
                     'punch_type' => $type,
                     'multiple' => $hasMultiple,
                 ];
+
+                if ($hasMultiple) {
+                    $entry['multiples_list'] = $punchesPerDay->filter(function ($other) use ($punch) {
+                        return $other->punch_type_id === $punch->punch_type_id
+                            && $other->shift_date === $punch->shift_date
+                            && $other->employee_id === $punch->employee_id;
+                    })->map(function ($dup) use ($type) {
+                        return collect([
+                            'attendance_id' => (string) $dup->attendance_id,
+                            'punch_time' => (string) \Carbon\Carbon::parse($dup->punch_time)->format('H:i:s'),
+                            'punch_state' => (string) $dup->punch_state,
+                            'device_id' => (string) $dup->device_id,
+                            'punch_type' => (string) $type,
+                        ])->all();
+                    })->values()->toArray();
+                }
+
+                $punchesSorted[$type][] = $entry;
             }
 
             return [

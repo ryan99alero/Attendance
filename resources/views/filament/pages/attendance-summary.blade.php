@@ -57,21 +57,19 @@
                                             <div>
                             <span x-data
                                   @click="
-                                        $dispatch('open-update-modal', {
-                                            attendanceId: '{{ $punch['attendance_id'] ?? '' }}',
-                                            employeeId: '{{ $attendance['employee']['employee_id'] }}',
-                                            deviceId: '{{ $punch['device_id'] ?? '' }}',
-                                            date: '{{ $attendance['employee']['shift_date'] }}',
-                                            punchType: '{{ $type }}',
-                                            existingTime: '{{ $punch['punch_time'] ?? '' }}',
-                                            punchState: '{{ $punch['punch_state'] ?? '' }}'
-                                        })"
-                                  class="cursor-pointer text-blue-500 underline">
-                                {{ $punch['punch_time'] ?? 'N/A' }}
-                            </span>
-
-                                                @if ($punch['multiple'])
-                                                    <span class="ml-2 text-red-600 font-bold">(Multiple: {{ implode(', ', $punch['multiples_list']) }})</span>
+        $dispatch('open-update-modal', {
+            attendanceId: '{{ $punch['attendance_id'] ?? '' }}',
+            employeeId: '{{ $attendance['employee']['employee_id'] }}',
+            deviceId: '{{ $punch['device_id'] ?? '' }}',
+            date: '{{ $attendance['employee']['shift_date'] }}',
+            punchType: '{{ $type }}',
+            existingTime: '{{ $punch['punch_time'] ?? '' }}',
+            punchState: '{{ $punch['punch_state'] ?? '' }}'
+        })"
+                                  style="color: {{ !empty($punch['multiple']) && !empty($punch['multiples_list']) ? 'red' : 'white' }}; text-decoration: underline; cursor: pointer;">
+    {{ is_string($punch['punch_time'] ?? null) ? $punch['punch_time'] : 'N/A' }}
+</span>
+                                                @if (!empty($punch['multiple']) && !empty($punch['multiples_list']) && is_array($punch['multiples_list']))
                                                 @endif
                                             </div>
                                         @endforeach
