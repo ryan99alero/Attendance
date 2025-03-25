@@ -5,11 +5,14 @@
             <div class="space-y-6">
                 {{ $this->form }}
 
-                <x-filament::button wire:click="processSelected" color="success" class="mt-6">
-                    Process Selected
-                </x-filament::button>
             </div>
         </form>
+
+        @if (!method_exists($this->form, 'hasComponent') || !$this->form->hasComponent('duplicatesFilter'))
+            <div class="mt-4">
+                <label for="duplicatesFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Duplicates</label>
+            </div>
+        @endif
 
         <!-- Attendance Table -->
         <div class="mt-6">

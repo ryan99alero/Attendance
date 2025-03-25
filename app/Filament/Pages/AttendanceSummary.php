@@ -21,6 +21,7 @@ class AttendanceSummary extends Page
     public $payPeriodId;
     public $search = '';
     public $statusFilter = 'NeedsReview';
+    public $duplicatesFilter = 'all';
     public $groupedAttendances;
     public array $selectedAttendances = [];
     public bool $selectAll = false;
@@ -63,6 +64,16 @@ class AttendanceSummary extends Page
                 ->default('problem')
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
+
+            Forms\Components\Select::make('duplicatesFilter')
+                ->label('Filter by Duplicates')
+                ->options([
+                    'all' => 'All',
+                    'duplicates_only' => 'Duplicates Only',
+                ])
+                ->default('all')
+                ->reactive()
+                ->afterStateUpdated(fn () => $this->updateAttendances()),
         ];
     }
 
@@ -85,6 +96,7 @@ class AttendanceSummary extends Page
 
         $payPeriod = PayPeriod::find($this->payPeriodId);
         if (!$payPeriod) {
+            $this->duplicatesFilter = 'all';
             return collect();
         }
 
@@ -117,6 +129,17 @@ class AttendanceSummary extends Page
             ->orderBy('attendances.shift_date')
             ->orderBy('attendances.punch_time')
             ->get();
+
+        if ($this->duplicatesFilter === 'duplicates_only') {
+            $duplicateKeys = $attendances
+                ->groupBy(fn ($p) => "{$p->employee_id}|{$p->shift_date}|{$p->punch_type_id}")
+                ->filter(fn ($group) => $group->count() > 1)
+                ->keys();
+
+            $attendances = $attendances->filter(function ($item) use ($duplicateKeys) {
+                return $duplicateKeys->contains("{$item->employee_id}|{$item->shift_date}|{$item->punch_type_id}");
+            })->values();
+        }
 
         Log::info("[AttendanceSummary] Retrieved {$attendances->count()} attendance records.");
 
