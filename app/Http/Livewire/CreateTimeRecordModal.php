@@ -89,11 +89,25 @@ class CreateTimeRecordModal extends Component
         $punchTypeId = $punchTypeMapping[$validatedData['punchType']];
 
         try {
-            Attendance::create([
+            $record = Attendance::create([
                 'employee_id' => $validatedData['employeeId'],
                 'punch_time' => "{$validatedData['date']} {$validatedData['punchTime']}",
                 'punch_type_id' => $punchTypeId,
                 'punch_state' => $validatedData['punchState'],
+                'shift_date' => $validatedData['date'],
+            ]);
+
+            Log::info('[CreateTimeRecordModal] Created Record', [
+                'id' => $record->id,
+                'employee_id' => $record->employee_id,
+                'punch_time' => $record->punch_time,
+                'punch_type_id' => $record->punch_type_id,
+                'punch_state' => $record->punch_state,
+                'shift_date' => $record->shift_date,
+                'created_by' => $record->created_by,
+                'timestamp' => now()->toDateTimeString(),
+                'exists' => $record->exists,
+                'wasRecentlyCreated' => $record->wasRecentlyCreated,
             ]);
 
             Log::info("[CreateTimeRecordModal] Successfully Created Time Record");

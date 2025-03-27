@@ -38,6 +38,7 @@ return new class extends Migration
             $table->enum('status', ['Incomplete', 'Partial', 'Complete', 'Migrated', 'Posted', 'NeedsReview'])
                 ->default('Incomplete')->comment('Processing status of the attendance record');
             $table->boolean('is_migrated')->storedAs("`status` = 'Migrated'")->comment('Indicates if the attendance record is migrated');
+            $table->boolean('is_processed')->default(false)->comment('Indicates if the pay period has been processed');
             $table->unsignedBigInteger('classification_id')->nullable()->comment('Foreign key to classification table');
             $table->unsignedBigInteger('holiday_id')->nullable()->comment('Foreign key to holidays table');
 
