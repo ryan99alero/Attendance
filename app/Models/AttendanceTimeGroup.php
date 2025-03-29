@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id Primary key of the attendance_time_groups table
  * @property int $employee_id Foreign key to employees table
@@ -45,8 +45,13 @@ class AttendanceTimeGroup extends Model
         'employee_id',
         'shift_date',
         'external_group_id',
+        'shift_window_start',
+        'shift_window_end',
+        'lunch_start_time',
+        'lunch_end_time',
         'created_by',
         'updated_by',
+
     ];
 
     public $timestamps = true; // Assumes you have created_at and updated_at

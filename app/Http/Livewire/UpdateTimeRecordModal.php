@@ -120,14 +120,16 @@ class UpdateTimeRecordModal extends Component
         $this->reset();
     }
 
-    public function deleteTimeRecord($attendanceId): void
+    public function deleteTimeRecord(): void
     {
         try {
-            Attendance::findOrFail($attendanceId)->delete();
-            Log::info("[UpdateTimeRecordModal] Deleted attendance record: $attendanceId");
+            Attendance::findOrFail($this->attendanceId)->delete();
+            Log::info("[UpdateTimeRecordModal] Deleted attendance record: {$this->attendanceId}");
 
             $this->dispatch('timeRecordUpdated');
             $this->dispatch('$refresh');
+            $this->dispatch('close-update-modal');
+            $this->reset();
         } catch (\Exception $e) {
             Log::error("[UpdateTimeRecordModal] Failed to delete record", ['error' => $e->getMessage()]);
         }

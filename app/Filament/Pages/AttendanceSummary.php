@@ -128,6 +128,17 @@ class AttendanceSummary extends Page
             ->orderBy('attendances.employee_id')
             ->orderBy('attendances.shift_date')
             ->orderBy('attendances.punch_time')
+            ->when($this->search, function ($query) {
+                $searchTerm = '%' . $this->search . '%';
+
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('employees.full_names', 'like', $searchTerm)
+                      ->orWhere('employees.external_id', 'like', $searchTerm)
+                      ->orWhere('attendances.punch_state', 'like', $searchTerm)
+                      ->orWhere(DB::raw("DATE_FORMAT(attendances.shift_date, '%Y-%m-%d')"), 'like', $searchTerm)
+                      ->orWhere(DB::raw("DATE_FORMAT(attendances.punch_time, '%H:%i')"), 'like', $searchTerm);
+                });
+            })
             ->get();
 
         if ($this->duplicatesFilter === 'duplicates_only') {

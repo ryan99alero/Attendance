@@ -3,8 +3,10 @@
         <!-- Filter Form -->
         <form wire:submit.prevent="updateAttendances">
             <div class="space-y-6">
+                <div class="flex flex-wrap gap-4">
+                    <!-- Removed duplicate search field block -->
+                </div>
                 {{ $this->form }}
-
             </div>
         </form>
 
