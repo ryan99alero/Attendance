@@ -17,6 +17,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     public function assignPunchTypes($punches, $flexibility, &$punchEvaluations): void
     {
+        Log::info("➡️ [Heuristic] Entering assignPunchTypes");
         foreach ($punches->groupBy('employee_id') as $employeeId => $employeePunches) {
             $schedule = $this->shiftScheduleService->getShiftScheduleForEmployee($employeeId);
 
@@ -41,6 +42,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     private function processPunchAssignments($punches, $schedule, $flexibility, &$punchEvaluations): void
     {
+        Log::info("➡️ [Heuristic] Entering processPunchAssignments");
         $punchesByDay = $punches->groupBy(fn($punch) => Carbon::parse($punch->punch_time)->format('Y-m-d'));
 
         foreach ($punchesByDay as $day => $dailyPunches) {
@@ -55,6 +57,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     private function assignScheduledPunchTypes($punches, $schedule, $flexibility, &$punchEvaluations): void
     {
+        Log::info("➡️ [Heuristic] Entering assignScheduledPunchTypes");
         $shiftStart = Carbon::parse($schedule->start_time);
         $shiftEnd = Carbon::parse($schedule->end_time);
         $lunchStart = Carbon::parse($schedule->lunch_start_time);
@@ -82,6 +85,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     private function assignLunchPunchTypes($punches, $lunchStart, $lunchEnd, $schedule, &$punchEvaluations): void
     {
+        Log::info("➡️ [Heuristic] Entering assignLunchPunchTypes");
         foreach ($punches->chunk(2) as $pair) {
             if ($pair->count() !== 2) {
                 continue;
@@ -109,6 +113,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     private function storePunchPrediction($punch, $type, &$punchEvaluations): void
     {
+        Log::info("➡️ [Heuristic] Entering storePunchPrediction");
         $punchTypeId = $this->getPunchTypeId($type);
 
         if (!$punchTypeId) {
@@ -127,6 +132,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     private function determinePunchState(int $punchTypeId): string
     {
+        Log::info("➡️ [Heuristic] Entering determinePunchState");
         $startTypes = ['Clock In', 'Lunch Start', 'Shift Start', 'Manual Start'];
         $stopTypes = ['Clock Out', 'Lunch Stop', 'Shift Stop', 'Manual Stop'];
 
@@ -143,6 +149,7 @@ class ShiftSchedulePunchTypeAssignmentService
 
     private function getPunchTypeId(string $type): ?int
     {
+        Log::info("➡️ [Heuristic] Entering getPunchTypeId");
         return \DB::table('punch_types')->where('name', $type)->value('id');
     }
 }

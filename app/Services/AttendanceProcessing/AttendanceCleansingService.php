@@ -3,6 +3,7 @@
 namespace App\Services\AttendanceProcessing;
 
 use App\Models\Attendance;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceCleansingService
@@ -16,39 +17,36 @@ class AttendanceCleansingService
     {
         Log::info("[AttendanceCleansingService] 🔍 Starting attendance duplicate cleansing process...");
 
-        // Step 1: Fetch potential duplicate attendance records
-        $duplicates = Attendance::query()
-            ->select('id', 'employee_id', 'punch_time', 'punch_type_id', 'punch_state', 'is_migrated')
-            ->where('is_migrated', false) // Exclude migrated records
-            ->orderBy('employee_id')
-            ->orderBy('punch_time')
-            ->get()
-            ->groupBy(fn($attendance) => "{$attendance->employee_id}-{$attendance->punch_time}"); // Group by employee & punch time
+        DB::transaction(function () {
+            // Get IDs of duplicate records to delete using subquery with window function
+            $duplicateIds = DB::table('attendances')
+                ->select('id')
+                ->fromSub(function ($query) {
+                    $query->select(
+                        'id',
+                        'employee_id', 
+                        'punch_time',
+                        DB::raw('ROW_NUMBER() OVER (
+                            PARTITION BY employee_id, punch_time 
+                            ORDER BY 
+                                CASE WHEN punch_type_id IS NOT NULL AND punch_state IS NOT NULL THEN 0 ELSE 1 END,
+                                id ASC
+                        ) as row_num')
+                    )
+                    ->from('attendances')
+                    ->where('is_migrated', false);
+                }, 'ranked')
+                ->where('row_num', '>', 1)
+                ->pluck('id')
+                ->toArray();
 
-        $totalDeleted = 0;
-
-        // Step 2: Iterate through groups & remove duplicate records
-        foreach ($duplicates as $group => $records) {
-            if ($records->count() > 1) {
-                Log::warning("[AttendanceCleansingService] ⚠️ Found duplicate records for Employee ID: {$records->first()->employee_id}, Punch Time: {$records->first()->punch_time}");
-
-                // Prioritize deletion of records without punch_type_id or punch_state
-                $recordsToDelete = $records->sortBy([
-                    fn($a, $b) => ($a->punch_type_id === null || $a->punch_state === null) ? -1 : 1, // Delete those missing data first
-                    fn($a, $b) => $b->id <=> $a->id, // Delete the highest ID (newest duplicate)
-                ])->slice(1); // Keep the first valid record
-
-                // Collect IDs for bulk deletion
-                $deleteIds = $recordsToDelete->pluck('id')->toArray();
-
-                if (!empty($deleteIds)) {
-                    Attendance::whereIn('id', $deleteIds)->delete();
-                    $totalDeleted += count($deleteIds);
-                    Log::info("[AttendanceCleansingService] 🗑 Deleted " . count($deleteIds) . " duplicate records for Employee ID: {$records->first()->employee_id}, Punch Time: {$records->first()->punch_time}");
-                }
+            // Delete duplicate records
+            $deletedCount = 0;
+            if (!empty($duplicateIds)) {
+                $deletedCount = Attendance::whereIn('id', $duplicateIds)->delete();
             }
-        }
 
-        Log::info("[AttendanceCleansingService] ✅ Duplicate cleansing process completed. Total records deleted: {$totalDeleted}");
+            Log::info("[AttendanceCleansingService] ✅ Duplicate cleansing process completed. Total records deleted: $deletedCount");
+        });
     }
 }

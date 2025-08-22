@@ -79,19 +79,19 @@ class PunchValidationService
         Log::info("[PunchValidationService] Resolving overlapping records for PayPeriod ID: {$payPeriod->id}");
 
         // Step 1: Identify overlapping records
-        $overlappingRecords = Attendance::select('employee_id', DB::raw('DATE(punch_time) as punch_date'), DB::raw('COUNT(*) as record_count'))
+        $overlappingRecords = Attendance::select('employee_id', 'shift_date', DB::raw('COUNT(*) as record_count'))
             ->whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
-            ->groupBy('employee_id', DB::raw('DATE(punch_time)'))
+            ->groupBy('employee_id', 'shift_date')
             ->having('record_count', '>', 1)
             ->get();
 
         foreach ($overlappingRecords as $record) {
             $employeeId = $record->employee_id;
-            $punchDate = $record->punch_date;
+            $punchDate = $record->shift_date;
 
             // Step 2: Retrieve all attendance records for the day
             $dailyRecords = Attendance::where('employee_id', $employeeId)
-                ->whereDate('punch_time', $punchDate)
+                ->where('shift_date', $punchDate)
                 ->get();
 
             if ($dailyRecords->isEmpty()) {
