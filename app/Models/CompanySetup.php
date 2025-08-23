@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,21 +18,21 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $enforce_shift_schedules Require employees to adhere to assigned shift schedules
  * @property int|null $allow_manual_time_edits Allow admins to manually edit time records
  * @property int|null $max_shift_length Maximum shift length in hours before requiring admin approval
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereAllowManualTimeEdits($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereAttendanceFlexibilityMinutes($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereAutoAdjustPunches($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereEnforceShiftSchedules($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereLoggingLevel($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereMaxShiftLength($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|CompanySetup whereUseMlForPunchMatching($value)
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @method static Builder<static>|CompanySetup newModelQuery()
+ * @method static Builder<static>|CompanySetup newQuery()
+ * @method static Builder<static>|CompanySetup query()
+ * @method static Builder<static>|CompanySetup whereAllowManualTimeEdits($value)
+ * @method static Builder<static>|CompanySetup whereAttendanceFlexibilityMinutes($value)
+ * @method static Builder<static>|CompanySetup whereAutoAdjustPunches($value)
+ * @method static Builder<static>|CompanySetup whereCreatedAt($value)
+ * @method static Builder<static>|CompanySetup whereEnforceShiftSchedules($value)
+ * @method static Builder<static>|CompanySetup whereId($value)
+ * @method static Builder<static>|CompanySetup whereLoggingLevel($value)
+ * @method static Builder<static>|CompanySetup whereMaxShiftLength($value)
+ * @method static Builder<static>|CompanySetup whereUpdatedAt($value)
+ * @method static Builder<static>|CompanySetup whereUseMlForPunchMatching($value)
  * @mixin \Eloquent
  */
 class CompanySetup extends Model

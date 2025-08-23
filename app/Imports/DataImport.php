@@ -2,6 +2,8 @@
 
 namespace App\Imports;
 
+use Exception;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use App\Models\Department;
 use App\Models\Employee;
 use Illuminate\Support\Collection;
@@ -87,7 +89,7 @@ class DataImport implements ToCollection, WithHeadingRow
                             $data['employee_name'] = $mappedEmployee->full_name;
                             $data['department_name'] = optional($mappedEmployee->department)->name;
                         } else {
-                            throw new \Exception("No employee found for external_id {$data['employee_external_id']}.");
+                            throw new Exception("No employee found for external_id {$data['employee_external_id']}.");
                         }
                     }
                 }
@@ -108,7 +110,7 @@ class DataImport implements ToCollection, WithHeadingRow
                 );
 
                 Log::info("Successfully imported/updated row {$index}: ", $data);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("Failed to import row {$index}: " . json_encode($row->toArray()) . " Error: " . $e->getMessage());
             }
         }
@@ -127,10 +129,10 @@ class DataImport implements ToCollection, WithHeadingRow
         // Handle Excel serial date format (numeric values)
         if (is_numeric($value)) {
             try {
-                return Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value))
+                return Carbon::instance(Date::excelToDateTimeObject($value))
                     ->format('Y-m-d H:i:s'); // Standardize format
-            } catch (\Exception $e) {
-                throw new \Exception("Failed to parse Excel serial date format: {$value}");
+            } catch (Exception $e) {
+                throw new Exception("Failed to parse Excel serial date format: {$value}");
             }
         }
 
@@ -144,12 +146,12 @@ class DataImport implements ToCollection, WithHeadingRow
             try {
                 $date = Carbon::createFromFormat($format, $value);
                 return $date->format('Y-m-d H:i:s'); // Standardize format
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Continue to next format
             }
         }
 
-        throw new \Exception("Invalid date format: {$value}");
+        throw new Exception("Invalid date format: {$value}");
     }
 
     /**
@@ -164,7 +166,7 @@ class DataImport implements ToCollection, WithHeadingRow
             $filePath = Storage::disk('public')->path($fileName);
             Log::info("Resolved file path: {$filePath}");
             return $filePath;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to resolve file path for {$fileName}. Error: " . $e->getMessage());
             throw $e;
         }

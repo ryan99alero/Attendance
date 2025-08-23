@@ -1,6 +1,8 @@
 <?php
 namespace App\Services\TimeGrouping;
 
+use App\Models\Attendance;
+use Carbon\Carbon;
 use App\Models\AttendanceTimeGroup;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -54,14 +56,14 @@ class AttendanceTimeGroupService
      * Ensures the attendance record has a valid shift_date and external_group_id.
      * Uses punch_time to infer shift_date if not already set.
      *
-     * @param \App\Models\Attendance $attendance
+     * @param Attendance $attendance
      * @param int $systemUserId
      * @return void
      */
-    public function getOrCreateShiftDate(\App\Models\Attendance $attendance, int $systemUserId): void
+    public function getOrCreateShiftDate(Attendance $attendance, int $systemUserId): void
     {
         if (empty($attendance->shift_date)) {
-            $attendance->shift_date = \Carbon\Carbon::parse($attendance->punch_time)->toDateString();
+            $attendance->shift_date = Carbon::parse($attendance->punch_time)->toDateString();
         }
 
         $existingGroup = AttendanceTimeGroup::where('employee_id', $attendance->employee_id)
@@ -72,7 +74,7 @@ class AttendanceTimeGroupService
             $attendance->external_group_id = $existingGroup->external_group_id;
             \Log::info("[TimeGroup] Found existing group for Attendance ID {$attendance->id} - External Group ID: {$existingGroup->external_group_id}");
         } else {
-            $externalGroupId = \Illuminate\Support\Str::uuid()->toString();
+            $externalGroupId = Str::uuid()->toString();
             $maxGroupIdLength = 40;
 
             if (strlen($externalGroupId) > $maxGroupIdLength) {
@@ -84,7 +86,7 @@ class AttendanceTimeGroupService
                 'external_group_id'   => $externalGroupId,
                 'shift_date'          => $attendance->shift_date,
                 'shift_window_start'  => $attendance->punch_time,
-                'shift_window_end'    => \Carbon\Carbon::parse($attendance->punch_time)->addHours(8),
+                'shift_window_end'    => Carbon::parse($attendance->punch_time)->addHours(8),
                 'created_at'          => now(),
                 'updated_at'          => now(),
             ]);
@@ -160,11 +162,11 @@ class AttendanceTimeGroupService
      * Wrapper to ensure both shift_date and external_group_id are assigned.
      * Intended for external use where both are required in sync.
      *
-     * @param \App\Models\Attendance $attendance
+     * @param Attendance $attendance
      * @param int $systemUserId
      * @return void
      */
-    public function getOrCreateGroupAndAssign(\App\Models\Attendance $attendance, int $systemUserId): void
+    public function getOrCreateGroupAndAssign(Attendance $attendance, int $systemUserId): void
     {
         Log::info("[TimeGroup] 🧩 Executing getOrCreateGroupAndAssign for Attendance ID: {$attendance->id}");
         $this->getOrCreateShiftDate($attendance, $systemUserId);

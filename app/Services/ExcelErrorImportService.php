@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use Exception;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -81,7 +85,7 @@ class ExcelErrorImportService implements ToCollection, WithHeadingRow
                 // Insert or update the model
                 $model = new $this->modelClass();
                 $model::updateOrCreate(['id' => $filteredData['id'] ?? null], $filteredData);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $rowNumber = $index + 1;
 
                 // Add the error to failed records
@@ -136,14 +140,14 @@ class ExcelErrorImportService implements ToCollection, WithHeadingRow
     /**
      * Export failed records as an Excel file.
      *
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return BinaryFileResponse
      */
-    public function exportFailedRecords(): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function exportFailedRecords(): BinaryFileResponse
     {
         $tableName = (new $this->modelClass())->getTable();
         $fileName = "{$tableName}_import_errors.xlsx";
 
-        return Excel::download(new class($this->failedRecords) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
+        return Excel::download(new class($this->failedRecords) implements FromCollection, WithHeadings {
             private $data;
 
             public function __construct(array $data)

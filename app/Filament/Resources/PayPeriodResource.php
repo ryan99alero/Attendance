@@ -2,13 +2,18 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
+use Exception;
+use App\Filament\Resources\PayPeriodResource\Pages\ListPayPeriods;
+use App\Filament\Resources\PayPeriodResource\Pages\CreatePayPeriod;
+use App\Filament\Resources\PayPeriodResource\Pages\EditPayPeriod;
 use App\Filament\Resources\PayPeriodResource\Pages;
 use App\Models\PayPeriod;
-use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
@@ -20,12 +25,12 @@ class PayPeriodResource extends Resource
 {
     protected static ?string $model = PayPeriod::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar';
     protected static ?string $navigationLabel = 'Pay Periods';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             DatePicker::make('start_date')
                 ->label('Start Date')
                 ->required(),
@@ -76,7 +81,7 @@ class PayPeriodResource extends Resource
                 ->sortable()
                 ->color('success'),
         ])
-            ->actions([
+            ->recordActions([
                 // Process Time Button
                 Action::make('process_time')
                     ->label('Process Time')
@@ -88,12 +93,12 @@ class PayPeriodResource extends Resource
                         try {
                             $processingService->processAll($record);
 
-                            return \Filament\Notifications\Notification::make()
+                            return Notification::make()
                                 ->success()
                                 ->title('Time Processed')
                                 ->body("Time records have been successfully processed for Pay Period ID: {$record->id}");
-                        } catch (\Exception $e) {
-                            return \Filament\Notifications\Notification::make()
+                        } catch (Exception $e) {
+                            return Notification::make()
                                 ->danger()
                                 ->title('Processing Error')
                                 ->body("An error occurred while processing Pay Period ID: {$record->id}. Error: {$e->getMessage()}");
@@ -108,7 +113,7 @@ class PayPeriodResource extends Resource
                     ->action(function ($record) {
                         // Check for unresolved attendance issues
                         if ($record->attendanceIssuesCount() > 0) {
-                            return \Filament\Notifications\Notification::make()
+                            return Notification::make()
                                 ->danger()
                                 ->title('Cannot Post Time')
                                 ->body('There are unresolved attendance issues for this pay period. Please resolve them before posting time.')
@@ -125,7 +130,7 @@ class PayPeriodResource extends Resource
 
                         $record->update(['is_posted' => true]);
 
-                        return \Filament\Notifications\Notification::make()
+                        return Notification::make()
                             ->success()
                             ->title('Time Posted')
                             ->body("Time records for Pay Period ID: {$record->id} have been finalized and archived.")
@@ -144,9 +149,9 @@ class PayPeriodResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPayPeriods::route('/'),
-            'create' => Pages\CreatePayPeriod::route('/create'),
-            'edit' => Pages\EditPayPeriod::route('/{record}/edit'),
+            'index' => ListPayPeriods::route('/'),
+            'create' => CreatePayPeriod::route('/create'),
+            'edit' => EditPayPeriod::route('/{record}/edit'),
         ];
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\AttendanceResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
+use Exception;
 use App\Filament\Resources\AttendanceResource;
 use App\Models\Attendance;
 use App\Imports\DataImport;
@@ -31,8 +33,8 @@ class ListAttendances extends ListRecords
             Action::make('Import Attendances')
                 ->label('Import')
                 ->color('primary')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
@@ -58,7 +60,7 @@ class ListAttendances extends ListRecords
                             ->body('Attendances imported successfully!')
                             ->success()
                             ->send();
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Import failed: {$e->getMessage()}");
 
                         Notification::make()
@@ -77,7 +79,7 @@ class ListAttendances extends ListRecords
                 ->action(function () {
                     try {
                         return Excel::download(new DataExport(AttendanceResource::getModel()), 'attendances.xlsx');
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Export failed: {$e->getMessage()}");
 
                         Notification::make()

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\UserResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
+use Exception;
 use App\Filament\Resources\UserResource;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
@@ -30,8 +32,8 @@ class ListUsers extends ListRecords
                 ->label('Import')
                 ->color('primary')
                 ->icon('heroicon-o-upload')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
@@ -50,7 +52,7 @@ class ListUsers extends ListRecords
                             ->body('Users imported successfully!')
                             ->success()
                             ->send();
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Import failed: {$e->getMessage()}");
 
                         Notification::make()
@@ -69,7 +71,7 @@ class ListUsers extends ListRecords
                 ->action(function () {
                     try {
                         return Excel::download(new DataExport(UserResource::getModel()), 'users.xlsx');
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Export failed: {$e->getMessage()}");
 
                         Notification::make()

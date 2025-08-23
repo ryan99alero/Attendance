@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\VacationCalendarResource\Pages;
 
+use Log;
+use Illuminate\Validation\ValidationException;
+use Exception;
 use App\Filament\Resources\VacationCalendarResource;
 use App\Models\VacationCalendar;
 use App\Models\Employee;
@@ -14,7 +17,7 @@ class CreateVacationCalendar extends CreateRecord
 
     protected function handleRecordCreation(array $data): VacationCalendar
     {
-        \Log::info("Starting VacationCalendar creation process with data: ", $data);
+        Log::info("Starting VacationCalendar creation process with data: ", $data);
 
         $startDate = Carbon::parse($data['start_date']);
         $endDate = Carbon::parse($data['end_date']);
@@ -34,8 +37,8 @@ class CreateVacationCalendar extends CreateRecord
         }
 
         if ($onlyWeekends) {
-            \Log::warning("Vacation dates selected are only weekends.");
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            Log::warning("Vacation dates selected are only weekends.");
+            throw ValidationException::withMessages([
                 'start_date' => 'Vacation dates cannot include only weekends.',
                 'end_date' => 'Please select a date range that includes at least one weekday.',
             ]);
@@ -47,11 +50,11 @@ class CreateVacationCalendar extends CreateRecord
             : Employee::where('id', $data['employee_id'])->get();
 
         if ($employees->isEmpty()) {
-            \Log::error("No employees found matching the criteria.");
-            throw new \Exception('No employees found matching the criteria.');
+            Log::error("No employees found matching the criteria.");
+            throw new Exception('No employees found matching the criteria.');
         }
 
-        \Log::info("Number of employees to process: {$employees->count()}");
+        Log::info("Number of employees to process: {$employees->count()}");
 
         $lastCreated = null;
 
@@ -60,7 +63,7 @@ class CreateVacationCalendar extends CreateRecord
 
             while ($currentDate->lte($endDate)) {
                 if ($currentDate->isWeekday()) {
-                    \Log::info("Creating vacation entry for Employee ID: {$employee->id} on {$currentDate->toDateString()}");
+                    Log::info("Creating vacation entry for Employee ID: {$employee->id} on {$currentDate->toDateString()}");
 
                     $vacationCalendar = VacationCalendar::create([
                         'employee_id' => $employee->id,
@@ -72,7 +75,7 @@ class CreateVacationCalendar extends CreateRecord
                     ]);
 
                     $lastCreated = $vacationCalendar;
-                    \Log::info("VacationCalendar record created: ", $vacationCalendar->toArray());
+                    Log::info("VacationCalendar record created: ", $vacationCalendar->toArray());
                 }
 
                 $currentDate->addDay();
@@ -81,11 +84,11 @@ class CreateVacationCalendar extends CreateRecord
 
         // Ensure at least one record was created
         if (!$lastCreated) {
-            \Log::error("No VacationCalendar records were created. Process failed.");
-            throw new \Exception('No valid vacation dates were found within the specified range.');
+            Log::error("No VacationCalendar records were created. Process failed.");
+            throw new Exception('No valid vacation dates were found within the specified range.');
         }
 
-        \Log::info("VacationCalendar creation process completed successfully. Returning the last created record.");
+        Log::info("VacationCalendar creation process completed successfully. Returning the last created record.");
 
         return $lastCreated;
     }

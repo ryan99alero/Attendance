@@ -2,6 +2,7 @@
 
 namespace App\Services\VacationProcessing;
 
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Attendance;
@@ -55,7 +56,7 @@ class VacationTimeProcessAttendanceService
 
                 Log::info("✅ Processed Vacation Record ID: {$record->id} for Employee ID: {$employee->id}");
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("❌ Failed to process Vacation Record ID: {$record->id} for Employee ID: {$employee->id}. Error: {$e->getMessage()}");
             }
         }
@@ -104,7 +105,7 @@ class VacationTimeProcessAttendanceService
             Log::info("🕒 Validated punch time for Vacation ID {$vacation->id}: {$punchTime}");
 
             return $punchTime;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("❌ Failed to create punch_time for Vacation ID: {$vacation->id}. Error: {$e->getMessage()}");
             return now()->toDateTimeString(); // Fallback in case of error
         }

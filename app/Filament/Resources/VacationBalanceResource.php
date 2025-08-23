@@ -2,10 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use App\Filament\Resources\VacationBalanceResource\Pages\ListVacationBalances;
+use App\Filament\Resources\VacationBalanceResource\Pages\CreateVacationBalance;
+use App\Filament\Resources\VacationBalanceResource\Pages\EditVacationBalance;
 use App\Filament\Resources\VacationBalanceResource\Pages;
 use App\Models\VacationBalance;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,42 +20,42 @@ class VacationBalanceResource extends Resource
 {
     protected static ?string $model = VacationBalance::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Vacation Balances';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\Select::make('employee_id')
+        return $schema->components([
+            Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
                 ->required(),
-            Forms\Components\TextInput::make('accrual_rate')->label('Accrual Rate')->numeric()->required(),
-            Forms\Components\TextInput::make('accrued_hours')->label('Accrued Hours')->numeric()->required(),
-            Forms\Components\TextInput::make('used_hours')->label('Used Hours')->numeric()->required(),
-            Forms\Components\TextInput::make('carry_over_hours')->label('Carry Over Hours')->numeric()->nullable(),
-            Forms\Components\TextInput::make('cap_hours')->label('Cap Hours')->numeric()->required(),
+            TextInput::make('accrual_rate')->label('Accrual Rate')->numeric()->required(),
+            TextInput::make('accrued_hours')->label('Accrued Hours')->numeric()->required(),
+            TextInput::make('used_hours')->label('Used Hours')->numeric()->required(),
+            TextInput::make('carry_over_hours')->label('Carry Over Hours')->numeric()->nullable(),
+            TextInput::make('cap_hours')->label('Cap Hours')->numeric()->required(),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('employee.first_name')->label('Employee'),
-            Tables\Columns\TextColumn::make('accrual_rate')->label('Accrual Rate'),
-            Tables\Columns\TextColumn::make('accrued_hours')->label('Accrued Hours'),
-            Tables\Columns\TextColumn::make('used_hours')->label('Used Hours'),
-            Tables\Columns\TextColumn::make('carry_over_hours')->label('Carry Over Hours'),
-            Tables\Columns\TextColumn::make('cap_hours')->label('Cap Hours'),
+            TextColumn::make('employee.first_name')->label('Employee'),
+            TextColumn::make('accrual_rate')->label('Accrual Rate'),
+            TextColumn::make('accrued_hours')->label('Accrued Hours'),
+            TextColumn::make('used_hours')->label('Used Hours'),
+            TextColumn::make('carry_over_hours')->label('Carry Over Hours'),
+            TextColumn::make('cap_hours')->label('Cap Hours'),
         ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVacationBalances::route('/'),
-            'create' => Pages\CreateVacationBalance::route('/create'),
-            'edit' => Pages\EditVacationBalance::route('/{record}/edit'),
+            'index' => ListVacationBalances::route('/'),
+            'create' => CreateVacationBalance::route('/create'),
+            'edit' => EditVacationBalance::route('/{record}/edit'),
         ];
     }
 }

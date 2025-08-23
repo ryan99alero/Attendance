@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\DeviceResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
+use Exception;
 use App\Filament\Resources\DeviceResource;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
@@ -30,8 +32,8 @@ class ListDevices extends ListRecords
             Action::make('Import Devices')
                 ->label('Import')
                 ->color('primary')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
@@ -59,7 +61,7 @@ class ListDevices extends ListRecords
                             ->body('Devices imported successfully!')
                             ->success()
                             ->send();
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Import failed: {$e->getMessage()}");
 
                         Notification::make()
@@ -78,7 +80,7 @@ class ListDevices extends ListRecords
                 ->action(function () {
                     try {
                         return Excel::download(new DataExport(DeviceResource::getModel()), 'devices.xlsx');
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Export failed: {$e->getMessage()}");
 
                         Notification::make()

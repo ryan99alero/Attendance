@@ -2,6 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -13,8 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class AttendanceSummary extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-table';
-    protected static string $view = 'filament.pages.attendance-summary';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table';
+    protected string $view = 'filament.pages.attendance-summary';
     protected static ?string $navigationLabel = 'Attendance Summary';
     protected static bool $shouldRegisterNavigation = false;
 
@@ -41,20 +44,20 @@ class AttendanceSummary extends Page
     protected function getFormSchema(): array
     {
         return [
-            Forms\Components\Select::make('payPeriodId')
+            Select::make('payPeriodId')
                 ->label('Select Pay Period')
                 ->options($this->getPayPeriods())
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances())
                 ->placeholder('All Pay Periods'),
 
-            Forms\Components\TextInput::make('search')
+            TextInput::make('search')
                 ->label('Search')
                 ->placeholder('Search any value...')
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
 
-            Forms\Components\Select::make('statusFilter')
+            Select::make('statusFilter')
                 ->label('Filter by Status')
                 ->options([
                     'all' => 'All',
@@ -65,7 +68,7 @@ class AttendanceSummary extends Page
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
 
-            Forms\Components\Select::make('duplicatesFilter')
+            Select::make('duplicatesFilter')
                 ->label('Filter by Duplicates')
                 ->options([
                     'all' => 'All',
@@ -192,7 +195,7 @@ class AttendanceSummary extends Page
 
                 $entry = [
                     'attendance_id' => $punch->attendance_id,
-                    'punch_time' => \Carbon\Carbon::parse($punch->punch_time)->format('H:i:s'),
+                    'punch_time' => Carbon::parse($punch->punch_time)->format('H:i:s'),
                     'punch_state' => $punch->punch_state,
                     'device_id' => $punch->device_id,
                     'punch_type' => $type,
@@ -207,7 +210,7 @@ class AttendanceSummary extends Page
                     })->map(function ($dup) use ($type) {
                         return collect([
                             'attendance_id' => (string) $dup->attendance_id,
-                            'punch_time' => (string) \Carbon\Carbon::parse($dup->punch_time)->format('H:i:s'),
+                            'punch_time' => (string) Carbon::parse($dup->punch_time)->format('H:i:s'),
                             'punch_state' => (string) $dup->punch_state,
                             'device_id' => (string) $dup->device_id,
                             'punch_type' => (string) $type,

@@ -2,10 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\EmployeeStatResource\Pages\ListEmployeeStats;
+use App\Filament\Resources\EmployeeStatResource\Pages\CreateEmployeeStat;
+use App\Filament\Resources\EmployeeStatResource\Pages\EditEmployeeStat;
 use App\Filament\Resources\EmployeeStatResource\Pages;
 use App\Models\EmployeeStat;
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -15,12 +18,12 @@ class EmployeeStatResource extends Resource
 {
     protected static ?string $model = EmployeeStat::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
     protected static ?string $navigationLabel = 'Employee Stats';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
@@ -58,9 +61,9 @@ class EmployeeStatResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListEmployeeStats::route('/'),
-            'create' => Pages\CreateEmployeeStat::route('/create'),
-            'edit' => Pages\EditEmployeeStat::route('/{record}/edit'),
+            'index' => ListEmployeeStats::route('/'),
+            'create' => CreateEmployeeStat::route('/create'),
+            'edit' => EditEmployeeStat::route('/{record}/edit'),
         ];
     }
 }

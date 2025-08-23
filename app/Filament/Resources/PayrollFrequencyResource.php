@@ -2,31 +2,34 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\PayrollFrequencyResource\Pages\ListPayrollFrequencies;
+use App\Filament\Resources\PayrollFrequencyResource\Pages\CreatePayrollFrequency;
+use App\Filament\Resources\PayrollFrequencyResource\Pages\EditPayrollFrequency;
 use App\Filament\Resources\PayrollFrequencyResource\Pages;
 use App\Models\PayrollFrequency;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 
 class PayrollFrequencyResource extends Resource
 {
     protected static ?string $model = PayrollFrequency::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar';
     protected static ?string $navigationLabel = 'Payroll Frequencies';
 
     /**
      * Define the form schema for creating/editing records.
      *
-     * @param Form $form
-     * @return Form
+     * @param \Filament\Schemas\Schema $schema
+     * @return \Filament\Schemas\Schema
      */
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             TextInput::make('frequency_name')
                 ->label('Frequency Name')
                 ->required()
@@ -116,9 +119,9 @@ class PayrollFrequencyResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPayrollFrequencies::route('/'),
-            'create' => Pages\CreatePayrollFrequency::route('/create'),
-            'edit' => Pages\EditPayrollFrequency::route('/{record}/edit'),
+            'index' => ListPayrollFrequencies::route('/'),
+            'create' => CreatePayrollFrequency::route('/create'),
+            'edit' => EditPayrollFrequency::route('/{record}/edit'),
         ];
     }
 }

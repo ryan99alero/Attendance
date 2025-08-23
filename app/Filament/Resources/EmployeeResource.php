@@ -2,13 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Models\RoundGroup;
+use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
+use App\Filament\Resources\EmployeeResource\Pages\CreateEmployee;
+use App\Filament\Resources\EmployeeResource\Pages\EditEmployee;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Models\PayrollFrequency;
 use App\Models\Shift; // Added for shift_id dropdown
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
@@ -19,13 +23,13 @@ use Filament\Tables\Columns\IconColumn;
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user-group';
     protected static ?string $navigationLabel = 'Employees';
     protected static bool $shouldRegisterNavigation = false;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             // Basic personal information
             TextInput::make('first_name')
                 ->label('First Name')
@@ -75,7 +79,7 @@ class EmployeeResource extends Resource
                 ->searchable(),
             Select::make('round_group_id')
                 ->label('Payroll Rounding')
-                ->options(\App\Models\RoundGroup::all()->pluck('group_name', 'id')) // Use the correct model and fields
+                ->options(RoundGroup::all()->pluck('group_name', 'id')) // Use the correct model and fields
                 ->nullable()
                 ->searchable(),
 
@@ -128,9 +132,9 @@ class EmployeeResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListEmployees::route('/'),
-            'create' => Pages\CreateEmployee::route('/create'),
-            'edit' => Pages\EditEmployee::route('/{record}/edit'),
+            'index' => ListEmployees::route('/'),
+            'create' => CreateEmployee::route('/create'),
+            'edit' => EditEmployee::route('/{record}/edit'),
         ];
     }
 }

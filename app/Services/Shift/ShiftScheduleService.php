@@ -2,6 +2,8 @@
 
 namespace App\Services\Shift;
 
+use Exception;
+use DB;
 use App\Models\Employee;
 use App\Models\ShiftSchedule;
 use App\Models\Attendance;
@@ -118,7 +120,7 @@ class ShiftScheduleService
     {
         try {
             return $this->classifier->predict([strtotime($punchTime) % 86400]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[Shift] ML prediction failed: " . $e->getMessage());
             return null;
         }
@@ -163,7 +165,7 @@ class ShiftScheduleService
         $startTypes = ['Clock In', 'Lunch Start', 'Shift Start', 'Manual Start'];
         $stopTypes = ['Clock Out', 'Lunch Stop', 'Shift Stop', 'Manual Stop'];
 
-        $punchTypeName = \DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+        $punchTypeName = DB::table('punch_types')->where('id', $punchTypeId)->value('name');
 
         if (in_array($punchTypeName, $startTypes)) {
             return 'start';
@@ -176,7 +178,7 @@ class ShiftScheduleService
 
     private function getPunchTypeId(string $type): ?int
     {
-        return \DB::table('punch_types')->where('name', $type)->value('id');
+        return DB::table('punch_types')->where('name', $type)->value('id');
     }
 
     /**

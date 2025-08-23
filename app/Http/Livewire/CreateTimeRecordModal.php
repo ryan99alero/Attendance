@@ -2,6 +2,10 @@
 
 namespace App\Http\Livewire;
 
+use Exception;
+use Illuminate\Contracts\View\View;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Foundation\Application;
 use Livewire\Component;
 use App\Models\Attendance;
 use App\Filament\Pages\AttendanceSummary;
@@ -112,7 +116,7 @@ class CreateTimeRecordModal extends Component
 
             Log::info("[CreateTimeRecordModal] Successfully Created Time Record");
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[CreateTimeRecordModal] Record Creation Failed", ['error' => $e->getMessage()]);
         }
 
@@ -121,7 +125,7 @@ class CreateTimeRecordModal extends Component
         $this->closeModal();
     }
 
-    public function render(): \Illuminate\Contracts\View\View|\Illuminate\Contracts\View\Factory|\Illuminate\Foundation\Application
+    public function render(): View|Factory|Application
     {
         return view('livewire.create-time-record-modal');
     }

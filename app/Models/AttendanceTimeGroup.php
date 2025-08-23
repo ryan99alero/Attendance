@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,25 +16,25 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $shift_date The official workday this shift is assigned to
  * @property string|null $shift_window_start Start of the work period for this shift group
  * @property string|null $shift_window_end End of the work period for this shift group
- * @property \Illuminate\Support\Carbon|null $created_at Timestamp of when the record was created
- * @property \Illuminate\Support\Carbon|null $updated_at Timestamp of when the record was last updated
+ * @property Carbon|null $created_at Timestamp of when the record was created
+ * @property Carbon|null $updated_at Timestamp of when the record was last updated
  * @property int $is_archived Indicates if record is archived
  * @property string|null $lunch_start_time Expected lunch break start time
  * @property string|null $lunch_end_time Expected lunch break end time
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereEmployeeId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereExternalGroupId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereIsArchived($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereLunchEndTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereLunchStartTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereShiftDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereShiftWindowEnd($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereShiftWindowStart($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|AttendanceTimeGroup whereUpdatedAt($value)
+ * @method static Builder<static>|AttendanceTimeGroup newModelQuery()
+ * @method static Builder<static>|AttendanceTimeGroup newQuery()
+ * @method static Builder<static>|AttendanceTimeGroup query()
+ * @method static Builder<static>|AttendanceTimeGroup whereCreatedAt($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereEmployeeId($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereExternalGroupId($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereId($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereIsArchived($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereLunchEndTime($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereLunchStartTime($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereShiftDate($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereShiftWindowEnd($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereShiftWindowStart($value)
+ * @method static Builder<static>|AttendanceTimeGroup whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 class AttendanceTimeGroup extends Model

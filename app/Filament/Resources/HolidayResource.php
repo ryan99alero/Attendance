@@ -2,10 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\HolidayResource\Pages\ListHolidays;
+use App\Filament\Resources\HolidayResource\Pages\CreateHoliday;
+use App\Filament\Resources\HolidayResource\Pages\EditHoliday;
 use App\Filament\Resources\HolidayResource\Pages;
 use App\Models\Holiday;
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DatePicker;
@@ -17,12 +20,12 @@ class HolidayResource extends Resource
 {
     protected static ?string $model = Holiday::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-sparkles';
     protected static ?string $navigationLabel = 'Holidays';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             TextInput::make('name')
                 ->label('Holiday Name')
                 ->required(),
@@ -56,9 +59,9 @@ class HolidayResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListHolidays::route('/'),
-            'create' => Pages\CreateHoliday::route('/create'),
-            'edit' => Pages\EditHoliday::route('/{record}/edit'),
+            'index' => ListHolidays::route('/'),
+            'create' => CreateHoliday::route('/create'),
+            'edit' => EditHoliday::route('/{record}/edit'),
         ];
     }
 }

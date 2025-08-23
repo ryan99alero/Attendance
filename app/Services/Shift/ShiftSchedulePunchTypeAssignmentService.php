@@ -2,6 +2,7 @@
 
 namespace App\Services\Shift;
 
+use DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
@@ -136,7 +137,7 @@ class ShiftSchedulePunchTypeAssignmentService
         $startTypes = ['Clock In', 'Lunch Start', 'Shift Start', 'Manual Start'];
         $stopTypes = ['Clock Out', 'Lunch Stop', 'Shift Stop', 'Manual Stop'];
 
-        $punchTypeName = \DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+        $punchTypeName = DB::table('punch_types')->where('id', $punchTypeId)->value('name');
 
         if (in_array($punchTypeName, $startTypes)) {
             return 'start';
@@ -150,6 +151,6 @@ class ShiftSchedulePunchTypeAssignmentService
     private function getPunchTypeId(string $type): ?int
     {
         Log::info("➡️ [Heuristic] Entering getPunchTypeId");
-        return \DB::table('punch_types')->where('name', $type)->value('id');
+        return DB::table('punch_types')->where('name', $type)->value('id');
     }
 }

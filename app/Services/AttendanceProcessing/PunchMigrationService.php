@@ -2,6 +2,8 @@
 
 namespace App\Services\AttendanceProcessing;
 
+use DateTime;
+use Exception;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use App\Models\Punch;
@@ -50,8 +52,8 @@ class PunchMigrationService
 
                 $roundGroupId = $attendance->employee->round_group_id ?? null;
                 $roundedPunchTime = $roundGroupId
-                    ? $this->roundingRuleService->getRoundedTime(new \DateTime($attendance->punch_time), $roundGroupId)
-                    : new \DateTime($attendance->punch_time);
+                    ? $this->roundingRuleService->getRoundedTime(new DateTime($attendance->punch_time), $roundGroupId)
+                    : new DateTime($attendance->punch_time);
 
                 Log::info("PunchMigrationService ✅ Rounded punch time for Attendance ID {$attendance->id}: {$roundedPunchTime->format('Y-m-d H:i:s')}");
 
@@ -114,7 +116,7 @@ class PunchMigrationService
 
                 DB::commit();
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 DB::rollBack();
                 Log::error("PunchMigrationService ❌ Error in migratePunchesWithinPayPeriod for Attendance ID {$attendance->id}: " . $e->getMessage());
             }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use Exception;
 use App\Models\Attendance;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -110,7 +111,7 @@ class UpdateTimeRecordModal extends Component
 
             Log::info("[UpdateTimeRecordModal] Successfully Updated Record ID: {$this->attendanceId}");
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[UpdateTimeRecordModal] Update Failed", ['error' => $e->getMessage()]);
         }
 
@@ -130,7 +131,7 @@ class UpdateTimeRecordModal extends Component
             $this->dispatch('$refresh');
             $this->dispatch('close-update-modal');
             $this->reset();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[UpdateTimeRecordModal] Failed to delete record", ['error' => $e->getMessage()]);
         }
     }

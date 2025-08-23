@@ -2,6 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Actions\EditAction;
+use App\Filament\Resources\CompanySetupResource\Pages\ListCompanySetups;
+use App\Filament\Resources\CompanySetupResource\Pages\EditCompanySetup;
 use Filament\Resources\Resource;
 use Filament\Forms;
 use Filament\Tables;
@@ -14,28 +25,28 @@ class CompanySetupResource extends Resource
     protected static ?string $model = CompanySetup::class;
 
     protected static ?string $navigationLabel = 'Company Setup';
-    protected static ?string $navigationGroup = 'Settings';
+    protected static string | \UnitEnum | null $navigationGroup = 'Settings';
     protected static ?string $slug = 'company-setup';
-    protected static ?string $navigationIcon = 'heroicon-o-cog';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog';
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 // Hidden field for ID (not editable or included in form submission)
-                Forms\Components\Hidden::make('id')
+                Hidden::make('id')
                     ->disabled()
                     ->dehydrated(false),
 
                 // Number of minutes allowed before/after a shift for attendance matching
-                Forms\Components\TextInput::make('attendance_flexibility_minutes')
+                TextInput::make('attendance_flexibility_minutes')
                     ->numeric()
                     ->default(30)
                     ->required()
                     ->label('Attendance Flexibility (Minutes)'),
 
                 // Defines the level of logging in the system (None, Error, Warning, Info, Debug)
-                Forms\Components\Select::make('logging_level')
+                Select::make('logging_level')
                     ->options([
                         'none' => 'None',      // No logging
                         'error' => 'Error',    // Only critical errors
@@ -47,7 +58,7 @@ class CompanySetupResource extends Resource
                     ->required()
                     ->label('Logging Level'),
                             // Temporary Debug Mode in  for Development (None, Error, Warning, Info, Debug)
-                Forms\Components\Select::make('debug_punch_assignment_mode')
+                Select::make('debug_punch_assignment_mode')
                     ->options([
                         'shift_schedule' => 'Shift Schedule',      // No logging
                         'heuristic' => 'Heuristic',    // Only critical errors
@@ -59,34 +70,34 @@ class CompanySetupResource extends Resource
                     ->label('PunchType Debug Mode'),
 
                 // Whether to automatically adjust punch types for incomplete records
-                Forms\Components\Toggle::make('auto_adjust_punches')
+                Toggle::make('auto_adjust_punches')
                     ->default(false)
                     ->label('Auto Adjust Punches'),
 
                 // Defines the minimum hours required between two punches for auto-assigning Clock In/Out instead of Needs Review.
-                Forms\Components\TextInput::make('heuristic_min_punch_gap')
+                TextInput::make('heuristic_min_punch_gap')
                     ->numeric()
                     ->default(6)
                     ->required()
                     ->label('heuristic Min Punch Gap'),
 
                 // Enable ML-based punch classification for better accuracy in punch assignments
-                Forms\Components\Toggle::make('use_ml_for_punch_matching')
+                Toggle::make('use_ml_for_punch_matching')
                     ->default(true)
                     ->label('Use ML for Punch Matching'),
 
                 // If enabled, employees must adhere to assigned shift schedules
-                Forms\Components\Toggle::make('enforce_shift_schedules')
+                Toggle::make('enforce_shift_schedules')
                     ->default(true)
                     ->label('Enforce Shift Schedules'),
 
                 // Allow admins to manually edit time records (If disabled, all changes must be system-generated)
-                Forms\Components\Toggle::make('allow_manual_time_edits')
+                Toggle::make('allow_manual_time_edits')
                     ->default(true)
                     ->label('Allow Manual Time Edits'),
 
                 // Maximum shift length (in hours) before requiring admin approval
-                Forms\Components\TextInput::make('max_shift_length')
+                TextInput::make('max_shift_length')
                     ->numeric()
                     ->default(12)
                     ->required()
@@ -94,54 +105,54 @@ class CompanySetupResource extends Resource
             ]);
     }
 
-    public static function table(Tables\Table $table): Tables\Table
+    public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('attendance_flexibility_minutes')->sortable()
+                TextColumn::make('attendance_flexibility_minutes')->sortable()
                     ->label('Attendance Flexibility (Minutes)'),
 
-                Tables\Columns\TextColumn::make('logging_level')->sortable()
+                TextColumn::make('logging_level')->sortable()
                     ->label('Logging Level'),
 
-                Tables\Columns\TextColumn::make('debug_punch_assignment_mode')->sortable()
+                TextColumn::make('debug_punch_assignment_mode')->sortable()
                     ->label('debug punch assignment mode'),
 
-                Tables\Columns\IconColumn::make('auto_adjust_punches')->boolean()
+                IconColumn::make('auto_adjust_punches')->boolean()
                     ->label('Auto Adjust Punches'),
 
-                Tables\Columns\TextColumn::make('heuristic_min_punch_gap')->sortable()
+                TextColumn::make('heuristic_min_punch_gap')->sortable()
                     ->label('Heuristic Min Punch Gap'),
 
-                Tables\Columns\IconColumn::make('use_ml_for_punch_matching')->boolean()
+                IconColumn::make('use_ml_for_punch_matching')->boolean()
                     ->label('Use ML for Punch Matching'),
 
-                Tables\Columns\IconColumn::make('enforce_shift_schedules')->boolean()
+                IconColumn::make('enforce_shift_schedules')->boolean()
                     ->label('Enforce Shift Schedules'),
 
-                Tables\Columns\IconColumn::make('allow_manual_time_edits')->boolean()
+                IconColumn::make('allow_manual_time_edits')->boolean()
                     ->label('Allow Manual Time Edits'),
 
-                Tables\Columns\TextColumn::make('max_shift_length')->sortable()
+                TextColumn::make('max_shift_length')->sortable()
                     ->label('Max Shift Length (Hours)'),
 
-                Tables\Columns\TextColumn::make('created_at')->dateTime()
+                TextColumn::make('created_at')->dateTime()
                     ->label('Created At'),
 
-                Tables\Columns\TextColumn::make('updated_at')->dateTime()
+                TextColumn::make('updated_at')->dateTime()
                     ->label('Updated At'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ])
-            ->bulkActions([]); // No bulk actions added yet
+            ->toolbarActions([]); // No bulk actions added yet
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListCompanySetups::route('/'),
-            'edit' => Pages\EditCompanySetup::route('/{record}/edit'),
+            'index' => ListCompanySetups::route('/'),
+            'edit' => EditCompanySetup::route('/{record}/edit'),
         ];
     }
 }

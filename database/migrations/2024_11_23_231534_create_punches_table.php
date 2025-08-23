@@ -29,7 +29,6 @@ return new class extends Migration
             $table->boolean('is_altered')->default(false)->comment('Indicates if the punch was manually altered after recording');
             $table->boolean('is_late')->default(false)->comment('Indicates if the punch is considered late');
             $table->enum('punch_state', ['start', 'stop', 'unknown'])
-                ->after('punch_type_id')
                 ->default('unknown')
                 ->comment('Indicates whether the punch is a start or stop event');
 
@@ -63,17 +62,14 @@ return new class extends Migration
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
         });
 
-        // Create the trigger
-        DB::unprepared('
+        // Create the trigger (single-statement form to avoid delimiter issues)
+        // Sets is_altered = 1 if punch_time changed
+        DB::unprepared("
             CREATE TRIGGER before_punch_time_update
             BEFORE UPDATE ON punches
             FOR EACH ROW
-            BEGIN
-                IF NEW.punch_time != OLD.punch_time THEN
-                    SET NEW.is_altered = 1;
-                END IF;
-            END
-        ');
+            SET NEW.is_altered = IF(NEW.punch_time <> OLD.punch_time, 1, NEW.is_altered)
+        ");
 
         Schema::enableForeignKeyConstraints();
     }

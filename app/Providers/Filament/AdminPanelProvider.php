@@ -2,6 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Pages\Dashboard;
+use Filament\Widgets\AccountWidget;
+use Filament\Widgets\FilamentInfoWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -78,7 +81,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Devices')
                     ->url('/admin/devices')
-                    ->icon('heroicon-o-device-mobile')
+                    ->icon('heroicon-o-device-phone-mobile')
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Cards')
                     ->url('/admin/cards')
@@ -90,7 +93,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Punch Types') // Added Punch Types to Punch & Attendance
                 ->url('/admin/punch-types')
-                    ->icon('heroicon-o-collection')
+                    ->icon('heroicon-o-rectangle-stack')
                     ->group('Punch & Attendance'),
 
                 // Employee Management
@@ -104,7 +107,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Employee Management'),
                 NavigationItem::make('Departments')
                     ->url('/admin/departments')
-                    ->icon('heroicon-o-office-building')
+                    ->icon('heroicon-o-building-office')
                     ->group('Employee Management'),
                 NavigationItem::make('Vacation Balances')
                     ->url('/admin/vacation-balances')
@@ -136,15 +139,15 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Payroll Frequencies')
                     ->url('/admin/payroll-frequencies')
-                    ->icon('heroicon-o-cash')
+                    ->icon('heroicon-o-banknotes')
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Overtime Rules')
                     ->url('/admin/overtime-rules')
-                    ->icon('heroicon-o-document-report')
+                    ->icon('heroicon-o-document-chart-bar')
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Rounding Rules') // Moved to Payroll & Overtime
                 ->url('/admin/rounding-rules')
-                    ->icon('heroicon-o-adjustments')
+                    ->icon('heroicon-o-adjustments-vertical')
                     ->group('Payroll & Overtime'),
 
                 // Reports & Stats
@@ -156,12 +159,12 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                AccountWidget::class,
+                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property int $employee_id Foreign key to Employees
@@ -17,25 +20,25 @@ use Illuminate\Database\Eloquent\Model;
  * @property numeric $cap_hours Maximum allowed vacation hours (cap)
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User|null $creator
- * @property-read \App\Models\Employee $employee
- * @property-read \App\Models\User|null $updater
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereAccrualRate($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereAccruedHours($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereCapHours($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereCarryOverHours($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereEmployeeId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereUpdatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|VacationBalance whereUsedHours($value)
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read User|null $creator
+ * @property-read Employee $employee
+ * @property-read User|null $updater
+ * @method static Builder<static>|VacationBalance newModelQuery()
+ * @method static Builder<static>|VacationBalance newQuery()
+ * @method static Builder<static>|VacationBalance query()
+ * @method static Builder<static>|VacationBalance whereAccrualRate($value)
+ * @method static Builder<static>|VacationBalance whereAccruedHours($value)
+ * @method static Builder<static>|VacationBalance whereCapHours($value)
+ * @method static Builder<static>|VacationBalance whereCarryOverHours($value)
+ * @method static Builder<static>|VacationBalance whereCreatedAt($value)
+ * @method static Builder<static>|VacationBalance whereCreatedBy($value)
+ * @method static Builder<static>|VacationBalance whereEmployeeId($value)
+ * @method static Builder<static>|VacationBalance whereId($value)
+ * @method static Builder<static>|VacationBalance whereUpdatedAt($value)
+ * @method static Builder<static>|VacationBalance whereUpdatedBy($value)
+ * @method static Builder<static>|VacationBalance whereUsedHours($value)
  * @mixin \Eloquent
  */
 class VacationBalance extends Model
@@ -61,17 +64,17 @@ class VacationBalance extends Model
         'cap_hours' => 'decimal:2',
     ];
 
-    public function employee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_id');
     }
 
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }

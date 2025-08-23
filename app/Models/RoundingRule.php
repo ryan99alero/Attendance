@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * 
+ *
  *
  * @property int $id Primary key of the rounding_rules table
  * @property int|null $round_group_id Foreign key referencing the round_groups table
@@ -15,20 +17,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $minute_max Maximum minute value for the rounding range
  * @property int $new_minute New minute value after rounding
  * @property numeric $new_minute_decimal Decimal equivalent of the rounded minute value
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\RoundGroup|null $roundGroup
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereMinuteMax($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereMinuteMin($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereNewMinute($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereNewMinuteDecimal($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereRoundGroupId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|RoundingRule whereUpdatedAt($value)
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read RoundGroup|null $roundGroup
+ * @method static Builder<static>|RoundingRule newModelQuery()
+ * @method static Builder<static>|RoundingRule newQuery()
+ * @method static Builder<static>|RoundingRule query()
+ * @method static Builder<static>|RoundingRule whereCreatedAt($value)
+ * @method static Builder<static>|RoundingRule whereId($value)
+ * @method static Builder<static>|RoundingRule whereMinuteMax($value)
+ * @method static Builder<static>|RoundingRule whereMinuteMin($value)
+ * @method static Builder<static>|RoundingRule whereNewMinute($value)
+ * @method static Builder<static>|RoundingRule whereNewMinuteDecimal($value)
+ * @method static Builder<static>|RoundingRule whereRoundGroupId($value)
+ * @method static Builder<static>|RoundingRule whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 class RoundingRule extends Model

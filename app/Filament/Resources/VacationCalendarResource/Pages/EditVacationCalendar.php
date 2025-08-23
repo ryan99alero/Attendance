@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VacationCalendarResource\Pages;
 
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\VacationCalendarResource;
 use App\Models\VacationCalendar;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ class EditVacationCalendar extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 

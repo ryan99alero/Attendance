@@ -26,7 +26,6 @@ return new class extends Migration
             $table->unsignedBigInteger('punch_type_id')->nullable()->comment('Foreign key to punch types table');
             $table->boolean('is_manual')->default(false)->comment('Indicates if the attendance was manually recorded');
             $table->enum('punch_state', ['start', 'stop', 'unknown'])
-                ->after('punch_type_id')
                 ->default('unknown')
                 ->comment('Indicates whether the punch is a start or stop event');
 

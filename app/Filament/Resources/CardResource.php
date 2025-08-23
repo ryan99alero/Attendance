@@ -2,6 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\CardResource\Pages\ListCards;
+use App\Filament\Resources\CardResource\Pages\CreateCard;
+use App\Filament\Resources\CardResource\Pages\EditCard;
 use App\Filament\Resources\CardResource\Pages;
 use App\Models\Card;
 use Filament\Forms\Components\Select;
@@ -10,19 +14,18 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 
 class CardResource extends Resource
 {
     protected static ?string $model = Card::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-credit-card';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
     protected static ?string $navigationLabel = 'Cards';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
@@ -57,9 +60,9 @@ class CardResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListCards::route('/'),
-            'create' => Pages\CreateCard::route('/create'),
-            'edit' => Pages\EditCard::route('/{record}/edit'),
+            'index' => ListCards::route('/'),
+            'create' => CreateCard::route('/create'),
+            'edit' => EditCard::route('/{record}/edit'),
         ];
     }
 }
