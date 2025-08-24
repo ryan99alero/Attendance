@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\ClassificationResource\Pages;
+namespace App\Filament\Resources\Classifications\Pages;
 
-use App\Filament\Resources\ClassificationResource;
-use Filament\Actions;
+use App\Filament\Resources\Classifications\ClassificationResource;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateClassification extends CreateRecord

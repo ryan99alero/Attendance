@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Filament\Resources\ClassificationResource\Pages;
+namespace App\Filament\Resources\Classifications\Pages;
 
+use App\Filament\Resources\Classifications\ClassificationResource;
 use Filament\Actions\CreateAction;
-use App\Filament\Resources\ClassificationResource;
-use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListClassifications extends ListRecords

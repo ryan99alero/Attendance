@@ -27,7 +27,7 @@ class CompanySetupResource extends Resource
     protected static ?string $navigationLabel = 'Company Setup';
     protected static string | \UnitEnum | null $navigationGroup = 'Settings';
     protected static ?string $slug = 'company-setup';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     public static function form(Schema $schema): Schema
     {
