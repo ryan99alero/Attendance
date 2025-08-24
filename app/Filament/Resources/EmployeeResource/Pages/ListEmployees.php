@@ -8,6 +8,7 @@ use App\Filament\Resources\EmployeeResource;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Services\ExcelErrorImportService;
+use App\Exports\DataExport;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Notifications\Notification;
@@ -84,8 +85,9 @@ class ListEmployees extends ListRecords
                             ->danger()
                             ->send();
                     }
+                    return null;
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-tray'),
 
             Action::make('Export Employees')
                 ->label('Export')
@@ -101,9 +103,10 @@ class ListEmployees extends ListRecords
                             ->body("An error occurred during the export: {$e->getMessage()}")
                             ->danger()
                             ->send();
+                        return null;
                     }
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-tray'),
         ];
     }
 }

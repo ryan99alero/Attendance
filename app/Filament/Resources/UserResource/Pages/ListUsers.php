@@ -31,7 +31,7 @@ class ListUsers extends ListRecords
             Action::make('Import Users')
                 ->label('Import')
                 ->color('primary')
-                ->icon('heroicon-o-upload')
+                ->icon('heroicon-o-arrow-up-tray')
                 ->schema([
                     FileUpload::make('file')
                         ->label('Import File')
@@ -67,7 +67,7 @@ class ListUsers extends ListRecords
             Action::make('Export Users')
                 ->label('Export')
                 ->color('warning')
-                ->icon('heroicon-o-download')
+                ->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
                     try {
                         return Excel::download(new DataExport(UserResource::getModel()), 'users.xlsx');
@@ -79,6 +79,7 @@ class ListUsers extends ListRecords
                             ->body("An error occurred during the export: {$e->getMessage()}")
                             ->danger()
                             ->send();
+                        return null;
                     }
                 }),
         ];

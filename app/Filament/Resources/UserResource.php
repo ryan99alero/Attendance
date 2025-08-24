@@ -102,14 +102,14 @@ class UserResource extends Resource
             Action::make('Export Users')
                 ->label('Export')
                 ->color('warning')
-                ->icon('heroicon-o-download')
+                ->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
                     return Excel::download(new DataExport(User::class), 'users.xlsx');
                 }),
             Action::make('Import Users')
                 ->label('Import')
                 ->color('primary')
-                ->icon('heroicon-o-upload')
+                ->icon('heroicon-o-arrow-up-tray')
                 ->schema([
                     FileUpload::make('file')
                         ->label('Import File')

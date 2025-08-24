@@ -20,7 +20,7 @@ class DeviceResource extends Resource
 {
     protected static ?string $model = Device::class;
     protected static bool $shouldRegisterNavigation = false;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-desktop-computer';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-computer-desktop';
     protected static ?string $navigationLabel = 'Devices';
 
     public static function form(Schema $schema): Schema

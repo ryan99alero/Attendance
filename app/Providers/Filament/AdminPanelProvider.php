@@ -147,7 +147,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Rounding Rules') // Moved to Payroll & Overtime
                 ->url('/admin/rounding-rules')
-                    ->icon('heroicon-o-adjustments-vertical')
+                    ->icon('heroicon-o-adjustments-vertical-vertical')
                     ->group('Payroll & Overtime'),
 
                 // Reports & Stats

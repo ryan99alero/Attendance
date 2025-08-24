@@ -41,7 +41,7 @@ class ListPunches extends ListRecords
                     Excel::import(new DataImport(PunchResource::getModel()), $data['file']);
                     $this->notify('success', 'Punchs imported successfully!');
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-tray'),
 
             Action::make('Export Punchs')
                 ->label('Export')
@@ -49,7 +49,7 @@ class ListPunches extends ListRecords
                 ->action(function () {
                     return Excel::download(new DataExport(PunchResource::getModel()), 'punch.xlsx');
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-tray'),
         ];
     }
 }

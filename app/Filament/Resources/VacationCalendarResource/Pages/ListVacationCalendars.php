@@ -31,7 +31,7 @@ class ListVacationCalendars extends ListRecords
             Action::make('Import Vacation Entries')
                 ->label('Import')
                 ->color('primary')
-                ->icon('heroicon-o-upload')
+                ->icon('heroicon-o-arrow-up-tray')
                 ->schema([
                     FileUpload::make('file')
                         ->label('Import File')
@@ -76,7 +76,7 @@ class ListVacationCalendars extends ListRecords
             Action::make('Export Vacation Entries')
                 ->label('Export')
                 ->color('warning')
-                ->icon('heroicon-o-download')
+                ->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
                     return Excel::download(new DataExport(VacationCalendarResource::getModel()), 'vacation_calendar.xlsx');
                 }),

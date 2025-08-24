@@ -19,6 +19,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\DB;
 use App\Services\AttendanceProcessing\AttendanceProcessingService;
+use Carbon\Carbon;
 
 
 class PayPeriodResource extends Resource
@@ -86,7 +87,7 @@ class PayPeriodResource extends Resource
                 Action::make('process_time')
                     ->label('Process Time')
                     ->color('primary')
-                    ->icon('heroicon-o-download')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         $processingService = app(AttendanceProcessingService::class);
 

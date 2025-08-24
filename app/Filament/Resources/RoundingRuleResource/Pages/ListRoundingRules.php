@@ -70,7 +70,7 @@ class ListRoundingRules extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-tray'),
 
             // Add an "Export" action button
             Action::make('Export Rounding Rules')
@@ -87,9 +87,10 @@ class ListRoundingRules extends ListRecords
                             ->body("An error occurred during the export: {$e->getMessage()}")
                             ->danger()
                             ->send();
+                        return null;
                     }
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-tray'),
         ];
     }
 }
