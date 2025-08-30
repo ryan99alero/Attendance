@@ -1,3 +1,5 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* Hide Alpine x-cloak elements until ready */
+[x-cloak] { display: none !important; }

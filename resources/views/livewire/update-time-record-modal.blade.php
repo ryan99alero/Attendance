@@ -1,124 +1,117 @@
-<div>
-    @if ($isOpen)
-        <div wire:ignore.self>
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-[100]"></div>
-            <div class="fixed inset-0 z-[101] overflow-auto flex items-center justify-center">
-                <div class="bg-white rounded-lg shadow-lg p-6 w-96">
-                    <h2 class="text-lg font-extrabold text-gray-700 text-center">Update Time Record</h2>
-                    <br>
+<div
+    x-data="{ open: @entangle('isOpen') }"
+    x-cloak
+>
+    <!-- Backdrop -->
+    <div
+        x-show="open"
+        class="fixed inset-0 z-40 bg-black/50"
+        aria-hidden="true"
+    ></div>
 
-                    <form wire:submit.prevent="updateTimeRecord">
+    <!-- Modal -->
+    <div
+        x-show="open"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold">Edit Time Record</h2>
+                <button type="button" class="text-gray-500 hover:text-gray-700" @click="open = false" wire:click="closeModal">✕</button>
+            </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">ID</label>
-                            <input
-                                type="text"
-                                wire:model="attendanceId"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
-                        </div>
+            <div class="space-y-4">
+                {{-- Readonly IDs --}}
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Attendance ID</label>
+                        <input type="text" class="w-full rounded-md border-gray-300 dark:bg-gray-800" value="{{ $attendanceId }}" disabled>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Employee ID</label>
+                        <input type="text" class="w-full rounded-md border-gray-300 dark:bg-gray-800" value="{{ $employeeId }}" disabled>
+                    </div>
+                </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">Employee</label>
-                            <input
-                                type="text"
-                                wire:model="employeeId"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
-                        </div>
+                {{-- Date --}}
+                <div>
+                    <label class="block text-sm font-medium mb-1">Date</label>
+                    <input type="date" class="w-full rounded-md border-gray-300 dark:bg-gray-800"
+                           wire:model="date" />
+                    @error('date') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">Device ID</label>
-                            <input
-                                type="text"
-                                wire:model="deviceId"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
-                        </div>
+                {{-- Punch Type --}}
+                <div>
+                    <label class="block text-sm font-medium mb-1">Punch Type</label>
+                    <select class="w-full rounded-md border-gray-300 dark:bg-gray-800"
+                            wire:model.live="punchType">
+                        <option value="">Select…</option>
+                        <option value="start_time">Clock In</option>
+                        <option value="lunch_start">Lunch Start</option>
+                        <option value="lunch_stop">Lunch Stop</option>
+                        <option value="stop_time">Clock Out</option>
+                    </select>
+                    @error('punchType') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">Date</label>
-                            <input
-                                type="text"
-                                wire:model="date"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
-                        </div>
+                {{-- Time --}}
+                <div>
+                    <label class="block text-sm font-medium mb-1">Punch Time (HH:MM:SS)</label>
+                    <input type="time" step="1" class="w-full rounded-md border-gray-300 dark:bg-gray-800"
+                           wire:model="punchTime" />
+                    @error('punchTime') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">Punch Type</label>
-                            <select
-                                wire:model="punchType"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                style="color: #1a202c; background-color: #fff;">
-                                <option value="">Select Punch Type</option>
-                                <option value="start_time">Clock In</option>
-                                <option value="stop_time">Clock Out</option>
-                                <option value="lunch_start">Lunch Start</option>
-                                <option value="lunch_stop">Lunch Stop</option>
-                            </select>
-                            @error('punchType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
+                {{-- Device (optional) --}}
+                <div>
+                    <label class="block text-sm font-medium mb-1">Device ID</label>
+                    <input type="text" class="w-full rounded-md border-gray-300 dark:bg-gray-800"
+                           wire:model="deviceId" />
+                    @error('deviceId') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">Punch State</label>
-                            <select
-                                wire:model="punchState"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                style="color: #1a202c; background-color: #fff;">
-                                <option value="">Select Punch State</option>
-                                <option value="start">Start</option>
-                                <option value="stop">Stop</option>
-                                <option value="unknown">Unknown</option>
-                            </select>
-                            @error('punchState')
-                            <span class="block mt-1 text-white text-sm px-2 py-1 rounded-md"
-                                  style="background-color: red; border-color: darkred;">
-                {{ $message }}
-            </span>
-                            @enderror
-                        </div>
+                {{-- Punch State --}}
+                <div>
+                    <label class="block text-sm font-medium mb-2">Punch State</label>
+                    <div class="flex gap-4">
+                        <label class="inline-flex items-center gap-2">
+                            <input type="radio" value="start" wire:model="punchState"> <span>Start</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2">
+                            <input type="radio" value="stop" wire:model="punchState"> <span>Stop</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2">
+                            <input type="radio" value="unknown" wire:model="punchState"> <span>Unknown</span>
+                        </label>
+                    </div>
+                    @error('punchState') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
 
-                        <div class="mb-4">
-                            <label class="block text-md font-medium text-gray-700">Punch Time</label>
-                            <input
-                                type="time"
-                                step="1"
-                                wire:model="punchTime"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                style="color: #1a202c; background-color: #fff;">
-                            @error('punchTime') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
+            <div class="mt-6 flex justify-between">
+                <button type="button"
+                        class="rounded-md border px-3 py-2"
+                        wire:click="deleteTimeRecord"
+                        wire:confirm="Delete this time record?"
+                        wire:target="deleteTimeRecord"
+                        wire:loading.attr="disabled">
+                    Delete
+                </button>
 
-                        <!-- Button Styling -->
-                        <div class="flex justify-between">
-                            <button
-                                type="button"
-                                wire:click="closeModal"
-                                class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
-                                Update Record
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="deleteTimeRecord"
-                                class="px-4 py-2 rounded-md text-white"
-                                style="background-color: red; border-color: darkred;">
-                                Delete
-                            </button>
-                        </div>
-
-                    </form>
+                <div class="flex gap-3">
+                    <button type="button" class="rounded-md border px-3 py-2" @click="open = false" wire:click="closeModal">
+                        Cancel
+                    </button>
+                    <button type="button" class="rounded-md bg-amber-600 px-3 py-2 text-white hover:bg-amber-700"
+                            wire:click="updateTimeRecord" wire:target="updateTimeRecord" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="updateTimeRecord">Save</span>
+                        <span wire:loading wire:target="updateTimeRecord">Saving…</span>
+                    </button>
                 </div>
             </div>
         </div>
-    @endif
+    </div>
 </div>

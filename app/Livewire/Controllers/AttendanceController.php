@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Controllers;
+namespace App\Livewire\Controllers;
 
 use App\Services\AttendanceProcessing\AttendanceFetchService;
 use Illuminate\Http\Request;

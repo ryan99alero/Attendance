@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Livewire\Controllers\AttendanceController;
+use App\Livewire\Controllers\AttendanceController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -18,6 +18,6 @@ Route::post('/api/attendance', [AttendanceController::class, 'store'])->name('at
 // Route for punches
 //Route::get('/admin/punches', [PunchController::class, 'index'])->name('punches.index');
 
-//use App\Http\Livewire\CreateTimeRecordModal;
+//use App\Livewire\CreateTimeRecordModal;
 //
 //Livewire::component('create-time-record-modal', CreateTimeRecordModal::class);

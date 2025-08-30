@@ -6,7 +6,7 @@
                 Filters
             </x-slot>
             
-            <form wire:submit.prevent="updatePunches">
+            <form wire:submit="updatePunches">
                 <div class="space-y-6">
                     {{ $this->form }}
                     <x-filament::button type="submit">
