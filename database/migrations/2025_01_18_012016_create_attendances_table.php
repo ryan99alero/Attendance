@@ -40,6 +40,7 @@ return new class extends Migration
             $table->boolean('is_processed')->default(false)->comment('Indicates if the pay period has been processed');
             $table->unsignedBigInteger('classification_id')->nullable()->comment('Foreign key to classification table');
             $table->unsignedBigInteger('holiday_id')->nullable()->comment('Foreign key to holidays table');
+            $table->text('issue_notes')->nullable()->comment('Notes or issues related to the attendance record');
 
             // Archival status
             $table->boolean('is_archived')->default(false)->comment('Indicates if the record is archived');

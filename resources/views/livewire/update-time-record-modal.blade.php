@@ -1,8 +1,8 @@
 <div>
     @if ($isOpen)
         <div wire:ignore.self>
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            <div class="fixed inset-0 z-50 overflow-auto flex items-center justify-center">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-[100]"></div>
+            <div class="fixed inset-0 z-[101] overflow-auto flex items-center justify-center">
                 <div class="bg-white rounded-lg shadow-lg p-6 w-96">
                     <h2 class="text-lg font-extrabold text-gray-700 text-center">Update Time Record</h2>
                     <br>

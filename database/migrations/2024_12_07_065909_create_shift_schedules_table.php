@@ -16,6 +16,7 @@ return new class extends Migration
             $table->id()->comment('Primary key of the schedules table');
             $table->string('schedule_name')->comment('Name of the schedule');
             $table->time('start_time')->comment('Scheduled start time');
+            $table->time('lunch_stop_time')->nullable()->comment('Scheduled lunch stop time');
             $table->time('lunch_start_time')->nullable()->comment('Scheduled lunch start time');
             $table->integer('lunch_duration')->default(60)->comment('Lunch duration in minutes');
             $table->integer('daily_hours')->comment('Standard hours worked per day');

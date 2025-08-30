@@ -62,9 +62,20 @@ class UpdateTimeRecordModal extends Component
         }
     }
 
-    public function openUpdateModal($attendanceId, $employeeId, $deviceId, $date, $punchType, $punchState, $existingTime): void
+    public function openUpdateModal(...$params): void
     {
+        // When Alpine dispatches an object, Livewire passes the values as arguments
+        // Expected order: attendanceId, employeeId, deviceId, date, punchType, existingTime, punchState
+        $attendanceId = $params[0] ?? null;
+        $employeeId = $params[1] ?? null;
+        $deviceId = $params[2] ?? null;
+        $date = $params[3] ?? null;
+        $punchType = $params[4] ?? null;
+        $existingTime = $params[5] ?? null;
+        $punchState = $params[6] ?? null;
+
         Log::info('[UpdateTimeRecordModal] Opened', compact('attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'existingTime'));
+        Log::info('[UpdateTimeRecordModal] Raw params', $params);
 
         $this->attendanceId = $attendanceId;
         $this->employeeId = $employeeId;

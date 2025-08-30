@@ -6,6 +6,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Carbon\Carbon;
 use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Log;
@@ -14,24 +16,25 @@ use App\Models\Attendance;
 use App\Models\PayPeriod;
 use Illuminate\Support\Facades\DB;
 
-class AttendanceSummary extends Page
+class AttendanceSummary extends Page implements HasForms
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table';
+    use InteractsWithForms;
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
     protected string $view = 'filament.pages.attendance-summary';
     protected static ?string $navigationLabel = 'Attendance Summary';
     protected static bool $shouldRegisterNavigation = false;
 
-    public $payPeriodId;
-    public $search = '';
-    public $statusFilter = 'NeedsReview';
-    public $duplicatesFilter = 'all';
-    public $groupedAttendances;
+    public ?string $payPeriodId;
+    public string $search = '';
+    public string $statusFilter = 'NeedsReview';
+    public string $duplicatesFilter = 'all';
+    public Collection $groupedAttendances;
     public array $selectedAttendances = [];
     public bool $selectAll = false;
     public bool $autoProcess = false;
 
-    public $sortColumn = 'shift_date';
-    public $sortDirection = 'asc';
+    public string $sortColumn = 'shift_date';
+    public string $sortDirection = 'asc';
 
     public function mount(): void
     {
@@ -47,14 +50,14 @@ class AttendanceSummary extends Page
             Select::make('payPeriodId')
                 ->label('Select Pay Period')
                 ->options($this->getPayPeriods())
-                ->reactive()
+                ->live()
                 ->afterStateUpdated(fn () => $this->updateAttendances())
                 ->placeholder('All Pay Periods'),
 
             TextInput::make('search')
                 ->label('Search')
                 ->placeholder('Search any value...')
-                ->reactive()
+                ->live()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
 
             Select::make('statusFilter')
@@ -65,7 +68,7 @@ class AttendanceSummary extends Page
                     'problem' => 'Problem (All Except Migrated)',
                 ])
                 ->default('problem')
-                ->reactive()
+                ->live()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
 
             Select::make('duplicatesFilter')
@@ -75,7 +78,7 @@ class AttendanceSummary extends Page
                     'duplicates_only' => 'Duplicates Only',
                 ])
                 ->default('all')
-                ->reactive()
+                ->live()
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
         ];
     }

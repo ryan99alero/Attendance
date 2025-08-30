@@ -131,6 +131,11 @@ class Employee extends Model
         return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
     }
 
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class, 'shift_id');
+    }
+
     public function schedule(): HasOne
     {
         return $this->hasOne(ShiftSchedule::class, 'employee_id');

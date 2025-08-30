@@ -68,7 +68,7 @@ class EmployeesRelationManager extends RelationManager
                 EditAction::make(),
                 Action::make('remove')
                     ->label('Remove')
-                    ->icon('heroicon-o-user-remove')
+                    ->icon('heroicon-o-user-minus')
                     ->action(function ($record) {
                         // Set the department_id to null instead of deleting the employee
                         $record->department_id = null;
@@ -80,7 +80,7 @@ class EmployeesRelationManager extends RelationManager
             ->toolbarActions([
                 BulkAction::make('bulkRemove')
                     ->label('Remove from Department')
-                    ->icon('heroicon-o-user-remove')
+                    ->icon('heroicon-o-user-minus')
                     ->action(function ($records) {
                         // Set department_id to null for all selected records
                         foreach ($records as $record) {

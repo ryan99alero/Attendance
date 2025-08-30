@@ -102,6 +102,7 @@ class EmployeeResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['department', 'shift', 'payrollFrequency', 'roundGroup']))
             ->columns([
                 TextColumn::make('full_names')
                     ->label('Name')

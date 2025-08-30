@@ -86,7 +86,7 @@ class ShiftResource extends Resource
             BooleanColumn::make('multi_day_shift')
                 ->label('Multi-Day Shift')
                 ->trueIcon('heroicon-o-check')
-                ->falseIcon('heroicon-o-x'),
+                ->falseIcon('heroicon-o-x-mark'),
         ]);
     }
 

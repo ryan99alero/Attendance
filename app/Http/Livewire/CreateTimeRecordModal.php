@@ -56,9 +56,16 @@ class CreateTimeRecordModal extends Component
         Log::info("[CreateTimeRecordModal] PunchState updated to: {$this->punchState}");
     }
 
-    public function openCreateModal($employeeId, $date, $punchType): void
+    public function openCreateModal(...$params): void
     {
+        // When Alpine dispatches an object, Livewire passes the values as arguments
+        // Expected order: employeeId, date, punchType
+        $employeeId = $params[0] ?? null;
+        $date = $params[1] ?? null;
+        $punchType = $params[2] ?? null;
+
         Log::info('[CreateTimeRecordModal] Opened', compact('employeeId', 'date', 'punchType'));
+        Log::info('[CreateTimeRecordModal] Raw params', $params);
 
         $this->employeeId = $employeeId;
         $this->date = $date;

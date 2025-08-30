@@ -8,13 +8,16 @@ use App\Models\PayPeriod;
 use App\Models\Punch;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 
-class PunchSummary extends Page
+class PunchSummary extends Page implements HasForms
 {
+    use InteractsWithForms;
     protected static bool $shouldRegisterNavigation = false;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
     protected string $view = 'filament.pages.punch-summary';
     protected static ?string $navigationLabel = 'Punch Summary';
 
@@ -34,13 +37,13 @@ class PunchSummary extends Page
             Select::make('payPeriodId')
                 ->label('Select Pay Period')
                 ->options($this->getPayPeriods()) // Options for the dropdown
-                ->reactive()
+                ->live()
                 ->afterStateUpdated(fn () => $this->updatePunches()) // Refresh data on selection
                 ->placeholder('All Pay Periods'),
             TextInput::make('search')
                 ->label('Search by Name or Payroll ID')
                 ->placeholder('Enter employee name or payroll ID')
-                ->reactive()
+                ->live()
                 ->afterStateUpdated(fn () => $this->updatePunches()), // Refresh punches on search
         ];
     }
