@@ -71,6 +71,11 @@ class AdminPanelProvider extends PanelProvider
                     ->url('/admin/attendance-summary')
                     ->icon('heroicon-o-document-text')
                     ->group('Punch & Attendance'),
+                NavigationItem::make('Attendance Summary (Claude)')
+                    ->url('/admin/c-attendance-summary')
+                    ->icon('heroicon-o-clock')
+                    ->group('Punch & Attendance')
+                    ->badge('New'),
                 NavigationItem::make('Punch Summary')
                     ->url('/admin/punch-summary')
                     ->icon('heroicon-o-finger-print')
