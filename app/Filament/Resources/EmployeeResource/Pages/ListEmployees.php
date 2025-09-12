@@ -83,7 +83,7 @@ class ListEmployees extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-on-square-stack'),
 
             Action::make('Export Employees')
                 ->label('Export')
@@ -101,7 +101,7 @@ class ListEmployees extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-on-square'),
         ];
     }
 }

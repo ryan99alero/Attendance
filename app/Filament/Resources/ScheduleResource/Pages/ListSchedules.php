@@ -29,7 +29,7 @@ class ListSchedules extends ListRecords
             Action::make('Import Schedules')
                 ->label('Import')
                 ->color('primary')
-                ->icon('heroicon-o-upload')
+                ->icon('heroicon-o-arrow-up-on-square')
                 ->form([
                     \Filament\Forms\Components\FileUpload::make('file')
                         ->label('Import File')
@@ -74,7 +74,7 @@ class ListSchedules extends ListRecords
             Action::make('Export Schedules')
                 ->label('Export')
                 ->color('warning')
-                ->icon('heroicon-o-download')
+                ->icon('heroicon-o-arrow-down-on-square')
                 ->action(function () {
                     return Excel::download(new DataExport(ShiftScheduleResource::getModel()), 'schedules.xlsx');
                 }),

@@ -76,7 +76,7 @@ class ListDepartments extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-on-square-stack'),
 
             Action::make('Export Departments')
                 ->label('Export')
@@ -86,7 +86,7 @@ class ListDepartments extends ListRecords
 
                     return Excel::download(new DataExport(DepartmentResource::getModel()), 'departments.xlsx');
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-on-square'),
         ];
     }
 }

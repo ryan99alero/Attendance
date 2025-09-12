@@ -69,7 +69,7 @@ class ListDevices extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-on-square-stack'),
 
             // Add an "Export" action button
             Action::make('Export Devices')
@@ -88,7 +88,7 @@ class ListDevices extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-on-square'),
         ];
     }
 }

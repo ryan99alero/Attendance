@@ -78,7 +78,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Devices')
                     ->url('/admin/devices')
-                    ->icon('heroicon-o-device-mobile')
+                    ->icon('heroicon-o-device-phone-mobile')
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Cards')
                     ->url('/admin/cards')
@@ -90,7 +90,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Punch & Attendance'),
                 NavigationItem::make('Punch Types') // Added Punch Types to Punch & Attendance
                 ->url('/admin/punch-types')
-                    ->icon('heroicon-o-collection')
+                    ->icon('heroicon-o-cloud')
                     ->group('Punch & Attendance'),
 
                 // Employee Management
@@ -104,7 +104,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Employee Management'),
                 NavigationItem::make('Departments')
                     ->url('/admin/departments')
-                    ->icon('heroicon-o-office-building')
+                    ->icon('heroicon-s-building-office')
                     ->group('Employee Management'),
                 NavigationItem::make('Vacation Balances')
                     ->url('/admin/vacation-balances')
@@ -136,15 +136,15 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Payroll Frequencies')
                     ->url('/admin/payroll-frequencies')
-                    ->icon('heroicon-o-cash')
+                    ->icon('heroicon-o-bell')
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Overtime Rules')
                     ->url('/admin/overtime-rules')
-                    ->icon('heroicon-o-document-report')
+                    ->icon('heroicon-o-document-text')
                     ->group('Payroll & Overtime'),
                 NavigationItem::make('Rounding Rules') // Moved to Payroll & Overtime
                 ->url('/admin/rounding-rules')
-                    ->icon('heroicon-o-adjustments')
+                    ->icon('heroicon-o-adjustments-horizontal')
                     ->group('Payroll & Overtime'),
 
                 // Reports & Stats

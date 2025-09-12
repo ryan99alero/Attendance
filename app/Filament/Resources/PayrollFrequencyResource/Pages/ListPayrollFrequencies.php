@@ -68,7 +68,7 @@ class ListPayrollFrequencies extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-upload'),
+                ->icon('heroicon-o-arrow-up-on-square-stack'),
 
             // Export Action
             Action::make('Export Payroll Frequencies')
@@ -87,7 +87,7 @@ class ListPayrollFrequencies extends ListRecords
                             ->send();
                     }
                 })
-                ->icon('heroicon-o-download'),
+                ->icon('heroicon-o-arrow-down-on-square'),
         ];
     }
 }

@@ -81,7 +81,7 @@ class PayPeriodResource extends Resource
                 Action::make('process_time')
                     ->label('Process Time')
                     ->color('primary')
-                    ->icon('heroicon-o-download')
+                    ->icon('heroicon-o-arrow-down-on-square')
                     ->action(function ($record) {
                         $processingService = app(AttendanceProcessingService::class);
 
