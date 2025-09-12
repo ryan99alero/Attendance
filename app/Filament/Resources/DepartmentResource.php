@@ -44,11 +44,24 @@ class DepartmentResource extends Resource
                     Log::info("TACO2: External Department ID updated to: {$state}");
                 }),
             Select::make('manager_id')
-                ->label('Manager') // Use a clear label
-                ->options(Employee::pluck('full_names', 'id')->toArray()) // Populate dropdown with managers
-                ->searchable(false) // Disable typing to search
-                ->placeholder('Select a Manager') // Provide a placeholder
-                ->required() // Mark as required if necessary
+                ->label('Manager')
+                ->options(function () {
+                    return Employee::orderBy('full_names')
+                        ->pluck('full_names', 'id')
+                        ->toArray();
+                })
+                ->searchable()
+                ->getSearchResultsUsing(function (string $search): array {
+                    return Employee::where('full_names', 'like', "%{$search}%")
+                        ->orWhere('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orderBy('full_names')
+                        ->limit(50)
+                        ->pluck('full_names', 'id')
+                        ->toArray();
+                })
+                ->placeholder('Select a Manager')
+                ->required()
                 ->afterStateUpdated(function ($state) {
                     Log::info("TACO2.5: Manager ID updated to: {$state}");
                 }),
