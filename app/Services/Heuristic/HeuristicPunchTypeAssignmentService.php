@@ -34,8 +34,8 @@ class HeuristicPunchTypeAssignmentService
                     continue;
                 }
 
-                $lunchStart = Carbon::parse($shiftSchedule->lunch_start);
-                $lunchStop = Carbon::parse($shiftSchedule->lunch_stop);
+                $lunchStart = Carbon::parse($shiftSchedule->lunch_start_time);
+                $lunchStop = Carbon::parse($shiftSchedule->lunch_stop_time);
 
                 // Assign Punch Types
                 $assignedTypes = $this->determinePunchTypes($sortedPunches, $lunchStart, $lunchStop);
@@ -77,7 +77,7 @@ class HeuristicPunchTypeAssignmentService
         $assignedTypes[0] = $this->getPunchTypeId('Clock In');
         $assignedTypes[$punchCount - 1] = $this->getPunchTypeId('Clock Out');
 
-        // Handle 6+ Punches (Breaks + Lunch) - Using improved logic from ShiftSchedule
+        // Handle 6+ Punches (Breaks + Lunch) - Using same logic as ShiftSchedule
         if ($punchCount >= 6) {
             $innerPunches = $punches->slice(1, -1);
 
@@ -85,15 +85,28 @@ class HeuristicPunchTypeAssignmentService
             $bestLunchPair = $this->findBestLunchPair($innerPunches, $lunchStart, $lunchStop);
 
             if ($bestLunchPair) {
-                Log::info("[Heuristic] Found best lunch pair - Start: {$bestLunchPair['startIndex']}, Stop: {$bestLunchPair['stopIndex']}");
-                $assignedTypes[$bestLunchPair['startIndex'] + 1] = $this->getPunchTypeId('Lunch Start');
-                $assignedTypes[$bestLunchPair['stopIndex'] + 1] = $this->getPunchTypeId('Lunch Stop');
+                Log::info("[Heuristic] Found best lunch pair - Start: {$bestLunchPair['start']->id}, Stop: {$bestLunchPair['stop']->id}");
 
-                // Assign remaining punches as breaks sequentially
-                $this->assignRemainingAsBreaks($innerPunches, $assignedTypes, $bestLunchPair);
+                // Find the indices of the lunch punches in the original array
+                $startIndex = $punches->search(function($punch) use ($bestLunchPair) {
+                    return $punch->id === $bestLunchPair['start']->id;
+                });
+                $stopIndex = $punches->search(function($punch) use ($bestLunchPair) {
+                    return $punch->id === $bestLunchPair['stop']->id;
+                });
+
+                $assignedTypes[$startIndex] = $this->getPunchTypeId('Lunch Start');
+                $assignedTypes[$stopIndex] = $this->getPunchTypeId('Lunch Stop');
+
+                // Remove lunch punches from the list and assign remaining as breaks
+                $remainingPunches = $innerPunches->reject(function ($punch) use ($bestLunchPair) {
+                    return $punch->id === $bestLunchPair['start']->id || $punch->id === $bestLunchPair['stop']->id;
+                })->values();
+
+                $this->assignBreakPunchTypes($remainingPunches, $assignedTypes, $punches);
             } else {
                 Log::info("[Heuristic] No optimal lunch pair found, assigning all middle punches as breaks");
-                $this->assignAllMiddleAsBreaks($innerPunches, $assignedTypes);
+                $this->assignBreakPunchTypes($innerPunches, $assignedTypes, $punches);
             }
         }
 
@@ -154,8 +167,8 @@ class HeuristicPunchTypeAssignmentService
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $bestPair = [
-                    'startIndex' => $i,
-                    'stopIndex' => $i + 1,
+                    'start' => $startPunch,
+                    'stop' => $stopPunch,
                     'score' => $score
                 ];
             }
@@ -196,49 +209,32 @@ class HeuristicPunchTypeAssignmentService
     }
 
     /**
-     * Assign remaining punches (after lunch assignment) as break pairs
+     * Assign break punch types similar to Shift Schedule approach
      */
-    private function assignRemainingAsBreaks($innerPunches, &$assignedTypes, $bestLunchPair): void
+    private function assignBreakPunchTypes($punches, &$assignedTypes, $originalPunches): void
     {
-        $lunchStartIndex = $bestLunchPair['startIndex'];
-        $lunchStopIndex = $bestLunchPair['stopIndex'];
+        Log::info("[Heuristic] Assigning {$punches->count()} punches as breaks");
 
-        // Collect unassigned punch indices
-        $unassignedIndices = [];
-        for ($i = 0; $i < $innerPunches->count(); $i++) {
-            if ($i !== $lunchStartIndex && $i !== $lunchStopIndex) {
-                $unassignedIndices[] = $i;
-            }
-        }
+        $punchCount = $punches->count();
 
-        // Assign breaks in pairs
-        for ($i = 0; $i < count($unassignedIndices); $i += 2) {
-            $startIndex = $unassignedIndices[$i];
-            $assignedTypes[$startIndex + 1] = $this->getPunchTypeId('Break Start');
-
-            if (isset($unassignedIndices[$i + 1])) {
-                $stopIndex = $unassignedIndices[$i + 1];
-                $assignedTypes[$stopIndex + 1] = $this->getPunchTypeId('Break Stop');
-                Log::info("[Heuristic] Assigned Break pair: {$startIndex} -> {$stopIndex}");
-            } else {
-                Log::warning("[Heuristic] Uneven break punches, leaving index {$startIndex} as Break Start only");
-            }
-        }
-    }
-
-    /**
-     * When no lunch pair is found, assign all middle punches as breaks
-     */
-    private function assignAllMiddleAsBreaks($innerPunches, &$assignedTypes): void
-    {
-        $punchCount = $innerPunches->count();
-
+        // Assign remaining punches as Break Start/Break Stop pairs chronologically
         for ($i = 0; $i < $punchCount; $i += 2) {
-            $assignedTypes[$i + 1] = $this->getPunchTypeId('Break Start');
+            if ($i >= $punchCount) break;
+
+            $startPunch = $punches->get($i);
+            $startIndex = $originalPunches->search(function($punch) use ($startPunch) {
+                return $punch->id === $startPunch->id;
+            });
+            $assignedTypes[$startIndex] = $this->getPunchTypeId('Break Start');
+            Log::info("[Heuristic] Assigned Break Start to Punch ID: {$startPunch->id}");
 
             if ($i + 1 < $punchCount) {
-                $assignedTypes[$i + 2] = $this->getPunchTypeId('Break Stop');
-                Log::info("[Heuristic] Assigned Break pair: {$i} -> " . ($i + 1));
+                $endPunch = $punches->get($i + 1);
+                $endIndex = $originalPunches->search(function($punch) use ($endPunch) {
+                    return $punch->id === $endPunch->id;
+                });
+                $assignedTypes[$endIndex] = $this->getPunchTypeId('Break Stop');
+                Log::info("[Heuristic] Assigned Break Stop to Punch ID: {$endPunch->id}");
             }
         }
     }
