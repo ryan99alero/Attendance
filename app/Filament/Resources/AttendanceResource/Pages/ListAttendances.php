@@ -6,7 +6,6 @@ use App\Filament\Resources\AttendanceResource;
 use App\Models\Attendance;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
-use App\Services\ExcelErrorImportService;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Notifications\Notification;
@@ -43,7 +42,7 @@ class ListAttendances extends ListRecords
 
                     Log::info("Resolved file path for import: {$filePath}");
 
-                    $importService = new ExcelErrorImportService(Attendance::class);
+                    $importService = new DataImport(Attendance::class);
 
                     try {
                         Excel::import($importService, $filePath);

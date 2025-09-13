@@ -65,11 +65,7 @@ class ShiftScheduleResource extends Resource
                 ->label('Shift')
                 ->relationship('shift', 'shift_name')
                 ->nullable(),
-            Forms\Components\Select::make('employee_id')
-                ->label('Employee')
-                ->relationship('employee', 'full_names')
-                ->searchable()
-                ->nullable(),
+            // employee_id removed - employees now reference shift_schedule_id instead
 
             // Miscellaneous
             Forms\Components\Textarea::make('notes')

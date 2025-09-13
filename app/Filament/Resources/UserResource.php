@@ -39,7 +39,7 @@ class UserResource extends Resource
                 ->required()
                 ->email()
                 ->maxLength(255)
-                ->unique(ignorable: fn ($record) => $record),
+                ->unique(User::class, 'email', ignoreRecord: true),
             TextInput::make('password')
                 ->label('Password')
                 ->password()
@@ -53,12 +53,21 @@ class UserResource extends Resource
                 ->label('Employee')
                 ->nullable()
                 ->options(function (?User $record) {
-                    return Employee::whereDoesntHave('user')
+                    $employees = Employee::whereDoesntHave('user')
                         ->orWhereHas('user', fn ($query) => $query->where('id', $record?->id))
                         ->get()
-                        ->pluck('full_names', 'id');
+                        ->pluck('full_names', 'id')
+                        ->toArray();
+                    return $employees;
                 })
                 ->searchable()
+                ->getSearchResultsUsing(function (string $search): array {
+                    return Employee::whereDoesntHave('user')
+                        ->where('full_names', 'like', "%{$search}%")
+                        ->limit(50)
+                        ->pluck('full_names', 'id')
+                        ->toArray();
+                })
                 ->placeholder('Select an Employee'),
             Toggle::make('is_admin')
                 ->label('Admin')

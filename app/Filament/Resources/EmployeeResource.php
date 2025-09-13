@@ -63,11 +63,18 @@ class EmployeeResource extends Resource
                 ->options(Department::all()->pluck('name', 'id'))
                 ->nullable()
                 ->searchable(),
-            Select::make('shift_id')
-                ->label('Shift')
-                ->options(Shift::all()->pluck('shift_name', 'id')) // Dropdown for shifts
-                ->nullable()
-                ->searchable(),
+            Select::make('shift_schedule_id')
+                ->label('Shift Schedule')
+                ->options(\App\Models\ShiftSchedule::with(['shift', 'department'])
+                    ->get()
+                    ->mapWithKeys(function ($schedule) {
+                        $shiftName = $schedule->shift ? $schedule->shift->shift_name : 'No Shift';
+                        $deptName = $schedule->department ? $schedule->department->name : 'No Dept';
+                        return [$schedule->id => "{$schedule->schedule_name} ({$shiftName} - {$deptName})"];
+                    })
+                    ->toArray())
+                ->searchable()
+                ->nullable(),
             Select::make('payroll_frequency_id')
                 ->label('Payroll Frequency')
                 ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
@@ -106,8 +113,11 @@ class EmployeeResource extends Resource
                 TextColumn::make('department.name')
                     ->label('Department')
                     ->sortable(),
-                TextColumn::make('shift.shift_name') // Ensure the relationship is defined in the Employee model
-                ->label('Shift')
+                TextColumn::make('shiftSchedule.schedule_name')
+                    ->label('Schedule')
+                    ->sortable(),
+                TextColumn::make('shift.shift_name') // Through relationship
+                    ->label('Shift')
                     ->sortable(),
                 TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')

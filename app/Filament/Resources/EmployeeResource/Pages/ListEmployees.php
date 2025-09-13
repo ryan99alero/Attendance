@@ -5,10 +5,12 @@ namespace App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Resources\EmployeeResource;
 use App\Models\Employee;
 use App\Models\Department;
-use App\Services\ExcelErrorImportService;
+use App\Imports\DataImport;
 use App\Exports\DataExport;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Tables\Filters\Filter;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Notifications\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +44,7 @@ class ListEmployees extends ListRecords
                     Log::info("Resolved file path for import: {$filePath}");
 
                     // Initialize the import service
-                    $importService = new ExcelErrorImportService(Employee::class, function (array $row) {
+                    $importService = new DataImport(Employee::class, function (array $row) {
                         // Department lookup logic
                         if (isset($row['external_department_id'])) {
                             $externalDepartmentId = str_pad((string) $row['external_department_id'], 3, '0', STR_PAD_LEFT);
@@ -103,6 +105,25 @@ class ListEmployees extends ListRecords
                     }
                 })
                 ->icon('heroicon-o-arrow-down-on-square'),
+
+            Action::make('toggle_active')
+                ->label(fn() => $this->tableFilters['hide_inactive']['isActive'] ?? true ? 'Show All' : 'Hide Inactive')
+                ->color('gray')
+                ->icon(fn() => $this->tableFilters['hide_inactive']['isActive'] ?? true ? 'heroicon-o-eye' : 'heroicon-o-eye-slash')
+                ->action(function () {
+                    $this->tableFilters['hide_inactive']['isActive'] = !($this->tableFilters['hide_inactive']['isActive'] ?? true);
+                }),
         ];
+    }
+
+    public function getTableQuery(): Builder
+    {
+        $query = parent::getTableQuery();
+        
+        if ($this->tableFilters['hide_inactive']['isActive'] ?? true) {
+            $query->where('is_active', true);
+        }
+        
+        return $query;
     }
 }

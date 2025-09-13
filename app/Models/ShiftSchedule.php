@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  *
@@ -63,7 +64,6 @@ class ShiftSchedule extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'employee_id',
         'department_id',
         'schedule_name',
         'lunch_start_time',
@@ -85,7 +85,7 @@ class ShiftSchedule extends Model
      *
      * @var array<string>
      */
-    protected $with = ['employee', 'department', 'shift'];
+    protected $with = ['department', 'shift'];
 
     /**
      * Attributes that should be cast.
@@ -102,11 +102,11 @@ class ShiftSchedule extends Model
     ];
 
     /**
-     * Relationship: Employee.
+     * Relationship: Employees using this schedule.
      */
-    public function employee(): BelongsTo
+    public function employees(): HasMany
     {
-        return $this->belongsTo(Employee::class, 'employee_id', 'id');
+        return $this->hasMany(Employee::class, 'shift_schedule_id', 'id');
     }
 
     /**
@@ -152,6 +152,14 @@ class ShiftSchedule extends Model
         static::updating(function ($model) {
             if (auth()->check()) {
                 $model->updated_by = auth()->id();
+            }
+        });
+
+        // Sync employee shift_id when ShiftSchedule is updated
+        static::updated(function ($shiftSchedule) {
+            if ($shiftSchedule->isDirty('shift_id')) {
+                Employee::where('shift_schedule_id', $shiftSchedule->id)
+                    ->update(['shift_id' => $shiftSchedule->shift_id]);
             }
         });
     }

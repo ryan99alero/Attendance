@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 /**
  * Employee model
@@ -129,9 +130,17 @@ class Employee extends Model
         return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
     }
 
-    public function schedule(): HasOne
+    public function shiftSchedule(): BelongsTo
     {
-        return $this->hasOne(ShiftSchedule::class, 'employee_id');
+        return $this->belongsTo(ShiftSchedule::class, 'shift_schedule_id');
+    }
+    
+    /**
+     * Get the shift through the shift schedule (source of truth)
+     */
+    public function shift(): HasOneThrough
+    {
+        return $this->hasOneThrough(Shift::class, ShiftSchedule::class, 'id', 'id', 'shift_schedule_id', 'shift_id');
     }
 
     public function user(): HasOne

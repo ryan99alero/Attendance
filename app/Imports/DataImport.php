@@ -9,22 +9,28 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
 class DataImport implements ToCollection, WithHeadingRow
 {
     protected string $modelClass;
+    protected array $failedRecords = [];
+    protected $rowProcessor = null;
 
     /**
      * Constructor to initialize the model class.
      *
      * @param string $modelClass
+     * @param callable|null $rowProcessor Optional custom row processing function
      */
-    public function __construct(string $modelClass)
+    public function __construct(string $modelClass, $rowProcessor = null)
     {
         $this->modelClass = $modelClass;
+        $this->rowProcessor = $rowProcessor;
         Log::info("DataImport initialized with model: {$modelClass}");
     }
 
@@ -58,6 +64,9 @@ class DataImport implements ToCollection, WithHeadingRow
             try {
                 // Standardize time fields for different models
                 $this->standardizeTimeFields($row);
+                
+                // Standardize datetime fields (created_at, updated_at)
+                $this->standardizeDateTimeFields($row);
 
                 // Default the is_manual field to true if it is empty
                 if (!isset($row['is_manual']) || $row['is_manual'] === '') {
@@ -65,49 +74,42 @@ class DataImport implements ToCollection, WithHeadingRow
                     Log::info("Defaulted is_manual to true for row {$index}");
                 }
 
+                // Convert to array for processing
+                $data = $row->toArray();
+
+                // Apply custom row processor if provided
+                if ($this->rowProcessor) {
+                    $data = call_user_func($this->rowProcessor, $data);
+                }
+
+                // Handle external_department_id mapping (only if it exists)
+                if (isset($data['external_department_id']) && !empty($data['external_department_id'])) {
+                    $externalDepartmentId = str_pad((string)$data['external_department_id'], 3, '0', STR_PAD_LEFT);
+                    $mappedDepartment = Department::where('external_department_id', $externalDepartmentId)->first();
+                    if ($mappedDepartment) {
+                        $data['department_id'] = $mappedDepartment->id;
+                        Log::info("Row {$index} - Mapped external_department_id {$externalDepartmentId} to department_id: {$mappedDepartment->id}");
+                    } else {
+                        Log::warning("Row {$index} - No department found for external_department_id: {$externalDepartmentId}");
+                        $data['department_id'] = null;
+                    }
+                }
+
                 // Filter data to include only fillable fields
-                $data = array_intersect_key($row->toArray(), array_flip((new $this->modelClass())->getFillable()));
+                $filteredData = array_intersect_key($data, array_flip((new $this->modelClass())->getFillable()));
                 
                 // Always preserve ID for imports, even if it's not fillable
-                if (isset($row['id']) && !empty($row['id'])) {
-                    $data['id'] = $row['id'];
-                    Log::info("Row {$index} - Added ID back to filtered data: {$row['id']}");
+                if (isset($data['id']) && !empty($data['id'])) {
+                    $filteredData['id'] = $data['id'];
+                    Log::info("Row {$index} - Added ID back to filtered data: {$data['id']}");
                 }
                 
-                Log::info("Row {$index} - Filtered data (fillable fields only): ", $data);
+                // Apply datetime standardization to the filtered data
+                $this->standardizeDateTimeFieldsForData($filteredData, $index);
 
-                // Handle external_department_id mapping to department_id
-                if (isset($row['external_department_id'])) {
-                    $mappedDepartment = Department::where('external_department_id', $row['external_department_id'])->first();
-                    $data['department_id'] = $mappedDepartment->id ?? null;
-                    if ($mappedDepartment) {
-                        Log::info("Row {$index} - Mapped external_department_id {$row['external_department_id']} to department_id: {$mappedDepartment->id}");
-                    } else {
-                        Log::warning("Row {$index} - No department found for external_department_id: {$row['external_department_id']}");
-                    }
-                }
-
-                // Conditionally apply Employee-specific logic
-                if ($this->modelClass === Employee::class) {
-                    // Lookup and map employee_external_id to employee_id
-                    if (isset($data['employee_external_id'])) {
-                        $mappedEmployee = Employee::where('external_id', $data['employee_external_id'])->first();
-
-                        if ($mappedEmployee) {
-                            $data['employee_id'] = $mappedEmployee->id;
-                            $data['employee_name'] = $mappedEmployee->full_name;
-                            $data['department_name'] = optional($mappedEmployee->department)->name;
-                        } else {
-                            throw new \Exception("No employee found for external_id {$data['employee_external_id']}.");
-                        }
-                    }
-                }
-
-                // Validate the data if rules exist
-                $model = new $this->modelClass();
-                $validatedData = method_exists($model, 'rules')
-                    ? Validator::make($data, $model->rules())->validate()
-                    : $data;
+                // Validate the data using dynamic validation rules
+                $validationRules = $this->generateValidationRules();
+                $validatedData = Validator::make($filteredData, $validationRules)->validate();
 
                 // Log final validated data
                 Log::info("Row {$index} - Final data being saved to {$this->modelClass}: ", $validatedData);
@@ -115,14 +117,22 @@ class DataImport implements ToCollection, WithHeadingRow
                 // Create or update the model with improved matching logic
                 $uniqueKey = $this->determineUniqueKey($validatedData);
                 Log::info("Row {$index} - Using unique key: ", $uniqueKey);
-                Log::info("Row {$index} - Attempting updateOrCreate with data: ", $validatedData);
                 
-                $result = $model::updateOrCreate($uniqueKey, $validatedData);
+                $result = (new $this->modelClass())::updateOrCreate($uniqueKey, $validatedData);
                 Log::info("Row {$index} - UpdateOrCreate result ID: {$result->id}, was recently created: " . ($result->wasRecentlyCreated ? 'yes' : 'no'));
 
-                Log::info("Successfully imported/updated row {$index}: ", $data);
+                Log::info("Successfully imported/updated row {$index}");
             } catch (\Exception $e) {
-                Log::error("Failed to import row {$index}: " . json_encode($row->toArray()) . " Error: " . $e->getMessage());
+                $rowNumber = $index + 1;
+                
+                // Add the error to failed records for export
+                $this->failedRecords[] = array_merge($row->toArray(), [
+                    'Row' => $rowNumber,
+                    'Error' => $e->getMessage(),
+                ]);
+
+                Log::error("Failed to import row {$rowNumber}: " . $e->getMessage());
+                Log::debug("Row data: " . json_encode($row->toArray()));
             }
         }
 
@@ -151,6 +161,9 @@ class DataImport implements ToCollection, WithHeadingRow
         $formats = [
             'Y-m-d H:i:s', 'Y-m-d H:i', 'm/d/Y g:i A', 'm/d/Y H:i:s', 'm/d/Y',
             'Y-m-d', 'Y/m/d H:i:s', 'Y/m/d H:i', 'd-m-Y H:i:s', 'd-m-Y H:i',
+            'Y-m-d\TH:i:s.u\Z', // ISO 8601 with microseconds and Z timezone (2024-12-31T19:46:24.000000Z)
+            'Y-m-d\TH:i:s\Z',   // ISO 8601 without microseconds (2024-12-31T19:46:24Z)
+            'Y-m-d\TH:i:s',     // ISO 8601 basic format (2024-12-31T19:46:24)
         ];
 
         foreach ($formats as $format) {
@@ -160,6 +173,14 @@ class DataImport implements ToCollection, WithHeadingRow
             } catch (\Exception $e) {
                 // Continue to next format
             }
+        }
+
+        // Try Carbon's built-in parsing for ISO 8601 and other formats
+        try {
+            $date = Carbon::parse($value);
+            return $date->format('Y-m-d H:i:s'); // Standardize format
+        } catch (\Exception $e) {
+            // Final fallback for common patterns
         }
 
         throw new \Exception("Invalid date format: {$value}");
@@ -217,6 +238,68 @@ class DataImport implements ToCollection, WithHeadingRow
 
         // Handle other time fields for different models as needed
         // Add more model-specific time field handling here
+    }
+
+    /**
+     * Standardize datetime fields like created_at, updated_at.
+     *
+     * @param Collection $row
+     * @return void
+     */
+    private function standardizeDateTimeFields(Collection $row): void
+    {
+        $dateTimeFields = ['created_at', 'updated_at', 'termination_date'];
+        
+        foreach ($dateTimeFields as $field) {
+            if (isset($row[$field]) && !empty($row[$field])) {
+                try {
+                    $row[$field] = $this->parseDateTime($row[$field]);
+                    Log::info("Standardized {$field}: {$row[$field]}");
+                } catch (\Exception $e) {
+                    Log::error("Failed to parse {$field} '{$row[$field]}': " . $e->getMessage());
+                    // For optional fields like termination_date, we can skip
+                    if ($field === 'termination_date') {
+                        unset($row[$field]);
+                    } else {
+                        // For required fields like created_at/updated_at, use current time
+                        $row[$field] = now()->format('Y-m-d H:i:s');
+                        Log::info("Using current time for {$field}: {$row[$field]}");
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Standardize datetime fields in array format (for validation).
+     *
+     * @param array $data
+     * @param int $index
+     * @return void
+     */
+    private function standardizeDateTimeFieldsForData(array &$data, int $index): void
+    {
+        $dateTimeFields = ['created_at', 'updated_at', 'termination_date'];
+        
+        foreach ($dateTimeFields as $field) {
+            if (isset($data[$field]) && !empty($data[$field])) {
+                try {
+                    $originalValue = $data[$field];
+                    $data[$field] = $this->parseDateTime($data[$field]);
+                    Log::info("Row {$index} - Standardized {$field}: '{$originalValue}' -> '{$data[$field]}'");
+                } catch (\Exception $e) {
+                    Log::error("Row {$index} - Failed to parse {$field} '{$data[$field]}': " . $e->getMessage());
+                    // For optional fields like termination_date, we can skip
+                    if ($field === 'termination_date') {
+                        unset($data[$field]);
+                    } else {
+                        // For required fields like created_at/updated_at, use current time
+                        $data[$field] = now()->format('Y-m-d H:i:s');
+                        Log::info("Row {$index} - Using current time for {$field}: {$data[$field]}");
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -367,5 +450,76 @@ class DataImport implements ToCollection, WithHeadingRow
         // Fallback: create new record (no matching criteria found)
         Log::warning("No unique key found for {$this->modelClass}, will create new record");
         return ['id' => null];
+    }
+
+    /**
+     * Generate validation rules dynamically based on database schema.
+     *
+     * @return array
+     */
+    protected function generateValidationRules(): array
+    {
+        $table = (new $this->modelClass())->getTable();
+        $columns = DB::getSchemaBuilder()->getColumnListing($table);
+        $rules = [];
+
+        foreach ($columns as $column) {
+            $type = DB::getSchemaBuilder()->getColumnType($table, $column);
+            $rules[$column] = match ($type) {
+                'string', 'text' => 'nullable|string',
+                'integer', 'bigint', 'smallint' => 'nullable|integer',
+                'decimal', 'float' => 'nullable|numeric',
+                'boolean' => 'nullable|boolean',
+                'date' => 'nullable|date',
+                'datetime', 'timestamp' => 'nullable|date_format:Y-m-d H:i:s',
+                default => 'nullable',
+            };
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Get the failed records with errors.
+     *
+     * @return array
+     */
+    public function getFailedRecords(): array
+    {
+        return $this->failedRecords;
+    }
+
+    /**
+     * Export failed records as an Excel file.
+     *
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportFailedRecords(): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $tableName = (new $this->modelClass())->getTable();
+        $fileName = "{$tableName}_import_errors.xlsx";
+
+        return Excel::download(new class($this->failedRecords) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
+            private $data;
+
+            public function __construct(array $data)
+            {
+                $this->data = $data;
+            }
+
+            public function collection(): Collection
+            {
+                return collect($this->data);
+            }
+
+            public function headings(): array
+            {
+                if (empty($this->data)) {
+                    return [];
+                }
+
+                return array_keys($this->data[0]);
+            }
+        }, $fileName);
     }
 }

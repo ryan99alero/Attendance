@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\PayPeriod;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
@@ -31,18 +32,37 @@ class AttendanceResource extends Resource
     {
         return $form->schema([
             Select::make('employee_id')
-                ->relationship('employee', 'first_name')
                 ->label('Employee')
-                ->getOptionLabelUsing(fn ($value) => Employee::find($value)?->first_name ?? 'Unknown Employee')
+                ->options(Employee::orderBy('last_name')->orderBy('first_name')
+                    ->get()
+                    ->mapWithKeys(fn($employee) => [$employee->id => "{$employee->last_name}, {$employee->first_name}"])
+                    ->toArray())
                 ->placeholder('Select an Employee')
                 ->searchable()
+                ->reactive()
+                ->afterStateUpdated(function ($state, callable $set) {
+                    if ($state) {
+                        $employee = Employee::find($state);
+                        if ($employee) {
+                            $set('employee_external_id', $employee->external_id);
+                        }
+                    }
+                })
                 ->required(),
 
-            Select::make('employee_external_id')
+            TextInput::make('employee_external_id')
                 ->label('Employee External ID')
-                ->options(Employee::pluck('external_id', 'external_id'))
-                ->nullable()
-                ->searchable(),
+                ->placeholder('Enter External ID')
+                ->reactive()
+                ->afterStateUpdated(function ($state, callable $set) {
+                    if ($state) {
+                        $employee = Employee::where('external_id', $state)->first();
+                        if ($employee) {
+                            $set('employee_id', $employee->id);
+                        }
+                    }
+                })
+                ->nullable(),
 
             Select::make('device_id')
                 ->relationship('device', 'device_name')
