@@ -64,7 +64,6 @@ class ShiftSchedule extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'department_id',
         'schedule_name',
         'lunch_start_time',
         'lunch_stop_time',
@@ -85,7 +84,7 @@ class ShiftSchedule extends Model
      *
      * @var array<string>
      */
-    protected $with = ['department', 'shift'];
+    protected $with = ['shift'];
 
     /**
      * Attributes that should be cast.
@@ -109,13 +108,6 @@ class ShiftSchedule extends Model
         return $this->hasMany(Employee::class, 'shift_schedule_id', 'id');
     }
 
-    /**
-     * Relationship: Department.
-     */
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class, 'department_id', 'id');
-    }
 
     /**
      * Relationship: Shift.

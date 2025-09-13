@@ -66,10 +66,11 @@ class AttendanceSummary extends Page
                 ->afterStateUpdated(fn () => $this->updateAttendances()),
 
             Forms\Components\Select::make('duplicatesFilter')
-                ->label('Filter by Duplicates')
+                ->label('Filter by Issues')
                 ->options([
                     'all' => 'All',
                     'duplicates_only' => 'Duplicates Only',
+                    'flexibility_issues' => 'Flexibility Issues (2+ Unclassified)',
                 ])
                 ->default('all')
                 ->reactive()
@@ -218,6 +219,10 @@ class AttendanceSummary extends Page
                 $punchesSorted[$type][] = $entry;
             }
 
+            // Check for flexibility issues (multiple unclassified punches indicating timing problems)
+            $unclassifiedCount = count($punchesSorted['unclassified']);
+            $hasFlexibilityIssue = $unclassifiedCount >= 2;
+            
             return [
                 'employee' => [
                     'employee_id' => $punchesPerDay->first()->employee_id,
@@ -225,10 +230,18 @@ class AttendanceSummary extends Page
                     'PayrollID' => $punchesPerDay->first()->PayrollID,
                     'shift_date' => $punchesPerDay->first()->shift_date,
                     'status' => $punchesPerDay->first()->status,
+                    'has_flexibility_issue' => $hasFlexibilityIssue,
                 ],
                 'punches' => $punchesSorted,
             ];
         });
+
+        // Apply flexibility issues filter
+        if ($this->duplicatesFilter === 'flexibility_issues') {
+            $grouped = $grouped->filter(function ($item) {
+                return $item['employee']['has_flexibility_issue'] ?? false;
+            });
+        }
 
         return $grouped->values();
     }

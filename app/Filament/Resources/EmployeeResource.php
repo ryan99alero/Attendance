@@ -65,12 +65,11 @@ class EmployeeResource extends Resource
                 ->searchable(),
             Select::make('shift_schedule_id')
                 ->label('Shift Schedule')
-                ->options(\App\Models\ShiftSchedule::with(['shift', 'department'])
+                ->options(\App\Models\ShiftSchedule::with(['shift'])
                     ->get()
                     ->mapWithKeys(function ($schedule) {
                         $shiftName = $schedule->shift ? $schedule->shift->shift_name : 'No Shift';
-                        $deptName = $schedule->department ? $schedule->department->name : 'No Dept';
-                        return [$schedule->id => "{$schedule->schedule_name} ({$shiftName} - {$deptName})"];
+                        return [$schedule->id => "{$schedule->schedule_name} ({$shiftName})"];
                     })
                     ->toArray())
                 ->searchable()

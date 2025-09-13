@@ -56,11 +56,6 @@ class ShiftScheduleResource extends Resource
                 ->default(0),
 
             // Relational Fields
-            Forms\Components\Select::make('department_id')
-                ->label('Department')
-                ->relationship('department', 'name')
-                ->searchable()
-                ->nullable(),
             Forms\Components\Select::make('shift_id')
                 ->label('Shift')
                 ->relationship('shift', 'shift_name')
@@ -82,27 +77,31 @@ class ShiftScheduleResource extends Resource
         return $table->columns([
             Tables\Columns\TextColumn::make('schedule_name')
                 ->label('Name')
-                ->searchable(),
+                ->searchable()
+                ->sortable(),
             Tables\Columns\TextColumn::make('start_time')
                 ->label('Start Time')
-                ->dateTime('H:i'),
+                ->dateTime('H:i')
+                ->sortable(),
             Tables\Columns\TextColumn::make('lunch_start_time')
                 ->label('Lunch Start Time')
                 ->dateTime('H:i')
-                ->placeholder('N/A'),
+                ->placeholder('N/A')
+                ->sortable(),
             Tables\Columns\TextColumn::make('lunch_stop_time')
                 ->label('Lunch Stop Time')
                 ->dateTime('H:i')
-                ->placeholder('N/A'),
+                ->placeholder('N/A')
+                ->sortable(),
             Tables\Columns\TextColumn::make('end_time')
                 ->label('End Time')
-                ->dateTime('H:i'),
+                ->dateTime('H:i')
+                ->sortable(),
             Tables\Columns\TextColumn::make('daily_hours')
-                ->label('Hours'),
+                ->label('Hours')
+                ->sortable(),
             Tables\Columns\TextColumn::make('grace_period')
-                ->label('Grace Period (Minutes)'),
-            Tables\Columns\TextColumn::make('department.name')
-                ->label('Department')
+                ->label('Grace Period (Minutes)')
                 ->sortable(),
             Tables\Columns\TextColumn::make('shift.shift_name')
                 ->label('Shift')
@@ -111,7 +110,8 @@ class ShiftScheduleResource extends Resource
                 ->label('Employees')
                 ->getStateUsing(fn ($record) => $record->employees ? $record->employees->pluck('full_names')->join(', ') : 'N/A'),
             Tables\Columns\IconColumn::make('is_active')
-                ->label('Active'),
+                ->label('Active')
+                ->sortable(),
         ])
             ->filters([
                 Tables\Filters\Filter::make('is_active')

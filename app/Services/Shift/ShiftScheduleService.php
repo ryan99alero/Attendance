@@ -39,12 +39,7 @@ class ShiftScheduleService
             }
         }
 
-        // Step 2: Fallback to department-level shift schedule
-        $departmentSchedule = ShiftSchedule::where('department_id', $employee->department_id)->first();
-        if ($departmentSchedule) {
-            Log::info("[Shift] Using department-level shift schedule for Employee ID: {$employeeId}, Department ID: {$employee->department_id}");
-            return $departmentSchedule;
-        }
+        // Step 2: No department-level fallback anymore since shifts are independent
 
         Log::warning("[Shift] No shift schedule found for Employee ID: {$employeeId}");
         return null;

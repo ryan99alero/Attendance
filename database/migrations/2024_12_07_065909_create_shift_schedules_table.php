@@ -27,14 +27,12 @@ return new class extends Migration
 
             // Foreign key columns
             $table->unsignedBigInteger('employee_id')->nullable()->comment('Foreign key referencing the employees table');
-            $table->unsignedBigInteger('department_id')->nullable()->comment('Foreign key referencing the departments table');
             $table->unsignedBigInteger('shift_id')->nullable()->comment('Foreign key referencing the shifts table');
             $table->unsignedBigInteger('created_by')->nullable()->comment('Foreign key referencing the user who created the record');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('Foreign key referencing the user who last updated the record');
 
             // Foreign key constraints
             $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade')->comment('References the employees table');
-            $table->foreign('department_id')->references('id')->on('departments')->onDelete('cascade')->comment('References the departments table');
             $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('set null')->comment('References the shifts table');
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null')->comment('References the users table for the record creator');
             $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null')->comment('References the users table for the last updater');

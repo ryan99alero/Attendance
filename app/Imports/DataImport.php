@@ -157,8 +157,49 @@ class DataImport implements ToCollection, WithHeadingRow
             }
         }
 
-        // Define acceptable formats
+        // Pre-process common 2-digit year patterns to avoid misinterpretation
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?$/i', $value, $matches)) {
+            $month = (int)$matches[1];
+            $day = (int)$matches[2];
+            $year = (int)$matches[3];
+            $hour = (int)$matches[4];
+            $minute = (int)$matches[5];
+            $second = isset($matches[6]) ? (int)$matches[6] : 0;
+            $ampm = isset($matches[7]) ? strtoupper($matches[7]) : '';
+            
+            // Convert 2-digit year to 4-digit (assume 2000s)
+            if ($year < 50) {
+                $year += 2000; // 00-49 becomes 2000-2049
+            } elseif ($year < 100) {
+                $year += 1900; // 50-99 becomes 1950-1999 (unlikely for attendance data)
+            }
+            
+            // Handle AM/PM conversion
+            if ($ampm === 'PM' && $hour !== 12) {
+                $hour += 12;
+            } elseif ($ampm === 'AM' && $hour === 12) {
+                $hour = 0;
+            }
+            
+            // Create standardized datetime
+            return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
+        }
+
+        // Define acceptable formats (prioritize 2-digit year formats first)
         $formats = [
+            // 2-digit year formats (these should be tried first)
+            'n/j/y G:i',        // 9/8/25 5:58 (single digit month/day, 2-digit year, 24-hour)
+            'n/j/y g:i A',      // 9/8/25 5:58 AM (single digit month/day, 2-digit year, 12-hour)
+            'm/d/y H:i:s',      // 09/08/25 05:58:00
+            'm/d/y H:i',        // 09/08/25 05:58
+            'm/d/y g:i A',      // 09/08/25 5:58 AM
+            'm/d/y',            // 09/08/25
+            'd/m/y H:i:s',      // 08/09/25 05:58:00 (day/month/year)
+            'd/m/y H:i',        // 08/09/25 05:58
+            'y-m-d H:i:s',      // 25-09-08 05:58:00
+            'y-m-d H:i',        // 25-09-08 05:58
+            
+            // 4-digit year formats
             'Y-m-d H:i:s', 'Y-m-d H:i', 'm/d/Y g:i A', 'm/d/Y H:i:s', 'm/d/Y',
             'Y-m-d', 'Y/m/d H:i:s', 'Y/m/d H:i', 'd-m-Y H:i:s', 'd-m-Y H:i',
             'Y-m-d\TH:i:s.u\Z', // ISO 8601 with microseconds and Z timezone (2024-12-31T19:46:24.000000Z)

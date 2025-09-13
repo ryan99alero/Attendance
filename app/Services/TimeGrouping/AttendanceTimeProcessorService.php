@@ -8,6 +8,7 @@ use App\Models\CompanySetup;
 use App\Services\Shift\ShiftSchedulePunchTypeAssignmentService;
 use App\Services\Heuristic\HeuristicPunchTypeAssignmentService;
 use App\Services\ML\MLPunchTypePredictorService;
+use App\Services\TimeGrouping\AttendanceTimeGroupService;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
@@ -16,15 +17,18 @@ class AttendanceTimeProcessorService
     protected ShiftSchedulePunchTypeAssignmentService $shiftScheduleService;
     protected HeuristicPunchTypeAssignmentService $heuristicService;
     protected MLPunchTypePredictorService $mlService;
+    protected AttendanceTimeGroupService $attendanceTimeGroupService;
 
     public function __construct(
         ShiftSchedulePunchTypeAssignmentService $shiftScheduleService,
         HeuristicPunchTypeAssignmentService $heuristicService,
-        MLPunchTypePredictorService $mlService
+        MLPunchTypePredictorService $mlService,
+        AttendanceTimeGroupService $attendanceTimeGroupService
     ) {
         $this->shiftScheduleService = $shiftScheduleService;
         $this->heuristicService = $heuristicService;
         $this->mlService = $mlService;
+        $this->attendanceTimeGroupService = $attendanceTimeGroupService;
         Log::info("[Processor] Initialized AttendanceTimeProcessorService.");
     }
 
@@ -42,7 +46,7 @@ class AttendanceTimeProcessorService
         $flexibility = $companySetup->attendance_flexibility_minutes ?? 30;
 
         $attendances = Attendance::whereBetween('punch_time', [$startDate, $endDate])
-            ->where('status', 'Incomplete')
+            ->whereIn('status', ['Incomplete', 'NeedsReview'])
             ->orderBy('employee_id')
             ->orderBy('punch_time')
             ->get()
@@ -52,6 +56,15 @@ class AttendanceTimeProcessorService
 
         foreach ($attendances as $employeeId => $punches) {
             Log::info("[Processor] Processing Employee ID: {$employeeId} with {$punches->count()} punch(es).");
+
+            // ✅ First: Assign shift_date to all punches before processing
+            foreach ($punches as $punch) {
+                if (empty($punch->shift_date)) {
+                    $this->attendanceTimeGroupService->getOrCreateShiftDate($punch, auth()->id() ?? 0);
+                    $punch->save(); // Save the updated shift_date
+                    Log::info("[Processor] Assigned shift_date {$punch->shift_date} to Punch ID: {$punch->id}");
+                }
+            }
 
             $punchEvaluations = []; // ✅ Initialize array to collect punch evaluation results
 

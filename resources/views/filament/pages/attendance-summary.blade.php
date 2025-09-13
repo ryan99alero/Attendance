@@ -46,6 +46,9 @@
                             </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 {{ $attendance['employee']['FullName'] }}
+                                @if ($attendance['employee']['has_flexibility_issue'] ?? false)
+                                    <span class="ml-2 text-yellow-500" title="Employee has 2+ unclassified punches - may need different shift schedule">⚠️</span>
+                                @endif
                             </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 {{ $attendance['employee']['shift_date'] }}

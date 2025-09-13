@@ -83,7 +83,7 @@ class PayPeriod extends Model
     {
         return Attendance::query()
             ->whereBetween('punch_time', [$this->start_date, $this->end_date])
-            ->where('is_migrated', false); // Only include records where is_migrated is false
+            ->whereIn('status', ['NeedsReview']); // Count records that need attention
     }
 
     // Custom Methods

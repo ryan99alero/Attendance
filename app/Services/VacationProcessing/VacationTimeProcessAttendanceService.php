@@ -89,9 +89,7 @@ class VacationTimeProcessAttendanceService
 
     private function getShiftScheduleForEmployee(Employee $employee): ?ShiftSchedule
     {
-        return $employee->shift_schedule_id
-            ? $employee->shiftSchedule
-            : ShiftSchedule::where('department_id', $employee->department_id)->first();
+        return $employee->shift_schedule_id ? $employee->shiftSchedule : null;
     }
 
     private function getVacationPunchTime(VacationCalendar $vacation, ShiftSchedule $shiftSchedule): string
