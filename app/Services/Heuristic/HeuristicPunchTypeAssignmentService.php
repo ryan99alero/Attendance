@@ -222,19 +222,35 @@ class HeuristicPunchTypeAssignmentService
             if ($i >= $punchCount) break;
 
             $startPunch = $punches->get($i);
+            if (!$startPunch) {
+                Log::warning("[Heuristic] Null startPunch at index {$i}, skipping");
+                continue;
+            }
+
             $startIndex = $originalPunches->search(function($punch) use ($startPunch) {
-                return $punch->id === $startPunch->id;
+                return $punch && $punch->id === $startPunch->id;
             });
-            $assignedTypes[$startIndex] = $this->getPunchTypeId('Break Start');
-            Log::info("[Heuristic] Assigned Break Start to Punch ID: {$startPunch->id}");
+
+            if ($startIndex !== false) {
+                $assignedTypes[$startIndex] = $this->getPunchTypeId('Break Start');
+                Log::info("[Heuristic] Assigned Break Start to Punch ID: {$startPunch->id}");
+            }
 
             if ($i + 1 < $punchCount) {
                 $endPunch = $punches->get($i + 1);
+                if (!$endPunch) {
+                    Log::warning("[Heuristic] Null endPunch at index " . ($i + 1) . ", skipping");
+                    continue;
+                }
+
                 $endIndex = $originalPunches->search(function($punch) use ($endPunch) {
-                    return $punch->id === $endPunch->id;
+                    return $punch && $punch->id === $endPunch->id;
                 });
-                $assignedTypes[$endIndex] = $this->getPunchTypeId('Break Stop');
-                Log::info("[Heuristic] Assigned Break Stop to Punch ID: {$endPunch->id}");
+
+                if ($endIndex !== false) {
+                    $assignedTypes[$endIndex] = $this->getPunchTypeId('Break Stop');
+                    Log::info("[Heuristic] Assigned Break Stop to Punch ID: {$endPunch->id}");
+                }
             }
         }
     }
