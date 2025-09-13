@@ -19,6 +19,8 @@ class PunchStateService
         $punchTypeStateMapping = [
             'start_time' => 'start',
             'stop_time' => 'stop',
+            'clock_in' => 'start',
+            'clock_out' => 'stop',
             'lunch_start' => 'stop',  // ✅ Lunch Start = Stopping work
             'lunch_stop' => 'start',  // ✅ Lunch Stop = Resuming work
             'unclassified' => 'unknown',
@@ -39,7 +41,7 @@ class PunchStateService
         $validStates = ['start', 'stop'];
 
         // Punch types that should have either 'start' or 'stop'
-        $punchTypesWithStates = ['start_time', 'stop_time', 'lunch_start', 'lunch_stop'];
+        $punchTypesWithStates = ['start_time', 'stop_time', 'clock_in', 'clock_out', 'lunch_start', 'lunch_stop'];
 
         // If punch type supports start/stop, ensure punchState is valid
         if (in_array($punchType, $punchTypesWithStates, true)) {

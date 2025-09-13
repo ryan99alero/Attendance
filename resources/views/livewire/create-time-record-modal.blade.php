@@ -23,7 +23,7 @@
 
                     <div class="mb-4">
                         <label class="block text-md font-medium text-gray-700">Punch Type</label>
-                        <select wire:model="punchType"
+                        <select wire:model.live="punchType"
                                 class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
                                 style="color: #1a202c; background-color: #fff;">
                             <option value="">Select Punch Type</option>

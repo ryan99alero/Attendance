@@ -83,10 +83,15 @@ class AttendanceProcessingService
         $this->punchValidationService->resolveOverlappingRecords($payPeriod);
         Log::info("[AttendanceProcessing] ✅ Step 7: Overlapping records resolved.");
 
-        // Step 8: Migrate Punches
-        Log::info("[AttendanceProcessing] 🔍 Step 8: Migrating punches.");
+        // Step 8: Re-evaluate NeedsReview records
+        Log::info("[AttendanceProcessing] 🔍 Step 8: Re-evaluating NeedsReview records.");
+        $this->attendanceStatusUpdateService->reevaluateNeedsReviewRecords($payPeriod);
+        Log::info("[AttendanceProcessing] ✅ Step 8: NeedsReview re-evaluation completed.");
+
+        // Step 9: Migrate Punches
+        Log::info("[AttendanceProcessing] 🔍 Step 9: Migrating punches.");
         $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 8: Punch migration completed.");
+        Log::info("[AttendanceProcessing] ✅ Step 9: Punch migration completed.");
 
         Log::info("[AttendanceProcessing] 🎯 Attendance processing completed for PayPeriod ID: {$payPeriod->id}");
     }

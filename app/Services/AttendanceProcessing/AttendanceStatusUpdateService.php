@@ -3,6 +3,7 @@
 namespace App\Services\AttendanceProcessing;
 
 use App\Models\Attendance;
+use App\Models\PayPeriod;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceStatusUpdateService
@@ -30,5 +31,31 @@ class AttendanceStatusUpdateService
         Attendance::whereIn('id', $validRecords->pluck('id'))->update(['status' => 'Complete']);
 
         Log::info("[AttendanceStatusUpdateService] ✅ Updated " . $validRecords->count() . " attendance records to status: Complete.");
+    }
+
+    public function reevaluateNeedsReviewRecords(PayPeriod $payPeriod): void
+    {
+        Log::info("[AttendanceStatusUpdateService] 🔍 Re-evaluating NeedsReview records for PayPeriod ID: {$payPeriod->id}");
+
+        // Find all NeedsReview records that now have valid punch_type_id and punch_state
+        $recordsToUpdate = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+            ->where('status', 'NeedsReview')
+            ->whereNotNull('punch_type_id')
+            ->whereNotNull('punch_state')
+            ->whereIn('punch_state', ['start', 'stop']) // Only valid punch states
+            ->get(['id']);
+
+        if ($recordsToUpdate->isEmpty()) {
+            Log::info("[AttendanceStatusUpdateService] ✅ No NeedsReview records found that can be updated to Complete.");
+            return;
+        }
+
+        $recordIds = $recordsToUpdate->pluck('id')->toArray();
+        Log::info("[AttendanceStatusUpdateService] 🛠 Found " . count($recordIds) . " NeedsReview records that can be marked as Complete: " . json_encode($recordIds));
+
+        // Update the records to Complete status
+        $updated = Attendance::whereIn('id', $recordIds)->update(['status' => 'Complete']);
+
+        Log::info("[AttendanceStatusUpdateService] ✅ Updated {$updated} NeedsReview records to Complete status.");
     }
 }

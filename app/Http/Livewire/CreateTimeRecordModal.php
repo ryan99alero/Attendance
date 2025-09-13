@@ -88,7 +88,13 @@ class CreateTimeRecordModal extends Component
         $this->date = $date;
         $this->punchType = $punchType;
         $this->punchTime = null;
-        $this->punchState = 'unknown'; // ✅ Reset punchState on open
+
+        // Determine and set punch state
+        $determinedPunchState = PunchStateService::determinePunchState($punchType);
+        $this->punchState = $determinedPunchState;
+
+        Log::info('[CreateTimeRecordModal] PunchState set to: ' . $this->punchState);
+
         $this->isOpen = true;
     }
     public function closeModal(): void
@@ -99,6 +105,8 @@ class CreateTimeRecordModal extends Component
 
     public function saveTimeRecord(): void
     {
+        Log::info('[CreateTimeRecordModal] Save attempt with punchState: ' . $this->punchState);
+
         $validatedData = $this->validate();
 
         // Get dynamic punch type mapping
