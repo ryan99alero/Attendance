@@ -44,6 +44,7 @@ class HeuristicPunchTypeAssignmentService
                     $punchEvaluations[$punch->id]['heuristic'] = [
                         'punch_type_id' => $assignedTypes[$index] ?? null,
                         'punch_state' => $this->determinePunchState($assignedTypes[$index] ?? null),
+                        'source' => 'Heuristic Engine'
                     ];
 
                     Log::info("✅ [Heuristic] Assigned Punch ID: {$punch->id} -> Type: " . ($assignedTypes[$index] ?? 'NULL'));
@@ -76,34 +77,23 @@ class HeuristicPunchTypeAssignmentService
         $assignedTypes[0] = $this->getPunchTypeId('Clock In');
         $assignedTypes[$punchCount - 1] = $this->getPunchTypeId('Clock Out');
 
-        // Handle 6+ Punches (Breaks + Lunch)
-        $innerPunches = $punches->slice(1, -1);
-        $unassigned = [];
+        // Handle 6+ Punches (Breaks + Lunch) - Using improved logic from ShiftSchedule
+        if ($punchCount >= 6) {
+            $innerPunches = $punches->slice(1, -1);
 
-        foreach ($innerPunches as $index => $punch) {
-            $punchTime = Carbon::parse($punch->punch_time);
+            // Find best lunch pair based on timing and schedule
+            $bestLunchPair = $this->findBestLunchPair($innerPunches, $lunchStart, $lunchStop);
 
-            // Lunch Assignment Logic
-            if ($punchTime->between($lunchStart, $lunchStop)) {
-                if (!in_array($this->getPunchTypeId('Lunch Start'), $assignedTypes)) {
-                    $assignedTypes[$index + 1] = $this->getPunchTypeId('Lunch Start');
-                } elseif (!in_array($this->getPunchTypeId('Lunch Stop'), $assignedTypes)) {
-                    $assignedTypes[$index + 1] = $this->getPunchTypeId('Lunch Stop');
-                } else {
-                    $unassigned[] = $index + 1;
-                }
+            if ($bestLunchPair) {
+                Log::info("[Heuristic] Found best lunch pair - Start: {$bestLunchPair['startIndex']}, Stop: {$bestLunchPair['stopIndex']}");
+                $assignedTypes[$bestLunchPair['startIndex'] + 1] = $this->getPunchTypeId('Lunch Start');
+                $assignedTypes[$bestLunchPair['stopIndex'] + 1] = $this->getPunchTypeId('Lunch Stop');
+
+                // Assign remaining punches as breaks sequentially
+                $this->assignRemainingAsBreaks($innerPunches, $assignedTypes, $bestLunchPair);
             } else {
-                $unassigned[] = $index + 1;
-            }
-        }
-
-        // Assign Breaks if 6+ Punches
-        if ($punchCount >= 6 && count($unassigned) >= 2) {
-            for ($i = 0; $i < count($unassigned); $i += 2) {
-                $assignedTypes[$unassigned[$i]] = $this->getPunchTypeId('Break Start');
-                if (isset($unassigned[$i + 1])) {
-                    $assignedTypes[$unassigned[$i + 1]] = $this->getPunchTypeId('Break Stop');
-                }
+                Log::info("[Heuristic] No optimal lunch pair found, assigning all middle punches as breaks");
+                $this->assignAllMiddleAsBreaks($innerPunches, $assignedTypes);
             }
         }
 
@@ -137,5 +127,119 @@ class HeuristicPunchTypeAssignmentService
         }
 
         return $id;
+    }
+
+    /**
+     * Find the best lunch pair from inner punches based on timing and schedule
+     */
+    private function findBestLunchPair($innerPunches, $lunchStart, $lunchStop): ?array
+    {
+        $bestPair = null;
+        $bestScore = -1;
+        $punchCount = $innerPunches->count();
+
+        // Try all possible consecutive pairs
+        for ($i = 0; $i < $punchCount - 1; $i += 2) {
+            if ($i + 1 >= $punchCount) break;
+
+            $startPunch = $innerPunches->get($i);
+            $stopPunch = $innerPunches->get($i + 1);
+
+            if (!$startPunch || !$stopPunch) {
+                continue;
+            }
+
+            $score = $this->scoreLunchPair($startPunch, $stopPunch, $lunchStart, $lunchStop);
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestPair = [
+                    'startIndex' => $i,
+                    'stopIndex' => $i + 1,
+                    'score' => $score
+                ];
+            }
+        }
+
+        return ($bestScore > 0) ? $bestPair : null;
+    }
+
+    /**
+     * Score a lunch pair based on timing alignment with schedule
+     */
+    private function scoreLunchPair($startPunch, $stopPunch, $lunchStart, $lunchStop): float
+    {
+        $startTime = Carbon::parse($startPunch->punch_time);
+        $stopTime = Carbon::parse($stopPunch->punch_time);
+
+        $score = 0;
+
+        // Score based on start time proximity to scheduled lunch start (max 50 points)
+        $startDiffMinutes = abs($startTime->diffInMinutes($lunchStart));
+        $startScore = max(0, 50 - ($startDiffMinutes / 2)); // Lose 0.5 points per minute away
+        $score += $startScore;
+
+        // Score based on stop time proximity to scheduled lunch stop (max 50 points)
+        $stopDiffMinutes = abs($stopTime->diffInMinutes($lunchStop));
+        $stopScore = max(0, 50 - ($stopDiffMinutes / 2)); // Lose 0.5 points per minute away
+        $score += $stopScore;
+
+        // Bonus for reasonable lunch duration (15-90 minutes)
+        $actualDuration = $stopTime->diffInMinutes($startTime);
+        if ($actualDuration >= 15 && $actualDuration <= 90) {
+            $score += 20;
+        }
+
+        Log::info("[Heuristic] Lunch pair score: Start {$startPunch->id} -> Stop {$stopPunch->id} = {$score} (duration: {$actualDuration}min)");
+
+        return $score;
+    }
+
+    /**
+     * Assign remaining punches (after lunch assignment) as break pairs
+     */
+    private function assignRemainingAsBreaks($innerPunches, &$assignedTypes, $bestLunchPair): void
+    {
+        $lunchStartIndex = $bestLunchPair['startIndex'];
+        $lunchStopIndex = $bestLunchPair['stopIndex'];
+
+        // Collect unassigned punch indices
+        $unassignedIndices = [];
+        for ($i = 0; $i < $innerPunches->count(); $i++) {
+            if ($i !== $lunchStartIndex && $i !== $lunchStopIndex) {
+                $unassignedIndices[] = $i;
+            }
+        }
+
+        // Assign breaks in pairs
+        for ($i = 0; $i < count($unassignedIndices); $i += 2) {
+            $startIndex = $unassignedIndices[$i];
+            $assignedTypes[$startIndex + 1] = $this->getPunchTypeId('Break Start');
+
+            if (isset($unassignedIndices[$i + 1])) {
+                $stopIndex = $unassignedIndices[$i + 1];
+                $assignedTypes[$stopIndex + 1] = $this->getPunchTypeId('Break Stop');
+                Log::info("[Heuristic] Assigned Break pair: {$startIndex} -> {$stopIndex}");
+            } else {
+                Log::warning("[Heuristic] Uneven break punches, leaving index {$startIndex} as Break Start only");
+            }
+        }
+    }
+
+    /**
+     * When no lunch pair is found, assign all middle punches as breaks
+     */
+    private function assignAllMiddleAsBreaks($innerPunches, &$assignedTypes): void
+    {
+        $punchCount = $innerPunches->count();
+
+        for ($i = 0; $i < $punchCount; $i += 2) {
+            $assignedTypes[$i + 1] = $this->getPunchTypeId('Break Start');
+
+            if ($i + 1 < $punchCount) {
+                $assignedTypes[$i + 2] = $this->getPunchTypeId('Break Stop');
+                Log::info("[Heuristic] Assigned Break pair: {$i} -> " . ($i + 1));
+            }
+        }
     }
 }
