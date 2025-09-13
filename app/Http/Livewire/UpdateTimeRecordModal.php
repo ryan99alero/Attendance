@@ -3,6 +3,7 @@
 namespace App\Http\Livewire;
 
 use App\Models\Attendance;
+use App\Models\PunchType;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use App\Services\PunchStateService;
@@ -24,15 +25,42 @@ class UpdateTimeRecordModal extends Component
         'deleteTimeRecord' => 'deleteTimeRecord',
     ];
 
+    public function getPunchTypes()
+    {
+        return PunchType::where('is_active', true)
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->mapWithKeys(function ($punchType) {
+                $key = strtolower(str_replace(' ', '_', $punchType->name));
+                return [$key => $punchType->name];
+            })
+            ->toArray();
+    }
+
+    public function getPunchTypeMapping()
+    {
+        return PunchType::where('is_active', true)
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->mapWithKeys(function ($punchType) {
+                $key = strtolower(str_replace(' ', '_', $punchType->name));
+                return [$key => $punchType->id];
+            })
+            ->toArray();
+    }
+
     protected function rules(): array
     {
+        $validPunchTypes = array_keys($this->getPunchTypes());
+        $validPunchTypes[] = 'unclassified'; // Add unclassified as valid option
+
         return [
             'employeeId' => 'required|exists:employees,id',
             'deviceId' => 'nullable|exists:devices,id',
             'date' => 'required|date',
             'punchType' => [
                 'required',
-                Rule::in(['start_time', 'stop_time', 'lunch_start', 'lunch_stop']),
+                Rule::in($validPunchTypes),
             ],
             'punchState' => [
                 'required',
@@ -85,19 +113,19 @@ class UpdateTimeRecordModal extends Component
     {
         $validatedData = $this->validate();
 
-        $punchTypeMapping = [
-            'start_time' => 1,
-            'stop_time' => 2,
-            'lunch_start' => 3,
-            'lunch_stop' => 4,
-        ];
+        // Get dynamic punch type mapping
+        $punchTypeMapping = $this->getPunchTypeMapping();
 
-        if (!isset($punchTypeMapping[$validatedData['punchType']])) {
-            Log::error("[UpdateTimeRecordModal] Invalid Punch Type: " . $validatedData['punchType']);
-            return;
+        // Handle unclassified as a special case - map to the lowest ID available punch type or 5
+        if ($validatedData['punchType'] === 'unclassified') {
+            $punchTypeId = 5; // Default unclassified ID
+        } else {
+            if (!isset($punchTypeMapping[$validatedData['punchType']])) {
+                Log::error("[UpdateTimeRecordModal] Invalid Punch Type: " . $validatedData['punchType']);
+                return;
+            }
+            $punchTypeId = $punchTypeMapping[$validatedData['punchType']];
         }
-
-        $punchTypeId = $punchTypeMapping[$validatedData['punchType']];
 
         try {
             Attendance::where('id', $this->attendanceId)->update([

@@ -27,10 +27,9 @@
                                 class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
                                 style="color: #1a202c; background-color: #fff;">
                             <option value="">Select Punch Type</option>
-                            <option value="start_time">Clock In</option>
-                            <option value="stop_time">Clock Out</option>
-                            <option value="lunch_start">Lunch Start</option>
-                            <option value="lunch_stop">Lunch Stop</option>
+                            @foreach ($this->getPunchTypes() as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
                         </select>
                     </div>
 

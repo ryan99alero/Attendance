@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
+use App\Models\PunchType;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceSummary extends Page
@@ -60,6 +61,7 @@ class AttendanceSummary extends Page
                     'all' => 'All',
                     'Migrated' => 'Migrated',
                     'problem' => 'Problem (All Except Migrated)',
+                    'problem_with_migrated' => 'Problem (Including Migrated)',
                 ])
                 ->default('problem')
                 ->reactive()
@@ -89,6 +91,76 @@ class AttendanceSummary extends Page
             ->toArray();
     }
 
+    public function getPunchTypes(): Collection
+    {
+        return PunchType::where('is_active', true)
+            ->orderBy('id')
+            ->get(['id', 'name']);
+    }
+
+    public function getPunchTypeMapping(): array
+    {
+        return $this->getPunchTypes()
+            ->mapWithKeys(function ($punchType) {
+                $key = strtolower(str_replace(' ', '_', $punchType->name));
+                return [$punchType->id => $key];
+            })
+            ->toArray();
+    }
+
+    public function getPunchTypeColumns(): array
+    {
+        $columns = $this->getPunchTypes()
+            ->mapWithKeys(function ($punchType) {
+                $key = strtolower(str_replace(' ', '_', $punchType->name));
+                return [$key => $punchType->name];
+            })
+            ->toArray();
+
+        $columns['unclassified'] = 'Unclassified';
+        return $columns;
+    }
+
+    public function getVisibleColumns(): array
+    {
+        // Core columns that should always be shown
+        $coreColumns = [
+            'clock_in' => 'Clock In',
+            'lunch_start' => 'Lunch Start',
+            'lunch_stop' => 'Lunch Stop',
+            'clock_out' => 'Clock Out',
+            'unclassified' => 'Unclassified'
+        ];
+
+        // If no data loaded yet, return just core columns
+        if ($this->groupedAttendances->isEmpty()) {
+            return $coreColumns;
+        }
+
+        // Find which punch types actually have data
+        $columnsWithData = [];
+        foreach ($this->groupedAttendances as $attendance) {
+            foreach ($attendance['punches'] as $punchType => $punches) {
+                if (!empty($punches)) {
+                    $columnsWithData[$punchType] = true;
+                }
+            }
+        }
+
+        // Start with core columns
+        $visibleColumns = $coreColumns;
+
+        // Add any additional columns that have data but aren't in core
+        $allColumns = $this->getPunchTypeColumns();
+        foreach (array_keys($columnsWithData) as $punchType) {
+            if (!isset($coreColumns[$punchType]) && isset($allColumns[$punchType])) {
+                $visibleColumns[$punchType] = $allColumns[$punchType];
+            }
+        }
+
+        return $visibleColumns;
+    }
+
     public function fetchAttendances(): Collection
     {
         if (!$this->payPeriodId) {
@@ -104,7 +176,7 @@ class AttendanceSummary extends Page
         Log::info("[AttendanceSummary] Fetching attendance records for PayPeriod ID: {$this->payPeriodId} ({$payPeriod->start_date} to {$payPeriod->end_date})");
 
         // Fetch all attendance records within the date range
-        $attendances = Attendance::with('employee')
+        $attendancesQuery = Attendance::with('employee')
             ->select([
                 'attendances.id as attendance_id',
                 'attendances.employee_id',
@@ -118,14 +190,43 @@ class AttendanceSummary extends Page
                 DB::raw("ANY_VALUE(attendances.status) as status"),
             ])
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
-            ->whereBetween('attendances.shift_date', [$payPeriod->start_date, $payPeriod->end_date])
-            ->when($this->statusFilter !== 'all', function ($q) {
-                if ($this->statusFilter === 'problem') {
-                    $q->where('attendances.status', '!=', 'Migrated');
-                } else {
-                    $q->where('attendances.status', $this->statusFilter);
-                }
-            })
+            ->whereBetween('attendances.shift_date', [$payPeriod->start_date, $payPeriod->end_date]);
+
+        // Handle different status filters
+        if ($this->statusFilter === 'problem') {
+            $attendancesQuery->where('attendances.status', '!=', 'Migrated');
+        } elseif ($this->statusFilter === 'problem_with_migrated') {
+            // Find employee/date combinations that have problem records
+            $problemDays = Attendance::select('employee_id', 'shift_date')
+                ->whereBetween('shift_date', [$payPeriod->start_date, $payPeriod->end_date])
+                ->where('status', '!=', 'Migrated')
+                ->get()
+                ->map(function ($record) {
+                    return $record->employee_id . '|' . $record->shift_date;
+                })
+                ->unique()
+                ->values();
+
+            if ($problemDays->isNotEmpty()) {
+                // Get all records for those employee/date combinations
+                $attendancesQuery->where(function ($query) use ($problemDays) {
+                    foreach ($problemDays as $day) {
+                        [$employeeId, $shiftDate] = explode('|', $day);
+                        $query->orWhere(function ($subQuery) use ($employeeId, $shiftDate) {
+                            $subQuery->where('attendances.employee_id', $employeeId)
+                                   ->where('attendances.shift_date', $shiftDate);
+                        });
+                    }
+                });
+            } else {
+                // No problem days found, return empty result
+                $attendancesQuery->whereRaw('1 = 0');
+            }
+        } elseif ($this->statusFilter !== 'all') {
+            $attendancesQuery->where('attendances.status', $this->statusFilter);
+        }
+
+        $attendances = $attendancesQuery
             ->orderBy('attendances.employee_id')
             ->orderBy('attendances.shift_date')
             ->orderBy('attendances.punch_time')
@@ -167,26 +268,19 @@ class AttendanceSummary extends Page
             Log::info("[AttendanceSummary] No duplicates found.");
         }
 
+        // Get dynamic punch type mapping
+        $punchTypeMapping = $this->getPunchTypeMapping();
+        $punchTypeColumns = $this->getPunchTypeColumns();
+
         // Group data per employee and shift date
         $grouped = $attendances->groupBy(function ($attendance) {
             return "{$attendance->employee_id}|{$attendance->shift_date}";
-        })->map(function ($punchesPerDay) use ($duplicates) {
-            $punchesSorted = [
-                'start_time' => [],
-                'lunch_start' => [],
-                'lunch_stop' => [],
-                'stop_time' => [],
-                'unclassified' => [],
-            ];
+        })->map(function ($punchesPerDay) use ($duplicates, $punchTypeMapping, $punchTypeColumns) {
+            // Initialize array with all punch type columns
+            $punchesSorted = array_fill_keys(array_keys($punchTypeColumns), []);
 
             foreach ($punchesPerDay as $punch) {
-                $type = match ($punch->punch_type_id) {
-                    1 => 'start_time',
-                    2 => 'stop_time',
-                    3 => 'lunch_start',
-                    4 => 'lunch_stop',
-                    default => 'unclassified'
-                };
+                $type = $punchTypeMapping[$punch->punch_type_id] ?? 'unclassified';
 
                 $key = "{$punch->employee_id}|{$punch->shift_date}|{$punch->punch_type_id}";
                 $hasMultiple = isset($duplicates[$key]);

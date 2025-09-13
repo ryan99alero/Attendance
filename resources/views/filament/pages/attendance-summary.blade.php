@@ -27,7 +27,7 @@
                         </th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Employee</th>
                         <th class="border border-gray-300 px-4 py-2 dark:border-gray-700">Shift Date</th>
-                        @foreach (['start_time' => 'Clock In', 'lunch_start' => 'Lunch Start', 'lunch_stop' => 'Lunch Stop', 'stop_time' => 'Clock Out', 'unclassified' => 'Unclassified'] as $key => $label)
+                        @foreach ($this->getVisibleColumns() as $key => $label)
                             <th class="border border-gray-300 px-4 py-2 dark:border-gray-700 cursor-pointer"
                                 wire:click="sortBy('{{ $key }}')">
                                 {{ $label }}
@@ -54,7 +54,7 @@
                                 {{ $attendance['employee']['shift_date'] }}
                             </td>
 
-                            @foreach (['start_time', 'lunch_start', 'lunch_stop', 'stop_time', 'unclassified'] as $type)
+                            @foreach (array_keys($this->getVisibleColumns()) as $type)
                                 <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                     @php
                                         $punches = $attendance['punches'][$type] ?? [];
