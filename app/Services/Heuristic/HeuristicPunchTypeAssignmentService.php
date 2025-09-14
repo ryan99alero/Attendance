@@ -38,7 +38,7 @@ class HeuristicPunchTypeAssignmentService
                 $lunchStop = Carbon::parse($shiftSchedule->lunch_stop_time);
 
                 // Assign Punch Types
-                $assignedTypes = $this->determinePunchTypes($sortedPunches, $lunchStart, $lunchStop);
+                $assignedTypes = $this->determinePunchTypes($sortedPunches, $lunchStart, $lunchStop, $shiftSchedule);
 
                 foreach ($sortedPunches as $index => $punch) {
                     $punchEvaluations[$punch->id]['heuristic'] = [
@@ -53,7 +53,7 @@ class HeuristicPunchTypeAssignmentService
         }
     }
 
-    private function determinePunchTypes($punches, $lunchStart, $lunchStop): array
+    private function determinePunchTypes($punches, $lunchStart, $lunchStop, $shiftSchedule): array
     {
         $punchCount = count($punches);
         $assignedTypes = array_fill(0, $punchCount, null);
@@ -100,7 +100,7 @@ class HeuristicPunchTypeAssignmentService
             $innerPunches = $punches->slice(1, -1);
 
             // Find best lunch pair based on timing and schedule
-            $bestLunchPair = $this->findBestLunchPair($innerPunches, $lunchStart, $lunchStop);
+            $bestLunchPair = $this->findBestLunchPair($innerPunches, $lunchStart, $lunchStop, $shiftSchedule);
 
             if ($bestLunchPair) {
                 Log::info("[Heuristic] Found best lunch pair - Start: {$bestLunchPair['start']->id}, Stop: {$bestLunchPair['stop']->id}");
@@ -169,33 +169,36 @@ class HeuristicPunchTypeAssignmentService
 
     /**
      * Find the best lunch pair from inner punches based on timing and schedule
+     * Uses same logic as Shift Schedule engine for consistency
      */
-    private function findBestLunchPair($innerPunches, $lunchStart, $lunchStop): ?array
+    private function findBestLunchPair($innerPunches, $lunchStart, $lunchStop, $shiftSchedule): ?array
     {
         $bestPair = null;
         $bestScore = -1;
         $punchCount = $innerPunches->count();
+        $flexibility = 30; // Default flexibility of 30 minutes
+        $expectedDuration = $shiftSchedule->lunch_duration ?? 30; // Use actual lunch duration from schedule
 
-        // Try all possible consecutive pairs
-        for ($i = 0; $i < $punchCount - 1; $i += 2) {
-            if ($i + 1 >= $punchCount) break;
+        // Try all possible pairs (not just consecutive ones)
+        for ($i = 0; $i < $punchCount - 1; $i++) {
+            for ($j = $i + 1; $j < $punchCount; $j++) {
+                $startPunch = $innerPunches->get($i);
+                $stopPunch = $innerPunches->get($j);
 
-            $startPunch = $innerPunches->get($i);
-            $stopPunch = $innerPunches->get($i + 1);
+                if (!$startPunch || !$stopPunch) {
+                    continue;
+                }
 
-            if (!$startPunch || !$stopPunch) {
-                continue;
-            }
+                $score = $this->scoreLunchPairShiftStyle($startPunch, $stopPunch, $lunchStart, $lunchStop, $expectedDuration, $flexibility);
 
-            $score = $this->scoreLunchPair($startPunch, $stopPunch, $lunchStart, $lunchStop);
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestPair = [
-                    'start' => $startPunch,
-                    'stop' => $stopPunch,
-                    'score' => $score
-                ];
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestPair = [
+                        'start' => $startPunch,
+                        'stop' => $stopPunch,
+                        'score' => $score
+                    ];
+                }
             }
         }
 
@@ -203,7 +206,89 @@ class HeuristicPunchTypeAssignmentService
     }
 
     /**
-     * Score a lunch pair based on timing alignment with schedule
+     * Score a lunch pair using Shift Schedule logic for consistency
+     */
+    private function scoreLunchPairShiftStyle($startPunch, $stopPunch, $lunchStart, $lunchEnd, $expectedDuration, $flexibility): int
+    {
+        $score = 0;
+
+        Log::info("[Heuristic] Scoring pair: {$startPunch->punch_time} -> {$stopPunch->punch_time}");
+
+        // Check if start time is close to scheduled lunch start
+        if ($this->isWithinFlexibility($startPunch->punch_time, $lunchStart, $flexibility)) {
+            $score += 10;
+            Log::info("  ✅ Start time matches scheduled lunch start (+10)");
+        }
+
+        // Check if end time is close to scheduled lunch end
+        if ($this->isWithinFlexibility($stopPunch->punch_time, $lunchEnd, $flexibility)) {
+            $score += 10;
+            Log::info("  ✅ End time matches scheduled lunch end (+10)");
+        }
+
+        // Check if duration matches expected lunch duration (with progressive scoring)
+        $actualDuration = Carbon::parse($startPunch->punch_time)->diffInMinutes(Carbon::parse($stopPunch->punch_time));
+        $durationDiff = abs($actualDuration - $expectedDuration);
+
+        Log::info("  📏 Duration analysis: actual={$actualDuration}min, expected={$expectedDuration}min, diff={$durationDiff}min");
+
+        if ($durationDiff <= 5) {
+            $score += 15; // Perfect duration match
+            Log::info("  ✅ Perfect duration match: {$actualDuration}min vs expected {$expectedDuration}min (+15)");
+        } elseif ($durationDiff <= 15) {
+            $score += 10; // Good duration match
+            Log::info("  ✅ Good duration match: {$actualDuration}min vs expected {$expectedDuration}min (+10)");
+        } elseif ($durationDiff <= 30) {
+            $score += 5; // Acceptable duration match
+            Log::info("  ✅ Acceptable duration match: {$actualDuration}min vs expected {$expectedDuration}min (+5)");
+        } elseif ($actualDuration >= 15 && $actualDuration <= 120) {
+            $score += 2; // At least reasonable lunch duration range
+            Log::info("  ✅ Within reasonable lunch range: {$actualDuration}min (+2)");
+        } else {
+            Log::info("  ❌ Poor duration match: {$actualDuration}min vs expected {$expectedDuration}min (0)");
+        }
+
+        // Prefer pairs that fall within typical lunch hours (11:00 AM - 2:00 PM)
+        $startHour = Carbon::parse($startPunch->punch_time)->hour;
+        if ($startHour >= 11 && $startHour <= 14) {
+            $score += 5;
+            Log::info("  ✅ Within typical lunch hours ({$startHour}:xx) (+5)");
+        } elseif ($startHour >= 10 && $startHour <= 15) {
+            $score += 2; // Extended lunch hours
+            Log::info("  ✅ Within extended lunch hours ({$startHour}:xx) (+2)");
+        } else {
+            Log::info("  ❌ Outside typical lunch hours ({$startHour}:xx) (0)");
+        }
+
+        // Small bonus for reasonable break duration even if not perfect lunch match
+        if ($actualDuration >= 10 && $actualDuration <= 180 && $score < 5) {
+            $score += 1; // Minimum viability bonus
+            Log::info("  ✅ Reasonable break duration, minimum viability (+1)");
+        }
+
+        Log::info("  📊 Total score for pair: {$score}");
+        return $score;
+    }
+
+    /**
+     * Check if punch time is within flexibility range of scheduled time
+     */
+    private function isWithinFlexibility($punchTime, $scheduledTime, $flexibility): bool
+    {
+        $punchTimeOnly = Carbon::parse($punchTime)->format('H:i:s');
+        $scheduledTimeOnly = Carbon::parse($scheduledTime)->format('H:i:s');
+
+        $punchCarbon = Carbon::parse($punchTimeOnly);
+        $scheduledCarbon = Carbon::parse($scheduledTimeOnly);
+
+        return $punchCarbon->between(
+            $scheduledCarbon->copy()->subMinutes($flexibility),
+            $scheduledCarbon->copy()->addMinutes($flexibility)
+        );
+    }
+
+    /**
+     * Score a lunch pair based on timing alignment with schedule (LEGACY METHOD)
      */
     private function scoreLunchPair($startPunch, $stopPunch, $lunchStart, $lunchStop): float
     {

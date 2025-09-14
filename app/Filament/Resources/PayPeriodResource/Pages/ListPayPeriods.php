@@ -10,6 +10,7 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Notifications\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Contracts\View\View;
 
 class ListPayPeriods extends ListRecords
 {

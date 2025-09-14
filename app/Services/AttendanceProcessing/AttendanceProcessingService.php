@@ -44,56 +44,81 @@ class AttendanceProcessingService
     {
         Log::info("[AttendanceProcessing] 🚀 Starting attendance processing for PayPeriod ID: {$payPeriod->id}");
 
-        // Step 1: Run Attendance Cleansing Service
-        Log::info("[AttendanceProcessing] 🔍 Step 1: Running AttendanceCleansingService to remove duplicates.");
-        $this->attendanceCleansingService->cleanUpDuplicates();
-        Log::info("[AttendanceProcessing] ✅ Step 1: Attendance Cleansing completed.");
+        $steps = [
+            [
+                'name' => 'Removing duplicate records',
+                'action' => fn() => $this->attendanceCleansingService->cleanUpDuplicates()
+            ],
+            [
+                'name' => 'Processing vacation records',
+                'action' => fn() => $this->vacationTimeProcessAttendanceService->processVacationDays($payPeriod->start_date, $payPeriod->end_date)
+            ],
+            [
+                'name' => 'Processing holiday records',
+                'action' => fn() => method_exists($this->holidayAttendanceProcessor, 'processHolidaysForPayPeriod')
+                    ? $this->holidayAttendanceProcessor->processHolidaysForPayPeriod($payPeriod)
+                    : Log::error("[AttendanceProcessing] processHolidaysForPayPeriod() method not found")
+            ],
+            [
+                'name' => 'Processing attendance time records',
+                'action' => fn() => $this->attendanceTimeProcessorService->processAttendanceForPayPeriod($payPeriod)
+            ],
+            [
+                'name' => 'Processing unresolved records',
+                'action' => fn() => $this->unresolvedAttendanceProcessorService->processStalePartialRecords($payPeriod)
+            ],
+            [
+                'name' => 'Validating punch records',
+                'action' => fn() => $this->punchValidationService->validatePunchesWithinPayPeriod($payPeriod)
+            ],
+            [
+                'name' => 'Resolving overlapping records',
+                'action' => fn() => $this->punchValidationService->resolveOverlappingRecords($payPeriod)
+            ],
+            [
+                'name' => 'Re-evaluating review records',
+                'action' => fn() => $this->attendanceStatusUpdateService->reevaluateNeedsReviewRecords($payPeriod)
+            ],
+            [
+                'name' => 'Migrating final punch records',
+                'action' => fn() => $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod)
+            ]
+        ];
 
-        // Step 2: Process Vacation Records
-        Log::info("[AttendanceProcessing] 🔍 Step 2: Processing vacation attendance records.");
-        $this->vacationTimeProcessAttendanceService->processVacationDays($payPeriod->start_date, $payPeriod->end_date);
-        Log::info("[AttendanceProcessing] ✅ Step 2: Vacation processing completed.");
+        $totalSteps = count($steps);
 
-        // Step 3: Process Holiday Records
-        Log::info("[AttendanceProcessing] 🔍 Step 3: Processing holiday attendance records.");
-        if (method_exists($this->holidayAttendanceProcessor, 'processHolidaysForPayPeriod')) {
-            $this->holidayAttendanceProcessor->processHolidaysForPayPeriod($payPeriod);
-            Log::info("[AttendanceProcessing] ✅ Step 3: Holiday processing completed.");
-        } else {
-            Log::error("[AttendanceProcessing] 🚨 processHolidaysForPayPeriod() does not exist in HolidayAttendanceProcessor.");
+        foreach ($steps as $index => $step) {
+            $stepNumber = $index + 1;
+            $stepName = $step['name'];
+
+            Log::info("[AttendanceProcessing] 🔍 Step {$stepNumber}/{$totalSteps}: {$stepName}");
+
+            // Send progress notification
+            \Filament\Notifications\Notification::make()
+                ->info()
+                ->title("Processing Step {$stepNumber}/{$totalSteps}")
+                ->body($stepName)
+                ->send();
+
+            try {
+                $step['action']();
+                Log::info("[AttendanceProcessing] ✅ Step {$stepNumber}: {$stepName} completed.");
+            } catch (\Exception $e) {
+                Log::error("[AttendanceProcessing] ❌ Step {$stepNumber}: {$stepName} failed: " . $e->getMessage());
+
+                // Send error notification and re-throw
+                \Filament\Notifications\Notification::make()
+                    ->danger()
+                    ->title("Step {$stepNumber} Failed")
+                    ->body("Error in {$stepName}: " . $e->getMessage())
+                    ->persistent()
+                    ->send();
+
+                throw $e;
+            }
         }
 
-        // Step 4: Process Attendance Time Records
-        Log::info("[AttendanceProcessing] 🔍 Step 4: Processing attendance time records.");
-        $this->attendanceTimeProcessorService->processAttendanceForPayPeriod($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 4: Attendance time processing completed.");
-
-        // Step 5: Process Unresolved Attendance BEFORE Validation & Migration
-        Log::info("[AttendanceProcessing] 🔍 Step 5: Processing unresolved attendance records.");
-        $this->unresolvedAttendanceProcessorService->processStalePartialRecords($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 5: Unresolved attendance processing completed.");
-
-        // Step 6: Validate Punches
-        Log::info("[AttendanceProcessing] 🔍 Step 6: Validating punches.");
-        $this->punchValidationService->validatePunchesWithinPayPeriod($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 6: Punch validation completed.");
-
-        // Step 7: Resolve overlapping records
-        Log::info("[AttendanceProcessing] 🔍 Step 7: Resolving overlapping attendance records.");
-        $this->punchValidationService->resolveOverlappingRecords($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 7: Overlapping records resolved.");
-
-        // Step 8: Re-evaluate NeedsReview records
-        Log::info("[AttendanceProcessing] 🔍 Step 8: Re-evaluating NeedsReview records.");
-        $this->attendanceStatusUpdateService->reevaluateNeedsReviewRecords($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 8: NeedsReview re-evaluation completed.");
-
-        // Step 9: Migrate Punches
-        Log::info("[AttendanceProcessing] 🔍 Step 9: Migrating punches.");
-        $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
-        Log::info("[AttendanceProcessing] ✅ Step 9: Punch migration completed.");
-
-        Log::info("[AttendanceProcessing] 🎯 Attendance processing completed for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[AttendanceProcessing] 🎯 All {$totalSteps} processing steps completed for PayPeriod ID: {$payPeriod->id}");
     }
 
     public function processCompletedAttendanceRecords(array $attendanceIds, bool $autoProcess): void

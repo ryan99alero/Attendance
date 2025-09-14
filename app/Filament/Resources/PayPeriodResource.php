@@ -14,6 +14,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\DB;
 use App\Services\AttendanceProcessing\AttendanceProcessingService;
+use Carbon\Carbon;
 
 
 class PayPeriodResource extends Resource
@@ -82,22 +83,54 @@ class PayPeriodResource extends Resource
                     ->label('Process Time')
                     ->color('primary')
                     ->icon('heroicon-o-arrow-down-on-square')
+                    ->extraAttributes(['data-action' => 'process_time'])
+                    ->requiresConfirmation()
+                    ->modalHeading('Process Time Records')
+                    ->modalDescription('This will process attendance records for this pay period. This operation may take several minutes and will show progress notifications.')
+                    ->modalSubmitActionLabel('Start Processing')
+                    ->modalIcon('heroicon-o-arrow-down-on-square')
                     ->action(function ($record) {
+                        set_time_limit(0); // Remove time limit for long operations
+
+                        // Show initial processing notification
+                        \Filament\Notifications\Notification::make()
+                            ->info()
+                            ->title('Processing Started')
+                            ->body("Starting 9-step processing for Pay Period ID: {$record->id}")
+                            ->duration(5000)
+                            ->send();
+
                         $processingService = app(AttendanceProcessingService::class);
 
                         try {
                             $processingService->processAll($record);
 
-                            return \Filament\Notifications\Notification::make()
+                            \Filament\Notifications\Notification::make()
                                 ->success()
-                                ->title('Time Processed')
-                                ->body("Time records have been successfully processed for Pay Period ID: {$record->id}");
+                                ->title('✅ Processing Complete')
+                                ->body("Successfully processed all attendance records for Pay Period ID: {$record->id}")
+                                ->duration(10000)
+                                ->send();
+
                         } catch (\Exception $e) {
-                            return \Filament\Notifications\Notification::make()
+                            \Filament\Notifications\Notification::make()
                                 ->danger()
-                                ->title('Processing Error')
-                                ->body("An error occurred while processing Pay Period ID: {$record->id}. Error: {$e->getMessage()}");
+                                ->title('❌ Processing Failed')
+                                ->body("Error processing Pay Period ID: {$record->id}: " . substr($e->getMessage(), 0, 200))
+                                ->persistent()
+                                ->send();
+
+                            throw $e; // Re-throw for proper error handling
                         }
+                    })
+                    ->before(function () {
+                        // This runs before the action, perfect for showing loading states
+                        \Filament\Notifications\Notification::make()
+                            ->info()
+                            ->title('🚀 Preparing Processing')
+                            ->body('Initializing attendance processing services...')
+                            ->duration(3000)
+                            ->send();
                     }),
 
                 // Post Time Button
@@ -105,31 +138,56 @@ class PayPeriodResource extends Resource
                     ->label('Post Time')
                     ->color('success')
                     ->icon('heroicon-o-check-circle')
+                    ->requiresConfirmation()
+                    ->modalHeading('Post Time Records')
+                    ->modalDescription(fn ($record) => $record->attendanceIssuesCount() > 0
+                        ? 'Warning: There are ' . $record->attendanceIssuesCount() . ' unresolved attendance issues. These must be resolved before posting.'
+                        : 'This will finalize and archive all attendance records for this pay period. This action cannot be undone.'
+                    )
+                    ->modalSubmitActionLabel('Post Time')
+                    ->disabled(fn ($record) => $record->attendanceIssuesCount() > 0)
                     ->action(function ($record) {
-                        // Check for unresolved attendance issues
+                        // Double-check for unresolved attendance issues
                         if ($record->attendanceIssuesCount() > 0) {
-                            return \Filament\Notifications\Notification::make()
+                            \Filament\Notifications\Notification::make()
                                 ->danger()
                                 ->title('Cannot Post Time')
-                                ->body('There are unresolved attendance issues for this pay period. Please resolve them before posting time.')
+                                ->body('There are ' . $record->attendanceIssuesCount() . ' unresolved attendance issues. Please resolve them first.')
                                 ->send();
+                            return;
                         }
 
-                        // Archive processed records and mark pay period as processed
-                        DB::table('attendances')
-                            ->whereBetween('punch_time', [
-                                Carbon::parse($record->start_date)->startOfDay(),
-                                Carbon::parse($record->end_date)->endOfDay(),
-                            ])
-                            ->update(['status' => 'Posted']);
-
-                        $record->update(['is_posted' => true]);
-
-                        return \Filament\Notifications\Notification::make()
-                            ->success()
-                            ->title('Time Posted')
-                            ->body("Time records for Pay Period ID: {$record->id} have been finalized and archived.")
+                        \Filament\Notifications\Notification::make()
+                            ->info()
+                            ->title('Posting Time Records')
+                            ->body("Finalizing time records for Pay Period ID: {$record->id}...")
                             ->send();
+
+                        try {
+                            // Archive processed records and mark pay period as processed
+                            $updatedRecords = DB::table('attendances')
+                                ->whereBetween('punch_time', [
+                                    \Carbon\Carbon::parse($record->start_date)->startOfDay(),
+                                    \Carbon\Carbon::parse($record->end_date)->endOfDay(),
+                                ])
+                                ->update(['status' => 'Posted']);
+
+                            $record->update(['is_posted' => true]);
+
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Time Posted Successfully')
+                                ->body("Finalized {$updatedRecords} attendance records for Pay Period ID: {$record->id}")
+                                ->send();
+
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Post Time Error')
+                                ->body("Error posting time for Pay Period ID: {$record->id}: {$e->getMessage()}")
+                                ->persistent()
+                                ->send();
+                        }
                     }),
 
                 // View Punches Button
