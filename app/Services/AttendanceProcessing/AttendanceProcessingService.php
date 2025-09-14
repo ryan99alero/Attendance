@@ -87,18 +87,19 @@ class AttendanceProcessingService
 
         $totalSteps = count($steps);
 
+        // Show single progress notification instead of per-step notifications
+        \Filament\Notifications\Notification::make()
+            ->info()
+            ->title('Processing Started')
+            ->body("Processing {$totalSteps} steps for attendance records...")
+            ->duration(3000)
+            ->send();
+
         foreach ($steps as $index => $step) {
             $stepNumber = $index + 1;
             $stepName = $step['name'];
 
             Log::info("[AttendanceProcessing] 🔍 Step {$stepNumber}/{$totalSteps}: {$stepName}");
-
-            // Send progress notification
-            \Filament\Notifications\Notification::make()
-                ->info()
-                ->title("Processing Step {$stepNumber}/{$totalSteps}")
-                ->body($stepName)
-                ->send();
 
             try {
                 $step['action']();
@@ -109,8 +110,8 @@ class AttendanceProcessingService
                 // Send error notification and re-throw
                 \Filament\Notifications\Notification::make()
                     ->danger()
-                    ->title("Step {$stepNumber} Failed")
-                    ->body("Error in {$stepName}: " . $e->getMessage())
+                    ->title("Processing Failed at Step {$stepNumber}")
+                    ->body("Error in {$stepName}: " . substr($e->getMessage(), 0, 100) . "...")
                     ->persistent()
                     ->send();
 

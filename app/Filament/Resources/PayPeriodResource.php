@@ -84,21 +84,8 @@ class PayPeriodResource extends Resource
                     ->color('primary')
                     ->icon('heroicon-o-arrow-down-on-square')
                     ->extraAttributes(['data-action' => 'process_time'])
-                    ->requiresConfirmation()
-                    ->modalHeading('Process Time Records')
-                    ->modalDescription('This will process attendance records for this pay period. This operation may take several minutes and will show progress notifications.')
-                    ->modalSubmitActionLabel('Start Processing')
-                    ->modalIcon('heroicon-o-arrow-down-on-square')
                     ->action(function ($record) {
                         set_time_limit(0); // Remove time limit for long operations
-
-                        // Show initial processing notification
-                        \Filament\Notifications\Notification::make()
-                            ->info()
-                            ->title('Processing Started')
-                            ->body("Starting 9-step processing for Pay Period ID: {$record->id}")
-                            ->duration(5000)
-                            ->send();
 
                         $processingService = app(AttendanceProcessingService::class);
 
@@ -109,7 +96,7 @@ class PayPeriodResource extends Resource
                                 ->success()
                                 ->title('✅ Processing Complete')
                                 ->body("Successfully processed all attendance records for Pay Period ID: {$record->id}")
-                                ->duration(10000)
+                                ->duration(8000)
                                 ->send();
 
                         } catch (\Exception $e) {
@@ -122,15 +109,6 @@ class PayPeriodResource extends Resource
 
                             throw $e; // Re-throw for proper error handling
                         }
-                    })
-                    ->before(function () {
-                        // This runs before the action, perfect for showing loading states
-                        \Filament\Notifications\Notification::make()
-                            ->info()
-                            ->title('🚀 Preparing Processing')
-                            ->body('Initializing attendance processing services...')
-                            ->duration(3000)
-                            ->send();
                     }),
 
                 // Post Time Button
