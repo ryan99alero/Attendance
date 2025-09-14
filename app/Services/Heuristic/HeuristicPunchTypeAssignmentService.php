@@ -85,7 +85,7 @@ class HeuristicPunchTypeAssignmentService
             return [
                 $this->getPunchTypeId('Clock In'),
                 $this->getPunchTypeId('Break Start'),
-                $this->getPunchTypeId('Break Stop'),
+                $this->getPunchTypeId('Break End'),
                 $this->getPunchTypeId('Lunch Start'),
                 $this->getPunchTypeId('Clock Out')
             ];
@@ -143,7 +143,7 @@ class HeuristicPunchTypeAssignmentService
         if (!$punchTypeId) return 'NeedsReview';
 
         $startTypes = ['Clock In', 'Lunch Start', 'Break Start'];
-        $stopTypes = ['Clock Out', 'Lunch Stop', 'Break Stop'];
+        $stopTypes = ['Clock Out', 'Lunch Stop', 'Break End'];
 
         $punchTypeName = \DB::table('punch_types')->where('id', $punchTypeId)->value('name');
 
@@ -273,8 +273,8 @@ class HeuristicPunchTypeAssignmentService
                 });
 
                 if ($endIndex !== false) {
-                    $assignedTypes[$endIndex] = $this->getPunchTypeId('Break Stop');
-                    Log::info("[Heuristic] Assigned Break Stop to Punch ID: {$endPunch->id}");
+                    $assignedTypes[$endIndex] = $this->getPunchTypeId('Break End');
+                    Log::info("[Heuristic] Assigned Break End to Punch ID: {$endPunch->id}");
                 }
             }
         }
