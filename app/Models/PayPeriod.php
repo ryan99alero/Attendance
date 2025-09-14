@@ -82,8 +82,19 @@ class PayPeriod extends Model
     public function attendanceIssues(): \Illuminate\Database\Eloquent\Builder
     {
         return Attendance::query()
-            ->whereBetween('punch_time', [$this->start_date, $this->end_date])
-            ->whereIn('status', ['NeedsReview']); // Count records that need attention
+            ->whereBetween('punch_time', [
+                $this->start_date->startOfDay(),
+                $this->end_date->endOfDay()
+            ])
+            ->where(function($query) {
+                $query->where('status', 'NeedsReview')
+                      ->orWhere(function($subQuery) {
+                          // Only show Incomplete records that have been processed (have punch_type_id assigned)
+                          // but still have issues, not those that are simply unprocessed
+                          $subQuery->where('status', 'Incomplete')
+                                   ->whereNotNull('punch_type_id');
+                      });
+            });
     }
 
     // Custom Methods
@@ -94,7 +105,15 @@ class PayPeriod extends Model
 
     public function punchCount(): int
     {
-        return $this->punches()->count();
+        // Count all attendance records that have punch_type_id assigned (processed records)
+        // This includes both 'Complete' and 'Migrated' records
+        return Attendance::whereBetween('punch_time', [
+            $this->start_date->startOfDay(),
+            $this->end_date->endOfDay()
+        ])
+        ->whereNotNull('punch_type_id')
+        ->whereIn('status', ['Complete', 'Migrated'])
+        ->count();
     }
 
     public function processAttendance(): int

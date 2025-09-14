@@ -74,6 +74,12 @@ class PunchMigrationService
                     continue;
                 }
 
+                // Skip individual unpaired punches (marked as NeedsReview during processing)
+                if ($attendance->status === 'NeedsReview' && str_contains($attendance->issue_notes ?? '', 'Unpaired punch')) {
+                    Log::warning("PunchMigrationService ⚠️ Skipping migration for Attendance ID {$attendance->id} - marked as unpaired punch.");
+                    continue;
+                }
+
                 // ✅ Begin Database Transaction
                 DB::beginTransaction();
 
@@ -138,11 +144,14 @@ class PunchMigrationService
         $holidayRecords = Attendance::where('employee_id', $employeeId)
             ->whereDate('punch_time', $date)
             ->whereNotNull('holiday_id')
+            ->whereIn('status', ['Complete', 'Migrated'])
             ->get();
 
         return $holidayRecords->isNotEmpty() || Attendance::where('employee_id', $employeeId)
                 ->whereDate('punch_time', $date)
+                ->whereIn('status', ['Complete', 'Migrated'])
                 ->whereIn('punch_type_id', [$this->getPunchTypeId('Clock In'), $this->getPunchTypeId('Clock Out')])
                 ->count() >= 2;
     }
+
 }

@@ -66,28 +66,91 @@ class AttendanceTimeProcessorService
                 }
             }
 
+            // ✅ Second: Handle odd-numbered punch days by processing pairs and marking unpaired punch
+            $punchDays = $punches->groupBy('shift_date');
+            $unpairedPunches = collect();
+
+            foreach ($punchDays as $shiftDate => $dayPunches) {
+                if ($dayPunches->count() % 2 !== 0) {
+                    Log::warning("[Processor] Employee {$employeeId} has {$dayPunches->count()} punches on shift date {$shiftDate} - will process pairs and mark unpaired punch");
+
+                    // Find the unpaired punch (usually the middle one that breaks the pattern)
+                    $sortedPunches = $dayPunches->sortBy('punch_time');
+                    $unpairedPunch = $this->findUnpairedPunch($sortedPunches);
+
+                    if ($unpairedPunch) {
+                        $unpairedPunch->status = 'NeedsReview';
+                        $unpairedPunch->punch_type_id = null;
+                        $unpairedPunch->punch_state = 'unknown';
+                        $unpairedPunch->issue_notes = "Unpaired punch detected on {$shiftDate} - requires manual review";
+                        $unpairedPunch->save();
+
+                        // Remove only the unpaired punch from processing, let the pairs continue
+                        $unpairedPunches->push($unpairedPunch);
+                        Log::info("[Processor] Marked punch ID {$unpairedPunch->id} as unpaired, continuing with remaining pairs");
+                    }
+                }
+            }
+
+            // Remove unpaired punches from processing but keep the pairs
+            if ($unpairedPunches->isNotEmpty()) {
+                $punches = $punches->reject(function($punch) use ($unpairedPunches) {
+                    return $unpairedPunches->pluck('id')->contains($punch->id);
+                });
+                Log::info("[Processor] Removed {$unpairedPunches->count()} unpaired punches, continuing with {$punches->count()} paired punches");
+            }
+
             $punchEvaluations = []; // ✅ Initialize array to collect punch evaluation results
 
             $debugMode = $companySetup->debug_punch_assignment_mode ?? 'full';
 
-            // ✅ 1️⃣ Run Heuristic Processing First
-            if ($debugMode === 'heuristic' || $debugMode === 'full') {
-                Log::info("[Processor] Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
-                $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
-            }
+            // ✅ Check if ML mode needs training data first
+            if ($debugMode === 'ml') {
+                $trainingDataCount = \DB::table('attendances')
+                    ->whereNotNull('punch_type_id')
+                    ->where('status', 'Complete')
+                    ->count();
 
-            // ✅ 2️⃣ Process Any Punches That Still Need a Punch Type Using Shift Logic
-            $pendingPunches = $punches->whereNull('punch_type_id');
-            if ($pendingPunches->isNotEmpty() && ($debugMode === 'shift_schedule' || $debugMode === 'full')) {
-                Log::info("[Processor] Running Shift-Based Punch Assignment for Employee ID: {$employeeId}.");
-                $this->shiftScheduleService->assignPunchTypes($pendingPunches, $flexibility, $punchEvaluations);
-            }
+                if ($trainingDataCount < 50) {
+                    Log::info("[Processor] ML mode detected but insufficient training data ({$trainingDataCount} records). Running training phase first.");
 
-            // ✅ 3️⃣ Process Any Remaining Unresolved Punches Using ML
-            $mlPendingPunches = $punches->whereNull('punch_type_id');
-            if ($mlPendingPunches->isNotEmpty() && ($debugMode === 'ml' || ($debugMode === 'full' && $companySetup->use_ml_for_punch_matching))) {
-                Log::info("[Processor] Running ML Punch Assignment for Employee ID: {$employeeId}.");
-                $this->mlService->assignPunchTypes($mlPendingPunches, $employeeId, $punchEvaluations);
+                    // Run Heuristic first to create training data
+                    Log::info("[Processor] Training Phase: Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
+                    $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
+
+                    // Run Shift Schedule for any remaining punches
+                    $pendingPunches = $punches->whereNull('punch_type_id');
+                    if ($pendingPunches->isNotEmpty()) {
+                        Log::info("[Processor] Training Phase: Running Shift-Based Punch Assignment for Employee ID: {$employeeId}.");
+                        $this->shiftScheduleService->assignPunchTypes($pendingPunches, $flexibility, $punchEvaluations);
+                    }
+
+                    Log::info("[Processor] Training phase completed. These processed records will become ML training data after migration.");
+                } else {
+                    Log::info("[Processor] Sufficient training data available ({$trainingDataCount} records). Running ML mode.");
+                    // Only run ML when we have enough training data
+                    $this->mlService->assignPunchTypes($punches, $employeeId, $punchEvaluations);
+                }
+            } else {
+                // ✅ 1️⃣ Run Heuristic Processing First
+                if ($debugMode === 'heuristic' || $debugMode === 'full') {
+                    Log::info("[Processor] Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
+                    $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
+                }
+
+                // ✅ 2️⃣ Process Any Punches That Still Need a Punch Type Using Shift Logic
+                $pendingPunches = $punches->whereNull('punch_type_id');
+                if ($pendingPunches->isNotEmpty() && ($debugMode === 'shift_schedule' || $debugMode === 'full')) {
+                    Log::info("[Processor] Running Shift-Based Punch Assignment for Employee ID: {$employeeId}.");
+                    $this->shiftScheduleService->assignPunchTypes($pendingPunches, $flexibility, $punchEvaluations);
+                }
+
+                // ✅ 3️⃣ Process Any Remaining Unresolved Punches Using ML
+                $mlPendingPunches = $punches->whereNull('punch_type_id');
+                if ($mlPendingPunches->isNotEmpty() && ($debugMode === 'full' && $companySetup->use_ml_for_punch_matching)) {
+                    Log::info("[Processor] Running ML Punch Assignment for Employee ID: {$employeeId}.");
+                    $this->mlService->assignPunchTypes($mlPendingPunches, $employeeId, $punchEvaluations);
+                }
             }
 
             // ✅ 4️⃣ FINALIZE Punch Types for Employee
@@ -167,5 +230,53 @@ class AttendanceTimeProcessorService
         }
 
         return 'unknown';
+    }
+
+    /**
+     * Find the unpaired punch in an odd-numbered set of punches
+     * This identifies punches that break the normal pairing pattern
+     */
+    private function findUnpairedPunch($sortedPunches)
+    {
+        $punches = $sortedPunches->values(); // Reset keys to 0, 1, 2...
+        $count = $punches->count();
+
+        // For 7 punches, we expect: Clock In, Break/Lunch Start, Break/Lunch Stop, Lunch/Break Start, Lunch/Break Stop, Break Start, Clock Out
+        // The unpaired punch is usually in the middle where the pattern breaks
+
+        // Simple heuristic: look for timing gaps or pattern breaks
+        // If we have 7 punches, typically one will be out of sequence
+
+        // Method 1: Look for the punch that creates the biggest time gap when removed
+        $bestCandidate = null;
+        $smallestGapSum = PHP_INT_MAX;
+
+        for ($i = 0; $i < $count; $i++) {
+            // Create array without this punch
+            $withoutPunch = $punches->reject(function($punch, $index) use ($i) {
+                return $index === $i;
+            })->values();
+
+            // Calculate total gaps between consecutive punches
+            $gapSum = 0;
+            for ($j = 0; $j < $withoutPunch->count() - 1; $j++) {
+                $time1 = strtotime($withoutPunch[$j]->punch_time);
+                $time2 = strtotime($withoutPunch[$j + 1]->punch_time);
+                $gap = abs($time2 - $time1);
+                $gapSum += $gap;
+            }
+
+            // The punch that creates the most regular pattern when removed is likely the unpaired one
+            if ($gapSum < $smallestGapSum) {
+                $smallestGapSum = $gapSum;
+                $bestCandidate = $punches[$i];
+            }
+        }
+
+        if ($bestCandidate) {
+            Log::info("[Processor] Identified punch ID {$bestCandidate->id} at {$bestCandidate->punch_time} as unpaired");
+        }
+
+        return $bestCandidate;
     }
 }
