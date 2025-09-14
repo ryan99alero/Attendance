@@ -64,12 +64,30 @@ class HeuristicPunchTypeAssignmentService
         if ($punchCount === 2) {
             return [$this->getPunchTypeId('Clock In'), $this->getPunchTypeId('Clock Out')];
         }
+        if ($punchCount === 3) {
+            // 3 punches: Clock In, Break/Lunch, Clock Out - assign middle as break
+            return [
+                $this->getPunchTypeId('Clock In'),
+                $this->getPunchTypeId('Break Start'),
+                $this->getPunchTypeId('Clock Out')
+            ];
+        }
         if ($punchCount === 4) {
             return [
                 $this->getPunchTypeId('Clock In'),
                 $this->getPunchTypeId('Lunch Start'),
                 $this->getPunchTypeId('Lunch Stop'),
                 $this->getPunchTypeId('Clock Out'),
+            ];
+        }
+        if ($punchCount === 5) {
+            // 5 punches: Clock In, Break Start, Break Stop, Lunch/Break, Clock Out
+            return [
+                $this->getPunchTypeId('Clock In'),
+                $this->getPunchTypeId('Break Start'),
+                $this->getPunchTypeId('Break Stop'),
+                $this->getPunchTypeId('Lunch Start'),
+                $this->getPunchTypeId('Clock Out')
             ];
         }
 
@@ -106,6 +124,13 @@ class HeuristicPunchTypeAssignmentService
                 $this->assignBreakPunchTypes($remainingPunches, $assignedTypes, $punches);
             } else {
                 Log::info("[Heuristic] No optimal lunch pair found, assigning all middle punches as breaks");
+                $this->assignBreakPunchTypes($innerPunches, $assignedTypes, $punches);
+            }
+        } else {
+            // Handle other punch counts (3, 5, 7, etc.) that fall through
+            Log::info("[Heuristic] Handling {$punchCount} punches - assigning middle punches as breaks");
+            if ($punchCount >= 3) {
+                $innerPunches = $punches->slice(1, -1);
                 $this->assignBreakPunchTypes($innerPunches, $assignedTypes, $punches);
             }
         }
