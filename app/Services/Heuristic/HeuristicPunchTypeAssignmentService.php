@@ -223,7 +223,7 @@ class HeuristicPunchTypeAssignmentService
         $score += $stopScore;
 
         // Bonus for reasonable lunch duration (15-90 minutes)
-        $actualDuration = $stopTime->diffInMinutes($startTime);
+        $actualDuration = $startTime->diffInMinutes($stopTime);
         if ($actualDuration >= 15 && $actualDuration <= 90) {
             $score += 20;
         }
