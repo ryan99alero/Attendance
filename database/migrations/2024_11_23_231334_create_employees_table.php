@@ -96,9 +96,6 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unsignedBigInteger('payroll_frequency_id')
-                ->nullable()
-                ->comment('Foreign key referencing the payroll frequencies table');
 
             $table->string('full_names', 101)
                 ->nullable()
@@ -125,9 +122,6 @@ return new class extends Migration
                 ->references('id')->on('users')
                 ->onDelete('set null');
 
-            $table->foreign('payroll_frequency_id')
-                ->references('id')->on('payroll_frequencies')
-                ->onDelete('set null');
 
             $table->foreign('shift_schedule_id')
                 ->references('id')->on('shift_schedules')

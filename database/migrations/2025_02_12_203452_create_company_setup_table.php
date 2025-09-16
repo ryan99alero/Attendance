@@ -31,7 +31,22 @@ return new class extends Migration {
                 ->default('all')
                 ->comment('Controls which Punch Type Assignment service runs for debugging');
 
+            // Payroll Frequency (moved from employee level to company level)
+            $table->unsignedBigInteger('payroll_frequency_id')
+                ->nullable()
+                ->comment('Company-wide payroll frequency - all employees follow the same schedule');
+
+            // Payroll Start Date (when the company first implemented this payroll schedule)
+            $table->date('payroll_start_date')
+                ->nullable()
+                ->comment('Date when the company started using the current payroll frequency (used for bi-weekly cycle calculations)');
+
             $table->timestamps();
+
+            // Foreign key constraint for payroll frequency
+            $table->foreign('payroll_frequency_id')
+                ->references('id')->on('payroll_frequencies')
+                ->onDelete('set null');
         });
     }
 

@@ -92,6 +92,15 @@ class CompanySetupResource extends Resource
                     ->default(12)
                     ->required()
                     ->label('Max Shift Length (Hours)'),
+
+                // Company-wide payroll frequency
+                Forms\Components\Select::make('payroll_frequency_id')
+                    ->label('Payroll Frequency')
+                    ->relationship('payrollFrequency', 'frequency_name')
+                    ->searchable()
+                    ->preload()
+                    ->nullable()
+                    ->helperText('All employees will follow this payroll schedule'),
             ]);
     }
 
@@ -125,6 +134,10 @@ class CompanySetupResource extends Resource
 
                 Tables\Columns\TextColumn::make('max_shift_length')->sortable()
                     ->label('Max Shift Length (Hours)'),
+
+                Tables\Columns\TextColumn::make('payrollFrequency.frequency_name')
+                    ->label('Payroll Frequency')
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')->dateTime()
                     ->label('Created At'),

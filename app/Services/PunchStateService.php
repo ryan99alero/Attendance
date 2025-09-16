@@ -36,19 +36,20 @@ class PunchStateService
      * @param string $punchState
      * @return bool
      */
-    public static function isValidPunchState(string $punchType, string $punchState): bool
-    {
-        $validStates = ['start', 'stop'];
-
-        // Punch types that should have either 'start' or 'stop'
-        $punchTypesWithStates = ['start_time', 'stop_time', 'clock_in', 'clock_out', 'lunch_start', 'lunch_stop'];
-
-        // If punch type supports start/stop, ensure punchState is valid
-        if (in_array($punchType, $punchTypesWithStates, true)) {
-            return in_array($punchState, $validStates, true);
-        }
-
-        // All other punch types should be 'unknown'
-        return $punchState === 'unknown';
-    }
+// Ryan Not Used
+//   public static function isValidPunchState(string $punchType, string $punchState): bool
+//    {
+//        $validStates = ['start', 'stop'];
+//
+//        // Punch types that should have either 'start' or 'stop'
+//        $punchTypesWithStates = ['start_time', 'stop_time', 'clock_in', 'clock_out', 'lunch_start', 'lunch_stop'];
+//
+//        // If punch type supports start/stop, ensure punchState is valid
+//        if (in_array($punchType, $punchTypesWithStates, true)) {
+//            return in_array($punchState, $validStates, true);
+//        }
+//
+//        // All other punch types should be 'unknown'
+//        return $punchState === 'unknown';
+//    }
 }

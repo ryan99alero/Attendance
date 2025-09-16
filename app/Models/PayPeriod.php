@@ -47,6 +47,7 @@ class PayPeriod extends Model
     protected $fillable = [
         'start_date',
         'end_date',
+        'pay_date',
         'is_processed',
         'is_posted',
         'processed_by',
@@ -57,6 +58,7 @@ class PayPeriod extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'pay_date' => 'date',
         'is_processed' => 'boolean',
         'is_posted' => 'boolean',
     ];

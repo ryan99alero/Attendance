@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Artisan;
 use App\Services\AttendanceProcessing\AttendanceProcessingService;
 use Carbon\Carbon;
 
@@ -116,6 +117,53 @@ class PayPeriodResource extends Resource
             ])
             ->defaultSort('start_date', 'desc')
             ->striped()
+            ->headerActions([
+                Action::make('generate_periods')
+                    ->label('Generate PayPeriods')
+                    ->icon('heroicon-o-plus-circle')
+                    ->color('success')
+                    ->form([
+                        \Filament\Forms\Components\Select::make('generation_type')
+                            ->label('Generation Type')
+                            ->options([
+                                'current_month' => 'Current Month Only',
+                                'weeks' => '4 Weeks from Current Week',
+                                'months' => '1 Month Ahead',
+                            ])
+                            ->default('current_month')
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        $generationType = $data['generation_type'];
+
+                        try {
+                            // Run the appropriate command based on selection
+                            $command = match ($generationType) {
+                                'current_month' => 'payroll:generate-periods --current-month',
+                                'weeks' => 'payroll:generate-periods --weeks=4',
+                                'months' => 'payroll:generate-periods --months=1',
+                                default => 'payroll:generate-periods --current-month',
+                            };
+
+                            Artisan::call($command);
+                            $output = Artisan::output();
+
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('✅ PayPeriods Generated')
+                                ->body('PayPeriods have been generated successfully. Check the output for details.')
+                                ->send();
+
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('❌ Generation Failed')
+                                ->body("Error generating PayPeriods: {$e->getMessage()}")
+                                ->persistent()
+                                ->send();
+                        }
+                    }),
+            ])
             ->actions([
                 // Process Time Button
                 Action::make('process_time')

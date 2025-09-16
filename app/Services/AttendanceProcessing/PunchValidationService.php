@@ -9,7 +9,8 @@ use App\Models\PayPeriod;
 
 class PunchValidationService
 {
-    protected const OVERLAPPING_ENTRY_METHODS = ['vacation', 'holiday'];
+// Ryan Not Used
+    //    protected const OVERLAPPING_ENTRY_METHODS = ['vacation', 'holiday'];
 
     /**
      * Validates punches within a pay period.

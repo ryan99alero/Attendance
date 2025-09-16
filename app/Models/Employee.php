@@ -24,7 +24,6 @@ use Illuminate\Database\Eloquent\Relations\HasOneThrough;
  * @property string|null $external_id
  * @property int|null $department_id
  * @property int|null $round_group_id
- * @property int|null $payroll_frequency_id
  * @property \Illuminate\Support\Carbon|null $termination_date
  * @property bool $is_active
  * @property bool $full_time
@@ -32,7 +31,6 @@ use Illuminate\Database\Eloquent\Relations\HasOneThrough;
  * @property-read string $full_name
  * @property-read \App\Models\Department|null $department
  * @property-read \App\Models\RoundingRule|null $roundingRule
- * @property-read \App\Models\PayrollFrequency|null $payrollFrequency
  * @property-read \App\Models\User|null $user
  * @property-read \App\Models\ShiftSchedule|null $schedule
  * @property string $external_department_id
@@ -64,7 +62,6 @@ use Illuminate\Database\Eloquent\Relations\HasOneThrough;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereIsActive($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereLastName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee wherePayrollFrequencyId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee wherePhone($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee wherePhotograph($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Employee whereRoundGroupId($value)
@@ -104,7 +101,6 @@ class Employee extends Model
         'vacation_pay',
         'created_at',
         'updated_at',
-        'payroll_frequency_id',
         'full_names',
         'shift_schedule_id',
     ];
@@ -126,10 +122,6 @@ class Employee extends Model
         return $this->belongsTo(RoundGroup::class, 'round_group_id');
     }
 
-    public function payrollFrequency(): BelongsTo
-    {
-        return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
-    }
 
     public function shiftSchedule(): BelongsTo
     {

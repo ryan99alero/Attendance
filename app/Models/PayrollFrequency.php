@@ -50,10 +50,16 @@ class PayrollFrequency extends Model
      */
     protected $fillable = [
         'frequency_name',
+        'frequency_type',
+        'reference_start_date',
         'weekly_day',
-        'semimonthly_first_day',
-        'semimonthly_second_day',
-        'monthly_day',
+        'first_pay_day',
+        'second_pay_day',
+        'month_end_handling',
+        'weekend_adjustment',
+        'skip_holidays',
+        'description',
+        'is_active',
         'created_by',
         'updated_by',
     ];
@@ -64,10 +70,12 @@ class PayrollFrequency extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'reference_start_date' => 'date',
         'weekly_day' => 'integer',
-        'semimonthly_first_day' => 'integer',
-        'semimonthly_second_day' => 'integer',
-        'monthly_day' => 'integer',
+        'first_pay_day' => 'integer',
+        'second_pay_day' => 'integer',
+        'skip_holidays' => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     /**

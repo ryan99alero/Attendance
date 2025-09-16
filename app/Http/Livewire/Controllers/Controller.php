@@ -1,8 +1,8 @@
 <?php
-
-namespace App\Http\Livewire\Controllers;
-
-abstract class Controller
-{
-    //
-}
+// Ryan Not Used
+//namespace App\Http\Livewire\Controllers;
+//
+//abstract class Controller
+//{
+//    //
+//}

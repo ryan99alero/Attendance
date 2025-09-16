@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
 use App\Models\Department;
-use App\Models\PayrollFrequency;
 use App\Models\Shift; // Added for shift_id dropdown
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
@@ -77,11 +76,6 @@ class EmployeeResource extends Resource
                     ->toArray())
                 ->searchable()
                 ->nullable(),
-            Select::make('payroll_frequency_id')
-                ->label('Payroll Frequency')
-                ->options(PayrollFrequency::all()->pluck('frequency_name', 'id'))
-                ->nullable()
-                ->searchable(),
             Select::make('round_group_id')
                 ->label('Payroll Rounding')
                 ->options(\App\Models\RoundGroup::all()->pluck('group_name', 'id')) // Use the correct model and fields
@@ -120,9 +114,6 @@ class EmployeeResource extends Resource
                     ->sortable(),
                 TextColumn::make('shift.shift_name') // Through relationship
                     ->label('Shift')
-                    ->sortable(),
-                TextColumn::make('payrollFrequency.frequency_name')
-                    ->label('Payroll Frequency')
                     ->sortable(),
                 TextColumn::make('roundGroup.group_name') // Ensure the relationship is defined in the Employee model
                 ->label('Payroll Rounding')

@@ -49,5 +49,23 @@ class CompanySetup extends Model
         'enforce_shift_schedules',
         'allow_manual_time_edits',
         'max_shift_length',
+        'payroll_frequency_id',
+        'payroll_start_date',
     ];
+
+    protected $casts = [
+        'auto_adjust_punches' => 'boolean',
+        'use_ml_for_punch_matching' => 'boolean',
+        'enforce_shift_schedules' => 'boolean',
+        'allow_manual_time_edits' => 'boolean',
+        'payroll_start_date' => 'date',
+    ];
+
+    /**
+     * Get the payroll frequency for the company
+     */
+    public function payrollFrequency()
+    {
+        return $this->belongsTo(PayrollFrequency::class, 'payroll_frequency_id');
+    }
 }
