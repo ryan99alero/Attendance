@@ -17,9 +17,12 @@ use Filament\Tables\Table;
 class ShiftResource extends Resource
 {
     protected static ?string $model = Shift::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-clock';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Scheduling & Shifts';
     protected static ?string $navigationLabel = 'Shifts';
+    protected static ?string $navigationIcon = 'heroicon-o-clock';
+    protected static ?int $navigationSort = 10;
 
     /**
      * Define the form schema for creating/editing records.

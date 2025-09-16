@@ -19,8 +19,6 @@ return new class extends Migration
                   ->comment('FK -> devices.id (which device saw it)');
             $table->foreignId('credential_id')->nullable()->constrained('credentials')->onDelete('set null')->onUpdate('cascade')
                   ->comment('FK -> credentials.id (which credential was used, if any)');
-            $table->foreignId('punch_type_id')->nullable()->constrained('punch_types')->onDelete('set null')->onUpdate('cascade')
-                  ->comment('FK -> punch_types.id (Clock In, Clock Out, etc.)');
             $table->dateTime('event_time')->comment('Exact server-side timestamp the event was recorded');
             $table->date('shift_date')->nullable()->comment('Logical workday the event belongs to (app assigned)');
             $table->enum('event_source', ['device', 'api', 'backfill', 'admin'])->default('device')
@@ -42,8 +40,7 @@ return new class extends Migration
             $table->index(['employee_id', 'event_time'], 'idx_clock_events_employee_time');
             $table->index(['device_id', 'event_time'], 'idx_clock_events_device_time');
             $table->index('shift_date', 'idx_clock_events_shift_date');
-            $table->index('punch_type_id', 'idx_clock_events_punch_type');
-            $table->index(['employee_id', 'shift_date', 'punch_type_id'], 'idx_clock_events_employee_shift_type');
+            $table->index(['employee_id', 'shift_date'], 'idx_clock_events_employee_shift_type');
             $table->index(['credential_id', 'event_time'], 'idx_clock_events_credential_time');
         });
     }

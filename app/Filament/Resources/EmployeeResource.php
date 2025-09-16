@@ -19,9 +19,12 @@ use Filament\Tables\Columns\IconColumn;
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Employee Management';
     protected static ?string $navigationLabel = 'Employees';
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {

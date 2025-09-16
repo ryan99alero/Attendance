@@ -17,6 +17,7 @@ class CompanySetupResource extends Resource
     protected static ?string $navigationGroup = 'Settings';
     protected static ?string $slug = 'company-setup';
     protected static ?string $navigationIcon = 'heroicon-o-cog';
+    protected static ?int $navigationSort = 10;
 
     public static function form(Forms\Form $form): Forms\Form
     {

@@ -24,9 +24,12 @@ use Filament\Tables\Table;
 class AttendanceResource extends Resource
 {
     protected static ?string $model = Attendance::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-clock';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Punch & Attendance';
     protected static ?string $navigationLabel = 'Attendances';
+    protected static ?string $navigationIcon = 'heroicon-o-finger-print';
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {

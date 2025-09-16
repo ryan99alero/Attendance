@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Livewire\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
-use App\Models\Card;
 use App\Models\Device;
 use App\Models\PayPeriod;
 use App\Models\Credential;
@@ -228,7 +227,7 @@ class TimeClockController extends Controller
                     'clock_event_id' => $clockEvent->id,
                     'status' => 'unmatched'
                 ],
-                'display_message' => 'Card not recognized. Please contact HR.'
+                'display_message' => 'Credential not recognized. Please contact HR.'
             ], 404);
 
         } catch (\Exception $e) {

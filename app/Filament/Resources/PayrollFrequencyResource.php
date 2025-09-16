@@ -14,9 +14,12 @@ use Filament\Tables\Table;
 class PayrollFrequencyResource extends Resource
 {
     protected static ?string $model = PayrollFrequency::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Payroll & Overtime';
     protected static ?string $navigationLabel = 'Payroll Frequencies';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static ?int $navigationSort = 20;
 
     /**
      * Define the form schema for creating/editing records.

@@ -20,9 +20,12 @@ use Carbon\Carbon;
 class PayPeriodResource extends Resource
 {
     protected static ?string $model = PayPeriod::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Payroll & Overtime';
     protected static ?string $navigationLabel = 'Pay Periods';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {

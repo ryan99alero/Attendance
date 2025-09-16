@@ -14,9 +14,12 @@ use Filament\Tables\Columns\TextColumn;
 class EmployeeStatResource extends Resource
 {
     protected static ?string $model = EmployeeStat::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Punch & Attendance';
     protected static ?string $navigationLabel = 'Employee Stats';
+    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static ?int $navigationSort = 50;
 
     public static function form(Form $form): Form
     {

@@ -18,9 +18,12 @@ use Illuminate\Support\Facades\Log;
 class DepartmentResource extends Resource
 {
     protected static ?string $model = Department::class;
-    protected static ?string $navigationIcon = 'heroicon-o-office-building';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Employee Management';
     protected static ?string $navigationLabel = 'Departments';
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationIcon = 'heroicon-o-building-office';
+    protected static ?int $navigationSort = 30;
 
     public static function form(Form $form): Form
     {

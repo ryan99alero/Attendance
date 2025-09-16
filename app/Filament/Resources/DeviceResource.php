@@ -16,9 +16,12 @@ use Filament\Tables\Columns\IconColumn;
 class DeviceResource extends Resource
 {
     protected static ?string $model = Device::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-desktop-computer';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Punch & Attendance';
     protected static ?string $navigationLabel = 'Devices';
+    protected static ?string $navigationIcon = 'heroicon-o-device-phone-mobile';
+    protected static ?int $navigationSort = 30;
 
     public static function form(Form $form): Form
     {

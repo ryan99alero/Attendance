@@ -13,9 +13,12 @@ use Filament\Tables\Table;
 class PunchTypeResource extends Resource
 {
     protected static ?string $model = PunchType::class;
-    protected static ?string $navigationIcon = 'heroicon-o-tag';
+
+    // Navigation Configuration
+    protected static ?string $navigationGroup = 'Punch & Attendance';
     protected static ?string $navigationLabel = 'Punch Types';
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationIcon = 'heroicon-o-cloud';
+    protected static ?int $navigationSort = 60;
 
     public static function form(Forms\Form $form): Forms\Form
     {
