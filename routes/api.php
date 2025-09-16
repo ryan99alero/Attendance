@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\TimeClockController;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,3 +37,27 @@ Route::middleware('web')->post('/web-keep-alive', function (Request $request) {
         'processing' => $request->input('processing', false)
     ]);
 })->name('web.keep-alive');
+
+/*
+|--------------------------------------------------------------------------
+| ESP32 Time Clock API Routes (v1)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('v1/timeclock')->group(function () {
+    // Public health check
+    Route::get('/health', [TimeClockController::class, 'health'])
+        ->name('timeclock.health');
+
+    // Device authentication and handshake
+    Route::post('/auth', [TimeClockController::class, 'authenticate'])
+        ->name('timeclock.auth');
+
+    // Record punch from card/RFID swipe
+    Route::post('/punch', [TimeClockController::class, 'recordPunch'])
+        ->name('timeclock.punch');
+
+    // Get employee information and hours
+    Route::get('/employee/{card_id}', [TimeClockController::class, 'getEmployeeInfo'])
+        ->name('timeclock.employee.info');
+});

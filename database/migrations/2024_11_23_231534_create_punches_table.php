@@ -37,7 +37,7 @@ return new class extends Migration
             $table->unsignedBigInteger('pay_period_id')->nullable()->comment('Foreign key referencing the associated pay period');
             $table->unsignedBigInteger('attendance_id')->nullable()->comment('Foreign key referencing the associated attendance record');
             $table->unsignedBigInteger('classification_id')->nullable()->comment('Foreign key referencing the classifications table');
-            $table->boolean('is_processed')->default(false)->comment('Indicates if the punch has been processed in the system');
+            $table->boolean('is_posted')->default(false)->comment('Indicates if the punch has been processed in the system');
             $table->boolean('is_archived')->default(false)->comment('Indicates if the record is archived');
 
             // Audit fields

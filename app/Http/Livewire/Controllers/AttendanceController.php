@@ -43,4 +43,14 @@ class AttendanceController extends Controller
             $this->attendanceService->fetchPayPeriodSummary($startDate, $endDate)
         );
     }
+
+    public function store(Request $request)
+    {
+        // Redirect to new Time Clock API
+        return response()->json([
+            'message' => 'This endpoint has been moved. Please use the new Time Clock API.',
+            'new_endpoint' => '/api/v1/timeclock/punch',
+            'documentation' => 'See ESP32_TIMECLOCK_API.md for details'
+        ], 301);
+    }
 }

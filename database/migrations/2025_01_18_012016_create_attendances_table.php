@@ -35,10 +35,10 @@ return new class extends Migration
             $table->date('shift_date')->nullable()->comment('The assigned workday for this attendance record');
 
             // Processing status and categorization
-            $table->enum('status', ['Incomplete', 'Partial', 'Complete', 'Migrated', 'Posted', 'NeedsReview'])
+            $table->enum('status', ['Incomplete','Partial','Complete','Discrepancy','Migrated','Posted','NeedsReview'])
                 ->default('Incomplete')->comment('Processing status of the attendance record');
             $table->boolean('is_migrated')->storedAs("`status` = 'Migrated'")->comment('Indicates if the attendance record is migrated');
-            $table->boolean('is_processed')->default(false)->comment('Indicates if the pay period has been processed');
+            $table->boolean('is_posted')->default(false)->comment('Indicates if the pay period has been processed');
             $table->unsignedBigInteger('classification_id')->nullable()->comment('Foreign key to classification table');
             $table->unsignedBigInteger('holiday_id')->nullable()->comment('Foreign key to holidays table');
 

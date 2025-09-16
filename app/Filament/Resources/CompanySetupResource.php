@@ -49,12 +49,12 @@ class CompanySetupResource extends Resource
                             // Temporary Debug Mode in  for Development (None, Error, Warning, Info, Debug)
                 Forms\Components\Select::make('debug_punch_assignment_mode')
                     ->options([
-                        'shift_schedule' => 'Shift Schedule',      // No logging
-                        'heuristic' => 'Heuristic',    // Only critical errors
-                        'ml' => 'Machine Learning',// Errors + potential issues
-                        'full' => 'All',      // General system events
+                        'heuristic' => 'Heuristic Only',
+                        'ml' => 'Machine Learning Only',
+                        'consensus' => 'Consensus (Both Engines)',
+                        'all' => 'All Engines',
                     ])
-                    ->default('error')
+                    ->default('all')
                     ->required()
                     ->label('PunchType Debug Mode'),
 

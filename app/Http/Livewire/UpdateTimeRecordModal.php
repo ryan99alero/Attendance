@@ -19,6 +19,7 @@ class UpdateTimeRecordModal extends Component
     public ?string $punchTime = null;
     public bool $isOpen = false;
     public ?string $punchState = 'unknown';
+    public ?string $status = null;
 
     protected $listeners = [
         'open-update-modal' => 'openUpdateModal',
@@ -89,9 +90,9 @@ class UpdateTimeRecordModal extends Component
         }
     }
 
-    public function openUpdateModal($attendanceId, $employeeId, $deviceId, $date, $punchType, $punchState, $existingTime): void
+    public function openUpdateModal($attendanceId, $employeeId, $deviceId, $date, $punchType, $punchState, $existingTime, $status = null): void
     {
-        Log::info('[UpdateTimeRecordModal] Opened', compact('attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'existingTime'));
+        Log::info('[UpdateTimeRecordModal] Opened', compact('attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'existingTime', 'status'));
 
         $this->attendanceId = $attendanceId;
         $this->employeeId = $employeeId;
@@ -100,6 +101,7 @@ class UpdateTimeRecordModal extends Component
         $this->punchType = $punchType;
         $this->punchState = $punchState ?: 'unknown';
         $this->punchTime = $existingTime ?: '00:00:00';
+        $this->status = $status;
         $this->isOpen = true;
     }
 
@@ -127,19 +129,60 @@ class UpdateTimeRecordModal extends Component
             $punchTypeId = $punchTypeMapping[$validatedData['punchType']];
         }
 
+        // Determine new status - if current status is Discrepancy and punch type changed, set to Complete
+        $newStatus = $this->status;
+        if ($this->status === 'Discrepancy') {
+            $newStatus = 'Complete';
+            Log::info("[UpdateTimeRecordModal] Status changed from Discrepancy to Complete for Record ID: {$this->attendanceId}");
+        }
+
         try {
-            Attendance::where('id', $this->attendanceId)->update([
+            $updateData = [
                 'punch_time' => "{$validatedData['date']} {$validatedData['punchTime']}",
                 'punch_type_id' => $punchTypeId,
                 'punch_state' => $validatedData['punchState'],
                 'device_id' => $validatedData['deviceId'],
                 'updated_at' => now(),
-            ]);
+            ];
+
+            // Add status update if it changed
+            if ($newStatus !== $this->status) {
+                $updateData['status'] = $newStatus;
+            }
+
+            Attendance::where('id', $this->attendanceId)->update($updateData);
 
             Log::info("[UpdateTimeRecordModal] Successfully Updated Record ID: {$this->attendanceId}");
 
         } catch (\Exception $e) {
             Log::error("[UpdateTimeRecordModal] Update Failed", ['error' => $e->getMessage()]);
+        }
+
+        $this->dispatch('timeRecordUpdated');
+        $this->dispatch('close-update-modal');
+
+        $this->reset();
+    }
+
+    public function acceptPunchType(): void
+    {
+        // Only available for Discrepancy status
+        if ($this->status !== 'Discrepancy') {
+            Log::warning("[UpdateTimeRecordModal] Accept Punch Type called for non-Discrepancy record: {$this->attendanceId}");
+            return;
+        }
+
+        try {
+            // Change status from Discrepancy to Complete without changing punch type
+            Attendance::where('id', $this->attendanceId)->update([
+                'status' => 'Complete',
+                'updated_at' => now(),
+            ]);
+
+            Log::info("[UpdateTimeRecordModal] Accepted punch type for Record ID: {$this->attendanceId} - Status changed to Complete");
+
+        } catch (\Exception $e) {
+            Log::error("[UpdateTimeRecordModal] Accept Punch Type Failed", ['error' => $e->getMessage()]);
         }
 
         $this->dispatch('timeRecordUpdated');

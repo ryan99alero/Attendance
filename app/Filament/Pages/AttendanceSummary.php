@@ -34,9 +34,29 @@ class AttendanceSummary extends Page
     public function mount(): void
     {
         Log::info("[AttendanceSummary] mount() called - Initializing component.");
+
+        // Set defaults
         $this->payPeriodId = null;
         $this->search = '';
         $this->groupedAttendances = collect();
+
+        // Check for URL parameters
+        if (request()->has('payPeriodId')) {
+            $this->payPeriodId = request()->get('payPeriodId');
+        }
+
+        if (request()->has('statusFilter')) {
+            $this->statusFilter = request()->get('statusFilter');
+        }
+
+        if (request()->has('duplicatesFilter')) {
+            $this->duplicatesFilter = request()->get('duplicatesFilter');
+        }
+
+        // If payPeriodId was set from URL, fetch attendances
+        if ($this->payPeriodId) {
+            $this->updateAttendances();
+        }
     }
 
     protected function getFormSchema(): array
@@ -73,6 +93,7 @@ class AttendanceSummary extends Page
                     'all' => 'All',
                     'duplicates_only' => 'Duplicates Only',
                     'flexibility_issues' => 'Flexibility Issues (2+ Unclassified)',
+                    'consensus' => 'Engine Discrepancy',
                 ])
                 ->default('all')
                 ->reactive()
@@ -292,6 +313,7 @@ class AttendanceSummary extends Page
                     'device_id' => $punch->device_id,
                     'punch_type' => $type,
                     'multiple' => $hasMultiple,
+                    'status' => $punch->status, // Add individual punch status
                 ];
 
                 if ($hasMultiple) {
@@ -334,6 +356,13 @@ class AttendanceSummary extends Page
         if ($this->duplicatesFilter === 'flexibility_issues') {
             $grouped = $grouped->filter(function ($item) {
                 return $item['employee']['has_flexibility_issue'] ?? false;
+            });
+        }
+
+        // Apply consensus filter
+        if ($this->duplicatesFilter === 'consensus') {
+            $grouped = $grouped->filter(function ($item) {
+                return $item['employee']['status'] === 'Discrepancy';
             });
         }
 

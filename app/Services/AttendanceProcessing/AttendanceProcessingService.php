@@ -3,6 +3,7 @@
 namespace App\Services\AttendanceProcessing;
 
 use App\Models\PayPeriod;
+use App\Models\Attendance;
 use Illuminate\Support\Facades\Log;
 use App\Services\HolidayProcessing\HolidayAttendanceProcessor;
 use App\Services\VacationProcessing\VacationTimeProcessAttendanceService;
@@ -134,8 +135,9 @@ class AttendanceProcessingService
         if ($autoProcess) {
             Log::info("[AttendanceProcessing] 🚀 Auto-Process enabled. Triggering Punch Migration Service.");
 
-            // ✅ Fix PayPeriod fetch logic
-            $payPeriod = PayPeriod::find($attendanceIds[0] ?? 0);
+            // ✅ Get PayPeriod from first attendance record
+            $firstAttendance = Attendance::find($attendanceIds[0] ?? 0);
+            $payPeriod = $firstAttendance ? PayPeriod::current() : null;
             if ($payPeriod instanceof PayPeriod) {
                 $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
                 Log::info("[AttendanceProcessing] ✅ Punch migration completed.");

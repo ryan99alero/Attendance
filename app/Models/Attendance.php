@@ -84,6 +84,7 @@ class Attendance extends Model
         'status',
         'issue_notes',
         'is_manual',
+        'is_posted',
         'created_by',
         'updated_by',
         'holiday_id',
@@ -100,6 +101,7 @@ class Attendance extends Model
         'punch_time' => 'datetime', // Use raw datetime for flexibility
         'is_manual' => 'boolean',
         'is_migrated' => 'boolean',
+        'is_posted' => 'boolean',
     ];
 
     protected $guarded = ['is_migrated'];

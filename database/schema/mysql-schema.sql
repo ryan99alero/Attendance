@@ -242,7 +242,7 @@ CREATE TABLE `company_setup` (
   `enforce_shift_schedules` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'Require employees to adhere to assigned shift schedules',
   `allow_manual_time_edits` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'Allow admins to manually edit time records',
   `max_shift_length` int NOT NULL DEFAULT '12' COMMENT 'Maximum shift length in hours before requiring admin approval',
-  `debug_punch_assignment_mode` enum('shift_schedule','heuristic','ml','full') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'full' COMMENT 'Controls which Punch Type Assignment service runs for debugging',
+  `debug_punch_assignment_mode` enum('heuristic','ml','consensus','all') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'all' COMMENT 'Controls which Punch Type Assignment service runs for debugging',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)

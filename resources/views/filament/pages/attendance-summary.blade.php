@@ -46,6 +46,20 @@
                             </td>
                             <td class="border border-gray-300 px-4 py-2 dark:border-gray-700">
                                 {{ $attendance['employee']['FullName'] }}
+                                @php
+                                    $hasConsensusIssue = false;
+                                    foreach ($attendance['punches'] as $punchType => $punches) {
+                                        foreach ($punches as $punch) {
+                                            if (($punch['status'] ?? '') === 'Discrepancy') {
+                                                $hasConsensusIssue = true;
+                                                break 2;
+                                            }
+                                        }
+                                    }
+                                @endphp
+                                @if ($hasConsensusIssue)
+                                    <span class="ml-2 text-orange-500" title="Engine discrepancy - validation engines disagree on punch type assignments">🔥</span>
+                                @endif
                                 @if ($attendance['employee']['has_flexibility_issue'] ?? false)
                                     <span class="ml-2 text-yellow-500" title="Employee has 2+ unclassified punches - may need different shift schedule">⚠️</span>
                                 @endif
@@ -72,9 +86,18 @@
             date: '{{ $attendance['employee']['shift_date'] }}',
             punchType: '{{ $type }}',
             existingTime: '{{ $punch['punch_time'] ?? '' }}',
-            punchState: '{{ $punch['punch_state'] ?? '' }}'
+            punchState: '{{ $punch['punch_state'] ?? '' }}',
+            status: '{{ $punch['status'] ?? '' }}'
         })"
-                                  style="color: {{ !empty($punch['multiple']) && !empty($punch['multiples_list']) ? 'red' : 'white' }}; text-decoration: underline; cursor: pointer;">
+                                  @php
+                                      $color = 'white'; // default color
+                                      if (!empty($punch['multiple']) && !empty($punch['multiples_list'])) {
+                                          $color = 'red'; // duplicates in red
+                                      } elseif (($punch['status'] ?? '') === 'Discrepancy') {
+                                          $color = 'orange'; // engine discrepancies in orange
+                                      }
+                                  @endphp
+                                  style="color: {{ $color }}; text-decoration: underline; cursor: pointer;">
     {{ is_string($punch['punch_time'] ?? null) ? $punch['punch_time'] : 'N/A' }}
 </span>
                                                 @if (!empty($punch['multiple']) && !empty($punch['multiples_list']) && is_array($punch['multiples_list']))

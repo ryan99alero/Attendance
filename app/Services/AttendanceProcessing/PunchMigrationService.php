@@ -87,16 +87,14 @@ class PunchMigrationService
                     'employee_id'       => $attendance->employee_id,
                     'device_id'         => $attendance->device_id,
                     'punch_type_id'     => $attendance->punch_type_id,
-                    'punch_state'       => $attendance->punch_state, // ✅ Added punch_state
+                    'punch_state'       => $attendance->punch_state,
                     'punch_time'        => $roundedPunchTime->format('Y-m-d H:i:s'),
                     'is_altered'        => true,
                     'pay_period_id'     => $payPeriod->id,
                     'attendance_id'     => $attendance->id,
                     'external_group_id' => $externalGroupId,
                     'shift_date'        => $attendance->shift_date,
-                    'holiday_id'        => $attendance->holiday_id,
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
+                    'classification_id' => $attendance->classification_id,
                 ];
 
                 Log::info("PunchMigrationService ✅ Inserting punch record: " . json_encode($punchData));
@@ -127,6 +125,9 @@ class PunchMigrationService
         }
 
         Log::info("PunchMigrationService ✅ Completed migratePunchesWithinPayPeriod for PayPeriod ID: {$payPeriod->id}");
+
+        // ✅ Check if all records are properly migrated and update PayPeriod if needed
+        $this->checkAndUpdatePayPeriodProcessedStatus($payPeriod);
     }
 
     private function getPunchTypeId(string $type): ?int
@@ -152,6 +153,54 @@ class PunchMigrationService
                 ->whereIn('status', ['Complete', 'Migrated'])
                 ->whereIn('punch_type_id', [$this->getPunchTypeId('Clock In'), $this->getPunchTypeId('Clock Out')])
                 ->count() >= 2;
+    }
+
+    /**
+     * Check if all attendance records within the pay period are properly migrated
+     * and update PayPeriod.is_processed = true if conditions are met.
+     */
+    public function checkAndUpdatePayPeriodProcessedStatus(PayPeriod $payPeriod): void
+    {
+        Log::info("PunchMigrationService ✅ Checking PayPeriod processed status for PayPeriod ID: {$payPeriod->id}");
+
+        $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
+        $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
+
+        // Get all attendance records within the pay period
+        $allRecords = Attendance::whereBetween('punch_time', [$startDate, $endDate])->get();
+        $totalRecords = $allRecords->count();
+
+        if ($totalRecords === 0) {
+            Log::info("PunchMigrationService ℹ️ No attendance records found for PayPeriod ID: {$payPeriod->id}");
+            return;
+        }
+
+        // Check if all records have punch_type_id and status = 'Migrated'
+        $properlyMigratedRecords = $allRecords->filter(function ($record) {
+            return !is_null($record->punch_type_id) && $record->status === 'Migrated';
+        });
+
+        $migratedCount = $properlyMigratedRecords->count();
+
+        Log::info("PunchMigrationService ✅ Migration Status for PayPeriod ID {$payPeriod->id}: {$migratedCount}/{$totalRecords} records properly migrated");
+
+        // If all records are properly migrated, set PayPeriod.is_processed = true
+        if ($migratedCount === $totalRecords) {
+            $payPeriod->update(['is_processed' => true]);
+            Log::info("PunchMigrationService ✅ Set PayPeriod ID {$payPeriod->id} is_processed = true - All {$totalRecords} records are properly migrated");
+        } else {
+            $unmigratedRecords = $totalRecords - $migratedCount;
+            Log::info("PunchMigrationService ⚠️ PayPeriod ID {$payPeriod->id} NOT marked as processed - {$unmigratedRecords} records still need migration");
+
+            // Optional: Log details about unmigrated records for debugging
+            $unmigrated = $allRecords->filter(function ($record) {
+                return is_null($record->punch_type_id) || $record->status !== 'Migrated';
+            });
+
+            foreach ($unmigrated as $record) {
+                Log::debug("PunchMigrationService 🔍 Unmigrated record - Attendance ID: {$record->id}, Status: {$record->status}, PunchType: " . ($record->punch_type_id ?? 'NULL'));
+            }
+        }
     }
 
 }

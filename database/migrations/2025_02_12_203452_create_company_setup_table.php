@@ -27,8 +27,8 @@ return new class extends Migration {
                 ->comment('Maximum shift length in hours before requiring admin approval');
 
             // NEW FIELD: Debug mode for punch assignment
-            $table->enum('debug_punch_assignment_mode', ['shift_schedule', 'heuristic', 'ml', 'full'])
-                ->default('full')
+            $table->enum('debug_punch_assignment_mode', ['heuristic', 'ml', 'consensus', 'all'])
+                ->default('all')
                 ->comment('Controls which Punch Type Assignment service runs for debugging');
 
             $table->timestamps();

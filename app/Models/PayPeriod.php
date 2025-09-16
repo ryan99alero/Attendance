@@ -48,6 +48,7 @@ class PayPeriod extends Model
         'start_date',
         'end_date',
         'is_processed',
+        'is_posted',
         'processed_by',
         'created_by',
         'updated_by',
@@ -57,6 +58,7 @@ class PayPeriod extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'is_processed' => 'boolean',
+        'is_posted' => 'boolean',
     ];
 
     // Relationships
@@ -106,13 +108,23 @@ class PayPeriod extends Model
     public function punchCount(): int
     {
         // Count all attendance records that have punch_type_id assigned (processed records)
-        // This includes both 'Complete' and 'Migrated' records
+        // This includes 'Complete', 'Migrated', and 'Posted' records
         return Attendance::whereBetween('punch_time', [
             $this->start_date->startOfDay(),
             $this->end_date->endOfDay()
         ])
         ->whereNotNull('punch_type_id')
-        ->whereIn('status', ['Complete', 'Migrated'])
+        ->whereIn('status', ['Complete', 'Migrated', 'Posted'])
+        ->count();
+    }
+
+    public function consensusDisagreementCount(): int
+    {
+        return Attendance::whereBetween('punch_time', [
+            $this->start_date->startOfDay(),
+            $this->end_date->endOfDay()
+        ])
+        ->where('status', 'Discrepancy')
         ->count();
     }
 

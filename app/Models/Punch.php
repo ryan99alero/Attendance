@@ -44,7 +44,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Punch whereUpdatedBy($value)
  * @property int|null $classification_id Foreign key referencing the classifications table
- * @property int $is_processed
+ * @property bool $is_posted
  * @property string $external_group_id Links to attendance_time_groups.external_group_id
  * @property string|null $shift_date The assigned workday for this punch record
  * @property int $is_archived Indicates if record is archived
@@ -69,6 +69,7 @@ class Punch extends Model
         'attendance_id',
         'is_altered',
         'is_late',
+        'is_posted',
         'created_by',
         'updated_by',
         'external_group_id',
@@ -79,21 +80,35 @@ class Punch extends Model
         'punch_time' => 'datetime',
         'is_altered' => 'boolean',
         'is_late' => 'boolean',
+        'is_posted' => 'boolean',
     ];
 
     /**
-     * Automatically flag 'is_altered' when a record is updated.
+     * Automatically flag 'is_altered' when a record is updated and set created_by/updated_by fields.
      */
     protected static function boot(): void
     {
         parent::boot();
 
+        static::creating(function ($punch) {
+            if (auth()->check()) {
+                $punch->created_by = auth()->id();
+            }
+        });
+
         static::updating(function ($punch) {
+            if (auth()->check()) {
+                $punch->updated_by = auth()->id();
+            }
+
             $dirtyFields = $punch->getDirty();
 
-            // Ignore changes to 'is_altered'
+            // Ignore changes to 'is_altered' and 'updated_by'
             if (array_key_exists('is_altered', $dirtyFields)) {
                 unset($dirtyFields['is_altered']);
+            }
+            if (array_key_exists('updated_by', $dirtyFields)) {
+                unset($dirtyFields['updated_by']);
             }
 
             // If any other field was changed, set 'is_altered' to true

@@ -5,29 +5,29 @@ namespace App\Services\TimeGrouping;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use App\Models\CompanySetup;
-use App\Services\Shift\ShiftSchedulePunchTypeAssignmentService;
 use App\Services\Heuristic\HeuristicPunchTypeAssignmentService;
 use App\Services\ML\MLPunchTypePredictorService;
+use App\Services\Consensus\PunchTypeConsensusService;
 use App\Services\TimeGrouping\AttendanceTimeGroupService;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class AttendanceTimeProcessorService
 {
-    protected ShiftSchedulePunchTypeAssignmentService $shiftScheduleService;
     protected HeuristicPunchTypeAssignmentService $heuristicService;
     protected MLPunchTypePredictorService $mlService;
+    protected PunchTypeConsensusService $consensusService;
     protected AttendanceTimeGroupService $attendanceTimeGroupService;
 
     public function __construct(
-        ShiftSchedulePunchTypeAssignmentService $shiftScheduleService,
         HeuristicPunchTypeAssignmentService $heuristicService,
         MLPunchTypePredictorService $mlService,
+        PunchTypeConsensusService $consensusService,
         AttendanceTimeGroupService $attendanceTimeGroupService
     ) {
-        $this->shiftScheduleService = $shiftScheduleService;
         $this->heuristicService = $heuristicService;
         $this->mlService = $mlService;
+        $this->consensusService = $consensusService;
         $this->attendanceTimeGroupService = $attendanceTimeGroupService;
         Log::info("[Processor] Initialized AttendanceTimeProcessorService.");
     }
@@ -118,43 +118,35 @@ class AttendanceTimeProcessorService
                     Log::info("[Processor] Training Phase: Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
                     $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
 
-                    // Run Shift Schedule for any remaining punches
-                    $pendingPunches = $punches->whereNull('punch_type_id');
-                    if ($pendingPunches->isNotEmpty()) {
-                        Log::info("[Processor] Training Phase: Running Shift-Based Punch Assignment for Employee ID: {$employeeId}.");
-                        $this->shiftScheduleService->assignPunchTypes($pendingPunches, $flexibility, $punchEvaluations);
-                    }
-
                     Log::info("[Processor] Training phase completed. These processed records will become ML training data after migration.");
                 } else {
                     Log::info("[Processor] Sufficient training data available ({$trainingDataCount} records). Running ML mode.");
                     // Only run ML when we have enough training data
                     $this->mlService->assignPunchTypes($punches, $employeeId, $punchEvaluations);
                 }
+            } elseif ($debugMode === 'consensus') {
+                // ✅ Run Consensus Processing - both engines evaluate all punches
+                Log::info("[Processor] Running Consensus Punch Assignment for Employee ID: {$employeeId}.");
+                $this->consensusService->processConsensus($punches, $employeeId, $flexibility, $punchEvaluations);
             } else {
                 // ✅ 1️⃣ Run Heuristic Processing First
-                if ($debugMode === 'heuristic' || $debugMode === 'full') {
+                if ($debugMode === 'heuristic' || $debugMode === 'all') {
                     Log::info("[Processor] Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
                     $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
                 }
 
-                // ✅ 2️⃣ Process Any Punches That Still Need a Punch Type Using Shift Logic
-                $pendingPunches = $punches->whereNull('punch_type_id');
-                if ($pendingPunches->isNotEmpty() && ($debugMode === 'shift_schedule' || $debugMode === 'full')) {
-                    Log::info("[Processor] Running Shift-Based Punch Assignment for Employee ID: {$employeeId}.");
-                    $this->shiftScheduleService->assignPunchTypes($pendingPunches, $flexibility, $punchEvaluations);
-                }
-
-                // ✅ 3️⃣ Process Any Remaining Unresolved Punches Using ML
+                // ✅ 2️⃣ Process Any Remaining Unresolved Punches Using ML
                 $mlPendingPunches = $punches->whereNull('punch_type_id');
-                if ($mlPendingPunches->isNotEmpty() && ($debugMode === 'full' && $companySetup->use_ml_for_punch_matching)) {
+                if ($mlPendingPunches->isNotEmpty() && ($debugMode === 'all' && $companySetup->use_ml_for_punch_matching)) {
                     Log::info("[Processor] Running ML Punch Assignment for Employee ID: {$employeeId}.");
                     $this->mlService->assignPunchTypes($mlPendingPunches, $employeeId, $punchEvaluations);
                 }
             }
 
-            // ✅ 4️⃣ FINALIZE Punch Types for Employee
-            $this->finalizePunchTypes($punches, $punchEvaluations);
+            // ✅ 4️⃣ FINALIZE Punch Types for Employee (skip if consensus mode handled it)
+            if ($debugMode !== 'consensus') {
+                $this->finalizePunchTypes($punches, $punchEvaluations);
+            }
 
             Log::info("[Processor] Punch Type Evaluations Completed for Employee ID: {$employeeId}");
         }
@@ -199,17 +191,13 @@ class AttendanceTimeProcessorService
 
     private function selectFinalPunchType($evaluations): ?int
     {
-        // Prioritize ML -> Heuristic -> Shift
+        // Prioritize ML -> Heuristic
         if (isset($evaluations['ml']['punch_type_id'])) {
             return $evaluations['ml']['punch_type_id'];
         }
 
         if (isset($evaluations['heuristic']['punch_type_id'])) {
             return $evaluations['heuristic']['punch_type_id'];
-        }
-
-        if (isset($evaluations['shift']['punch_type_id'])) {
-            return $evaluations['shift']['punch_type_id'];
         }
 
         return null;
@@ -223,10 +211,6 @@ class AttendanceTimeProcessorService
 
         if (isset($evaluations['heuristic']['punch_state'])) {
             return $evaluations['heuristic']['punch_state'];
-        }
-
-        if (isset($evaluations['shift']['punch_state'])) {
-            return $evaluations['shift']['punch_state'];
         }
 
         return 'unknown';

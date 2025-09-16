@@ -43,46 +43,83 @@ class PayPeriodResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            TextColumn::make('start_date')
-                ->label('Start Date')
-                ->date(),
+        return $table
+            ->columns([
+                TextColumn::make('start_date')
+                    ->label('Start Date')
+                    ->date()
+                    ->size('sm')
+                    ->width('auto'),
 
-            TextColumn::make('end_date')
-                ->label('End Date')
-                ->date(),
+                TextColumn::make('end_date')
+                    ->label('End Date')
+                    ->date()
+                    ->size('sm')
+                    ->width('auto')
+                    ->hiddenFrom('sm'),
 
-            IconColumn::make('is_processed')
-                ->label('Processed')
-                ->boolean(),
+                IconColumn::make('is_processed')
+                    ->label('Processed')
+                    ->boolean()
+                    ->size('sm')
+                    ->width('auto'),
 
-            TextColumn::make('attendance_issues_count')
-                ->label('Attendance Issues')
-                ->state(fn ($record) => $record->attendanceIssuesCount())
-                ->sortable()
-                ->url(fn ($record) => route('filament.admin.resources.attendances.index', [
-                    'filter' => [
-                        'is_migrated' => false,
-                        'date_range' => [
-                            'start' => $record->start_date->toDateString(),
-                            'end' => $record->end_date->toDateString(),
+                IconColumn::make('is_posted')
+                    ->label('Posted')
+                    ->boolean()
+                    ->size('sm')
+                    ->width('auto'),
+
+                TextColumn::make('attendance_issues_count')
+                    ->label('Issues')
+                    ->state(fn ($record) => $record->attendanceIssuesCount())
+                    ->sortable()
+                    ->url(fn ($record) => route('filament.admin.resources.attendances.index', [
+                        'filter' => [
+                            'is_migrated' => false,
+                            'date_range' => [
+                                'start' => $record->start_date->toDateString(),
+                                'end' => $record->end_date->toDateString(),
+                            ],
                         ],
-                    ],
-                ]), true)
-                ->color('danger'),
+                    ]), true)
+                    ->color('danger')
+                    ->size('sm')
+                    ->width('auto')
+                    ->alignment('center'),
 
-            TextColumn::make('punch_count')
-                ->label('Punch Count')
-                ->state(fn ($record) => $record->punchCount())
-                ->sortable()
-                ->color('success'),
-        ])
+                TextColumn::make('consensus_disagreement_count')
+                    ->label('Engine Disc.')
+                    ->state(fn ($record) => $record->consensusDisagreementCount())
+                    ->sortable()
+                    ->url(fn ($record) => '/admin/attendance-summary?' . http_build_query([
+                        'payPeriodId' => $record->id,
+                        'statusFilter' => 'all',
+                        'duplicatesFilter' => 'consensus',
+                    ]), true)
+                    ->color('warning')
+                    ->size('sm')
+                    ->width('auto')
+                    ->alignment('center'),
+
+                TextColumn::make('punch_count')
+                    ->label('Punches')
+                    ->state(fn ($record) => $record->punchCount())
+                    ->sortable()
+                    ->color('success')
+                    ->size('sm')
+                    ->width('auto')
+                    ->alignment('center'),
+            ])
+            ->defaultSort('start_date', 'desc')
+            ->striped()
             ->actions([
                 // Process Time Button
                 Action::make('process_time')
                     ->label('Process Time')
                     ->color('primary')
                     ->icon('heroicon-o-arrow-down-on-square')
+                    ->size('sm')
                     ->extraAttributes(['data-action' => 'process_time'])
                     ->action(function ($record) {
                         set_time_limit(0); // Remove time limit for long operations
@@ -116,16 +153,27 @@ class PayPeriodResource extends Resource
                     ->label('Post Time')
                     ->color('success')
                     ->icon('heroicon-o-check-circle')
+                    ->size('sm')
                     ->requiresConfirmation()
                     ->modalHeading('Post Time Records')
-                    ->modalDescription(fn ($record) => $record->attendanceIssuesCount() > 0
-                        ? 'Warning: There are ' . $record->attendanceIssuesCount() . ' unresolved attendance issues. These must be resolved before posting.'
-                        : 'This will finalize and archive all attendance records for this pay period. This action cannot be undone.'
+                    ->modalDescription(fn ($record) =>
+                        $record->is_posted
+                            ? 'This pay period has already been posted and cannot be posted again.'
+                            : ($record->attendanceIssuesCount() > 0 || $record->consensusDisagreementCount() > 0
+                                ? 'Validation engine failed: There are punch type disagreements that require review. ' . ($record->attendanceIssuesCount() + $record->consensusDisagreementCount()) . ' unresolved issues (' . $record->attendanceIssuesCount() . ' attendance issues, ' . $record->consensusDisagreementCount() . ' engine discrepancies). Please review all issues before posting.'
+                                : 'This will finalize and archive all attendance records for this pay period. This action cannot be undone.')
                     )
-                    ->modalSubmitActionLabel('Post Time')
-                    ->disabled(fn ($record) => $record->attendanceIssuesCount() > 0)
+                    ->modalSubmitActionLabel(fn ($record) =>
+                        $record->consensusDisagreementCount() > 0 ? 'Close' : 'Post Time'
+                    )
+                    ->disabled(fn ($record) => $record->attendanceIssuesCount() > 0 || $record->is_posted)
                     ->action(function ($record) {
-                        // Double-check for unresolved attendance issues
+                        // If there are engine discrepancies, the "Close" button was clicked - just return
+                        if ($record->consensusDisagreementCount() > 0) {
+                            return;
+                        }
+
+                        // Double-check for unresolved attendance issues (but not consensus - those are handled by modal)
                         if ($record->attendanceIssuesCount() > 0) {
                             \Filament\Notifications\Notification::make()
                                 ->danger()
@@ -142,20 +190,30 @@ class PayPeriodResource extends Resource
                             ->send();
 
                         try {
-                            // Archive processed records and mark pay period as processed
-                            $updatedRecords = DB::table('attendances')
+                            // Archive only properly processed records (Migrated status with punch types assigned)
+                            $updatedAttendanceRecords = DB::table('attendances')
                                 ->whereBetween('punch_time', [
                                     \Carbon\Carbon::parse($record->start_date)->startOfDay(),
                                     \Carbon\Carbon::parse($record->end_date)->endOfDay(),
                                 ])
-                                ->update(['status' => 'Posted']);
+                                ->where('status', 'Migrated')
+                                ->whereNotNull('punch_type_id')
+                                ->update([
+                                    'status' => 'Posted',
+                                    'is_posted' => true
+                                ]);
+
+                            // Also update corresponding punch records to set is_posted = true
+                            $updatedPunchRecords = DB::table('punches')
+                                ->where('pay_period_id', $record->id)
+                                ->update(['is_posted' => true]);
 
                             $record->update(['is_posted' => true]);
 
                             \Filament\Notifications\Notification::make()
                                 ->success()
                                 ->title('Time Posted Successfully')
-                                ->body("Finalized {$updatedRecords} attendance records for Pay Period ID: {$record->id}")
+                                ->body("Posted {$updatedAttendanceRecords} attendance records and {$updatedPunchRecords} punch records for Pay Period ID: {$record->id}")
                                 ->send();
 
                         } catch (\Exception $e) {
@@ -173,6 +231,7 @@ class PayPeriodResource extends Resource
                     ->label('View Punches')
                     ->color('secondary')
                     ->icon('heroicon-o-eye')
+                    ->size('sm')
                     ->url(fn ($record) => route('filament.admin.resources.punches.index', ['pay_period_id' => $record->id])),
             ]);
     }

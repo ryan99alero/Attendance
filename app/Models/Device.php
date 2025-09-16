@@ -44,8 +44,15 @@ class Device extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'device_id',
         'device_name',
+        'mac_address',
         'ip_address',
+        'last_seen_at',
+        'last_ip',
+        'last_mac',
+        'firmware_version',
+        'last_wakeup_at',
         'is_active',
         'department_id',
         'created_by',

@@ -123,6 +123,36 @@ class AttendanceResource extends Resource
                     ]);
                 }
 
+                // Apply consensus review filter - show all records from days that have Discrepancy records
+                if ($filter && isset($filter['consensus_review']) && $filter['consensus_review']) {
+                    // Get all dates that have Discrepancy records within the date range
+                    $dateRangeCondition = function ($subQuery) use ($filter) {
+                        if (isset($filter['date_range']['start'], $filter['date_range']['end'])) {
+                            $subQuery->whereBetween('punch_time', [
+                                $filter['date_range']['start'],
+                                $filter['date_range']['end']
+                            ]);
+                        }
+                    };
+
+                    $disagreementDates = \App\Models\Attendance::where('status', 'Discrepancy')
+                        ->where($dateRangeCondition)
+                        ->selectRaw('DATE(punch_time) as review_date')
+                        ->distinct()
+                        ->pluck('review_date');
+
+                    // Show all records from those dates
+                    if ($disagreementDates->isNotEmpty()) {
+                        $query->whereIn(
+                            \Illuminate\Support\Facades\DB::raw('DATE(punch_time)'),
+                            $disagreementDates
+                        );
+                    } else {
+                        // If no consensus review records found, show none
+                        $query->whereRaw('1 = 0');
+                    }
+                }
+
                 // Apply `is_migrated` filter
                 if ($filter && isset($filter['is_migrated'])) {
                     $query->where('is_migrated', $filter['is_migrated']);

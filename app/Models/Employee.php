@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
@@ -146,6 +147,16 @@ class Employee extends Model
     public function user(): HasOne
     {
         return $this->hasOne(User::class, 'employee_id');
+    }
+
+    public function credentials(): HasMany
+    {
+        return $this->hasMany(Credential::class);
+    }
+
+    public function clockEvents(): HasMany
+    {
+        return $this->hasMany(ClockEvent::class);
     }
 
     public function getFullNameAttribute(): string
