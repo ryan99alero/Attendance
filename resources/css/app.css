@@ -1,3 +1,41 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Fix mobile navigation scrolling for Filament */
+@media (max-width: 768px) {
+    /* Target all possible sidebar containers */
+    .fi-sidebar,
+    .fi-sidebar-nav,
+    .fi-layout-sidebar,
+    [data-sidebar],
+    nav[aria-label="Navigation"],
+    .fi-sidebar-content,
+    .fi-sidebar-group-list {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        max-height: 100vh !important;
+        -webkit-overflow-scrolling: touch !important;
+        position: relative !important;
+    }
+
+    /* Specific fixes for navigation lists */
+    .fi-sidebar-nav ul,
+    .fi-sidebar-group ul {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Fix for the main navigation container */
+    aside[role="navigation"],
+    .fi-layout aside {
+        height: 100vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Ensure body doesn't interfere */
+    body {
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
