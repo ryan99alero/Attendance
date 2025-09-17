@@ -34,11 +34,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label('Punch & Attendance')
+                    ->label('Employee Management')
                     ->collapsible()
                     ->collapsed(),
                 NavigationGroup::make()
-                    ->label('Employee Management')
+                    ->label('Time Tracking')
                     ->collapsible()
                     ->collapsed(),
                 NavigationGroup::make()
@@ -50,11 +50,15 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsible()
                     ->collapsed(),
                 NavigationGroup::make()
-                    ->label('Reports & Stats')
+                    ->label('Time Off Management')
                     ->collapsible()
-                    ->collapsed(), // Placeholder for future reports and statistics
+                    ->collapsed(),
                 NavigationGroup::make()
-                    ->label('Settings')
+                    ->label('System & Hardware')
+                    ->collapsible()
+                    ->collapsed(),
+                NavigationGroup::make()
+                    ->label('Reports & Analytics')
                     ->collapsible()
                     ->collapsed(),
             ])
@@ -63,17 +67,17 @@ class AdminPanelProvider extends PanelProvider
                 NavigationItem::make('Attendance Summary')
                     ->url('/admin/attendance-summary')
                     ->icon('heroicon-o-document-text')
-                    ->group('Punch & Attendance'),
+                    ->group('Time Tracking'),
                 NavigationItem::make('Punch Summary')
                     ->url('/admin/punch-summary')
                     ->icon('heroicon-o-finger-print')
-                    ->group('Punch & Attendance'),
+                    ->group('Time Tracking'),
 
-                // Reports & Stats (placeholder for future reports)
+                // Reports & Analytics (placeholder for future reports)
                 NavigationItem::make('Reports Dashboard')
                     ->url('/admin/reports-placeholder')
                     ->icon('heroicon-o-chart-pie')
-                    ->group('Reports & Stats'),
+                    ->group('Reports & Analytics'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

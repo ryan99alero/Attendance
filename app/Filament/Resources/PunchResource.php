@@ -20,7 +20,7 @@ class PunchResource extends Resource
     protected static ?string $model = Punch::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Punch & Attendance';
+    protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Punches';
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
     protected static ?int $navigationSort = 20;

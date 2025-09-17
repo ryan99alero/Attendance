@@ -15,10 +15,10 @@ class PunchTypeResource extends Resource
     protected static ?string $model = PunchType::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Punch & Attendance';
+    protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Punch Types';
-    protected static ?string $navigationIcon = 'heroicon-o-cloud';
-    protected static ?int $navigationSort = 60;
+    protected static ?string $navigationIcon = 'heroicon-o-tag';
+    protected static ?int $navigationSort = 40;
 
     public static function form(Forms\Form $form): Forms\Form
     {

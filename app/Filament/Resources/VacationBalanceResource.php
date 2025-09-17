@@ -13,9 +13,10 @@ use Filament\Tables\Table;
 class VacationBalanceResource extends Resource
 {
     protected static ?string $model = VacationBalance::class;
-    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Vacation Balances';
+    protected static ?string $navigationGroup = 'Time Off Management';
+    protected static ?int $navigationSort = 20;
 
     public static function form(Form $form): Form
     {

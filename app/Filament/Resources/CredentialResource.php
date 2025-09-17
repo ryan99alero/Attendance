@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CredentialResource\Pages;
-use App\Filament\Resources\CredentialResource\RelationManagers;
 use App\Models\Credential;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -21,7 +20,7 @@ class CredentialResource extends Resource
     protected static ?string $navigationGroup = 'Employee Management';
     protected static ?string $navigationLabel = 'Employee Credentials';
     protected static ?string $navigationIcon = 'heroicon-o-key';
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 40;
 
     public static function form(Form $form): Form
     {

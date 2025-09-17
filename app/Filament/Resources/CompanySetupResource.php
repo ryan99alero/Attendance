@@ -14,10 +14,10 @@ class CompanySetupResource extends Resource
     protected static ?string $model = CompanySetup::class;
 
     protected static ?string $navigationLabel = 'Company Setup';
-    protected static ?string $navigationGroup = 'Settings';
+    protected static ?string $navigationGroup = 'System & Hardware';
     protected static ?string $slug = 'company-setup';
     protected static ?string $navigationIcon = 'heroicon-o-cog';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 20;
 
     public static function form(Forms\Form $form): Forms\Form
     {

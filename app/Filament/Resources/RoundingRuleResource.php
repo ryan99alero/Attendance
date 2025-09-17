@@ -14,8 +14,10 @@ use Filament\Tables\Table;
 class RoundingRuleResource extends Resource
 {
     protected static ?string $model = RoundingRule::class;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationIcon = 'heroicon-o-calculator';
+    protected static ?string $navigationLabel = 'Rounding Rules';
+    protected static ?string $navigationGroup = 'Payroll & Overtime';
+    protected static ?int $navigationSort = 50;
 
     public static function form(Form $form): Form
     {

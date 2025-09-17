@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ClockEventResource\Pages;
-use App\Filament\Resources\ClockEventResource\RelationManagers;
 use App\Models\ClockEvent;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,14 +10,13 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ClockEventResource extends Resource
 {
     protected static ?string $model = ClockEvent::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Punch & Attendance';
+    protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Clock Events';
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?int $navigationSort = 15;
@@ -144,6 +142,7 @@ class ClockEventResource extends Resource
                             ->label('Until Date'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
+                        /** @var Builder<ClockEvent> $query */
                         return $query
                             ->when(
                                 $data['from'],

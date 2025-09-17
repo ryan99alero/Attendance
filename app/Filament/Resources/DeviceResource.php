@@ -18,10 +18,10 @@ class DeviceResource extends Resource
     protected static ?string $model = Device::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Punch & Attendance';
+    protected static ?string $navigationGroup = 'System & Hardware';
     protected static ?string $navigationLabel = 'Devices';
     protected static ?string $navigationIcon = 'heroicon-o-device-phone-mobile';
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {

@@ -20,13 +20,16 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
+use Filament\Tables;
+use Filament\Forms;
+use Illuminate\Database\Eloquent\Builder;
 
 class AttendanceResource extends Resource
 {
     protected static ?string $model = Attendance::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Punch & Attendance';
+    protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Attendances';
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
     protected static ?int $navigationSort = 10;
@@ -140,9 +143,9 @@ class AttendanceResource extends Resource
 
                     $disagreementDates = \App\Models\Attendance::where('status', 'Discrepancy')
                         ->where($dateRangeCondition)
-                        ->selectRaw('DATE(punch_time) as review_date')
-                        ->distinct()
-                        ->pluck('review_date');
+                        ->get()
+                        ->map(fn($record) => $record->punch_time->format('Y-m-d'))
+                        ->unique();
 
                     // Show all records from those dates
                     if ($disagreementDates->isNotEmpty()) {
@@ -219,7 +222,111 @@ class AttendanceResource extends Resource
                         'success' => true,
                         'danger' => false,
                     ]),
-            ]);
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('device_id')
+                    ->label('Device')
+                    ->relationship('device', 'device_name')
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('employee_id')
+                    ->label('Employee')
+                    ->relationship('employee', 'full_names'),
+
+                Tables\Filters\SelectFilter::make('punch_type_id')
+                    ->label('Punch Type')
+                    ->relationship('punchType', 'name')
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Status')
+                    ->options(fn () => Attendance::getStatusOptions())
+                    ->multiple(),
+
+                Tables\Filters\TernaryFilter::make('is_manual')
+                    ->label('Manual Entry')
+                    ->boolean()
+                    ->trueLabel('Manual Only')
+                    ->falseLabel('Automatic Only')
+                    ->placeholder('All Entries'),
+
+                Tables\Filters\TernaryFilter::make('is_migrated')
+                    ->label('Migration Status')
+                    ->boolean()
+                    ->trueLabel('Migrated Only')
+                    ->falseLabel('Not Migrated Only')
+                    ->placeholder('All Records'),
+
+                Tables\Filters\Filter::make('punch_time')
+                    ->form([
+                        Forms\Components\DatePicker::make('from')
+                            ->label('From Date'),
+                        Forms\Components\DatePicker::make('until')
+                            ->label('Until Date'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('punch_time', '>=', $date),
+                            )
+                            ->when(
+                                $data['until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('punch_time', '<=', $date),
+                            );
+                    }),
+
+                Tables\Filters\Filter::make('pay_period')
+                    ->form([
+                        Forms\Components\Select::make('pay_period_id')
+                            ->label('Pay Period')
+                            ->options(function () {
+                                return PayPeriod::orderBy('start_date', 'desc')
+                                    ->limit(10)
+                                    ->get()
+                                    ->mapWithKeys(function ($period) {
+                                        return [$period->id => $period->start_date->format('M j') . ' - ' . $period->end_date->format('M j, Y')];
+                                    });
+                            })
+                            ->searchable()
+                            ->placeholder('Select Pay Period'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['pay_period_id'],
+                            function (Builder $query, $payPeriodId): Builder {
+                                $payPeriod = PayPeriod::find($payPeriodId);
+                                if ($payPeriod) {
+                                    return $query->whereBetween('punch_time', [
+                                        $payPeriod->start_date->startOfDay(),
+                                        $payPeriod->end_date->endOfDay(),
+                                    ]);
+                                }
+                                return $query;
+                            }
+                        );
+                    }),
+
+                Tables\Filters\Filter::make('issues_only')
+                    ->toggle()
+                    ->label('Issues Only')
+                    ->query(fn (Builder $query): Builder => $query->whereIn('status', ['NeedsReview', 'Incomplete', 'Discrepancy'])),
+
+                Tables\Filters\Filter::make('consensus_review')
+                    ->toggle()
+                    ->label('Consensus Review Required')
+                    ->query(fn (Builder $query): Builder => $query->where('status', 'Discrepancy')),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make(),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ])
+            ->defaultSort('punch_time', 'desc');
     }
 
     public static function getPages(): array
