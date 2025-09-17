@@ -7,9 +7,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-
+use Spatie\Permission\Traits\HasRoles;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 /**
- * 
+ *
  *
  * @property int $id
  * @property int|null $employee_id Foreign key to Employee, links the user account to an employee
@@ -52,7 +54,8 @@ use Filament\Panel;
  */
 class User extends Authenticatable implements FilamentUser
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasRoles;
+    protected string $guard_name = 'web';
 
     /**
      * The attributes that are mass assignable.
@@ -130,7 +133,10 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessFilament(): bool
     {
-        return $this->is_admin === true || $this->is_manager === true;
+        // Allow super_admin role or panel_user role
+        return $this->hasRole(['super_admin', 'panel_user', 'manager']) ||
+               $this->is_admin === true ||
+               $this->is_manager === true;
     }
 
     /**
@@ -162,5 +168,29 @@ class User extends Authenticatable implements FilamentUser
                 $model->updated_by = auth()->id();
             }
         });
+    }
+
+    /**
+     * Get the IDs of employees managed by this user.
+     *
+     * @return array
+     */
+    public function getManagedEmployeeIds(): array
+    {
+        if (!$this->hasRole('manager') || !$this->employee) {
+            return [];
+        }
+
+        // Get departments managed by this user's employee
+        $managedDepartmentIds = $this->employee->managedDepartments()->pluck('id')->toArray();
+
+        if (empty($managedDepartmentIds)) {
+            return [];
+        }
+
+        // Get employee IDs from those departments
+        return \App\Models\Employee::whereIn('department_id', $managedDepartmentIds)
+            ->pluck('id')
+            ->toArray();
     }
 }

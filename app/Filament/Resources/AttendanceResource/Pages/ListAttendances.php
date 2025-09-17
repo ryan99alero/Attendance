@@ -16,6 +16,27 @@ class ListAttendances extends ListRecords
 {
     protected static string $resource = AttendanceResource::class;
 
+    protected function getTableQuery(): ?\Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getTableQuery();
+
+        // Apply department filtering for managers
+        $user = auth()->user();
+
+        if ($user && $user->hasRole('manager') && !$user->hasRole('super_admin')) {
+            $managedEmployeeIds = $user->getManagedEmployeeIds();
+
+            if (!empty($managedEmployeeIds)) {
+                $query->whereIn('employee_id', $managedEmployeeIds);
+            } else {
+                // If manager has no employees, show no records
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        return $query;
+    }
+
     protected function getHeaderActions(): array
     {
         return [

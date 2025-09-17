@@ -213,6 +213,19 @@ class AttendanceSummary extends Page
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
             ->whereBetween('attendances.shift_date', [$payPeriod->start_date, $payPeriod->end_date]);
 
+        // Apply department filtering for managers
+        $user = auth()->user();
+        if ($user && $user->hasRole('manager') && !$user->hasRole('super_admin')) {
+            $managedEmployeeIds = $user->getManagedEmployeeIds();
+
+            if (!empty($managedEmployeeIds)) {
+                $attendancesQuery->whereIn('attendances.employee_id', $managedEmployeeIds);
+            } else {
+                // If manager has no employees, show no records
+                $attendancesQuery->whereRaw('1 = 0');
+            }
+        }
+
         // Handle different status filters
         if ($this->statusFilter === 'problem') {
             $attendancesQuery->where('attendances.status', '!=', 'Migrated');

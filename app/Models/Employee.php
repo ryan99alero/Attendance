@@ -156,6 +156,14 @@ class Employee extends Model
         return "{$this->first_name} {$this->last_name}";
     }
 
+    /**
+     * Get departments where this employee is the manager.
+     */
+    public function managedDepartments(): HasMany
+    {
+        return $this->hasMany(Department::class, 'manager_id');
+    }
+
     protected static function boot(): void
     {
         parent::boot();
