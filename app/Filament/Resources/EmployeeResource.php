@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 
@@ -28,7 +29,7 @@ class EmployeeResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            // Basic personal information
+            // Basic Personal Information
             TextInput::make('first_name')
                 ->label('First Name')
                 ->required(),
@@ -41,8 +42,11 @@ class EmployeeResource extends Resource
             TextInput::make('phone')
                 ->label('Phone')
                 ->nullable(),
+            TextInput::make('external_id')
+                ->label('External ID')
+                ->nullable(),
 
-            // Address fields
+            // Address Information
             TextInput::make('address')
                 ->label('Address')
                 ->nullable(),
@@ -59,7 +63,18 @@ class EmployeeResource extends Resource
                 ->label('Country')
                 ->nullable(),
 
-            // Employment and organizational details
+            // Employment Dates
+            DatePicker::make('date_of_hire')
+                ->label('Date of Hire')
+                ->nullable(),
+            DatePicker::make('seniority_date')
+                ->label('Seniority Date')
+                ->nullable(),
+            DatePicker::make('termination_date')
+                ->label('Termination Date')
+                ->nullable(),
+
+            // Organizational Assignment
             Select::make('department_id')
                 ->label('Department')
                 ->options(Department::all()->pluck('name', 'id'))
@@ -82,18 +97,44 @@ class EmployeeResource extends Resource
                 ->nullable()
                 ->searchable(),
 
-            // Flags and identifiers
-            TextInput::make('external_id')
-                ->label('External ID')
+            // Pay Information
+            Select::make('pay_type')
+                ->label('Pay Type')
+                ->options([
+                    'hourly' => 'Hourly',
+                    'salary' => 'Salary',
+                    'contract' => 'Contract',
+                ])
+                ->default('hourly'),
+            TextInput::make('pay_rate')
+                ->label('Pay Rate')
+                ->numeric()
+                ->step(0.01)
                 ->nullable(),
+
+            // Overtime Settings
+            TextInput::make('overtime_rate')
+                ->label('Overtime Rate Multiplier')
+                ->numeric()
+                ->step(0.001)
+                ->default(1.500),
+            TextInput::make('double_time_threshold')
+                ->label('Double Time Threshold (Hours)')
+                ->numeric()
+                ->step(0.01)
+                ->nullable(),
+
+            // Note: Vacation management is now handled through the configurable vacation system
+
+            // Status Flags
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
             Toggle::make('full_time')
                 ->label('Full Time')
                 ->default(false),
-            Toggle::make('vacation_pay')
-                ->label('Vacation Pay')
+            Toggle::make('overtime_exempt')
+                ->label('Overtime Exempt')
                 ->default(false),
         ]);
     }

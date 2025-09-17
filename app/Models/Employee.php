@@ -98,18 +98,31 @@ class Employee extends Model
         'termination_date',
         'is_active',
         'full_time',
-        'vacation_pay',
         'created_at',
         'updated_at',
         'full_names',
         'shift_schedule_id',
+        // Employment fields
+        'date_of_hire',
+        'seniority_date',
+        'overtime_exempt',
+        'overtime_rate',
+        'double_time_threshold',
+        'pay_type',
+        'pay_rate',
     ];
 
     protected $casts = [
         'termination_date' => 'date',
         'is_active' => 'boolean',
         'full_time' => 'boolean',
-        'vacation_pay' => 'boolean',
+        // Employment field casts
+        'date_of_hire' => 'date',
+        'seniority_date' => 'date',
+        'overtime_exempt' => 'boolean',
+        'overtime_rate' => 'decimal:3',
+        'double_time_threshold' => 'decimal:2',
+        'pay_rate' => 'decimal:2',
     ];
 
     public function department(): BelongsTo
@@ -162,6 +175,57 @@ class Employee extends Model
     public function managedDepartments(): HasMany
     {
         return $this->hasMany(Department::class, 'manager_id');
+    }
+
+    /**
+     * Get the vacation transactions for this employee
+     */
+    public function vacationTransactions(): HasMany
+    {
+        return $this->hasMany(VacationTransaction::class);
+    }
+
+    /**
+     * Get the vacation policy assignments for this employee
+     */
+    public function vacationAssignments(): HasMany
+    {
+        return $this->hasMany(EmployeeVacationAssignment::class);
+    }
+
+    /**
+     * Get the current active vacation policy assignment
+     */
+    public function currentVacationAssignment(): HasOne
+    {
+        return $this->hasOne(EmployeeVacationAssignment::class)
+            ->where('is_active', true)
+            ->where('effective_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', now());
+            })
+            ->latest('effective_date');
+    }
+
+    /**
+     * Get the current vacation policy through assignment
+     */
+    public function currentVacationPolicy(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            VacationPolicy::class,
+            EmployeeVacationAssignment::class,
+            'employee_id', // Foreign key on employee_vacation_assignments table
+            'id',          // Foreign key on vacation_policies table
+            'id',          // Local key on employees table
+            'vacation_policy_id' // Local key on employee_vacation_assignments table
+        )->where('employee_vacation_assignments.is_active', true)
+         ->where('employee_vacation_assignments.effective_date', '<=', now())
+         ->where(function ($query) {
+             $query->whereNull('employee_vacation_assignments.end_date')
+                   ->orWhere('employee_vacation_assignments.end_date', '>=', now());
+         });
     }
 
     protected static function boot(): void

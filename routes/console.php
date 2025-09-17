@@ -13,3 +13,11 @@ Schedule::command('payroll:generate-periods --months=1')
     ->dailyAt('02:00')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Vacation Accrual Processing - Daily at 3:00 AM
+Schedule::command('vacation:process-accruals')
+    ->dailyAt('03:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/vacation-accruals.log'))
+    ->emailOutputOnFailure(env('ADMIN_EMAIL'));

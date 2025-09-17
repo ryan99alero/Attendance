@@ -101,6 +101,118 @@ class CompanySetupResource extends Resource
                     ->preload()
                     ->nullable()
                     ->helperText('All employees will follow this payroll schedule'),
+
+                // Vacation Configuration Section
+                Forms\Components\Section::make('Vacation Configuration')
+                    ->schema([
+                        // Primary vacation accrual method
+                        Forms\Components\Select::make('vacation_accrual_method')
+                            ->label('Vacation Accrual Method')
+                            ->options([
+                                'calendar_year' => 'Calendar Year Front-Load',
+                                'pay_period' => 'Pay Period Accrual',
+                                'anniversary' => 'Anniversary Date (Step Blocks)',
+                            ])
+                            ->default('anniversary')
+                            ->required()
+                            ->live()
+                            ->helperText('Choose how employees accrue vacation time'),
+
+                        // Calendar Year Method Fields
+                        Forms\Components\Section::make('Calendar Year Settings')
+                            ->schema([
+                                Forms\Components\DatePicker::make('calendar_year_award_date')
+                                    ->label('Annual Award Date')
+                                    ->helperText('Date each year when vacation is awarded (e.g., January 1st)')
+                                    ->default('2024-01-01'),
+
+                                Forms\Components\Toggle::make('calendar_year_prorate_partial')
+                                    ->label('Prorate Partial Year Employment')
+                                    ->default(true)
+                                    ->helperText('Prorate vacation for employees hired mid-year'),
+                            ])
+                            ->visible(fn (Forms\Get $get): bool => $get('vacation_accrual_method') === 'calendar_year')
+                            ->columns(2),
+
+                        // Pay Period Method Fields
+                        Forms\Components\Section::make('Pay Period Settings')
+                            ->schema([
+                                Forms\Components\TextInput::make('pay_period_hours_per_period')
+                                    ->label('Hours Per Pay Period')
+                                    ->numeric()
+                                    ->step(0.0001)
+                                    ->helperText('Vacation hours accrued each pay period'),
+
+                                Forms\Components\Toggle::make('pay_period_accrue_immediately')
+                                    ->label('Accrue Immediately')
+                                    ->default(true)
+                                    ->helperText('Start accruing vacation from the first pay period'),
+
+                                Forms\Components\TextInput::make('pay_period_waiting_periods')
+                                    ->label('Waiting Periods')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->helperText('Number of pay periods to wait before starting accrual'),
+                            ])
+                            ->visible(fn (Forms\Get $get): bool => $get('vacation_accrual_method') === 'pay_period')
+                            ->columns(3),
+
+                        // Anniversary Method Fields
+                        Forms\Components\Section::make('Anniversary Settings')
+                            ->schema([
+                                Forms\Components\Toggle::make('anniversary_first_year_waiting_period')
+                                    ->label('First Year Waiting Period')
+                                    ->default(true)
+                                    ->helperText('Employees must wait until their first anniversary to receive vacation'),
+
+                                Forms\Components\Toggle::make('anniversary_award_on_anniversary')
+                                    ->label('Award on Anniversary Date')
+                                    ->default(true)
+                                    ->helperText('Award full year vacation on anniversary date'),
+
+                                Forms\Components\TextInput::make('anniversary_max_days_cap')
+                                    ->label('Maximum Days Cap')
+                                    ->numeric()
+                                    ->nullable()
+                                    ->helperText('Global maximum vacation days (leave empty to use policy-based caps)'),
+
+                                Forms\Components\Toggle::make('anniversary_allow_partial_year')
+                                    ->label('Allow Partial Year Accrual')
+                                    ->default(false)
+                                    ->helperText('Allow partial vacation accrual in the first year of employment'),
+                            ])
+                            ->visible(fn (Forms\Get $get): bool => $get('vacation_accrual_method') === 'anniversary')
+                            ->columns(2),
+
+                        // General Vacation Settings (visible for all methods)
+                        Forms\Components\Section::make('General Vacation Settings')
+                            ->schema([
+                                Forms\Components\Toggle::make('allow_carryover')
+                                    ->label('Allow Vacation Carryover')
+                                    ->default(true)
+                                    ->helperText('Allow employees to carry over unused vacation to the next period'),
+
+                                Forms\Components\TextInput::make('max_carryover_hours')
+                                    ->label('Max Carryover Hours')
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->nullable()
+                                    ->helperText('Maximum vacation hours that can be carried over (leave empty for no limit)'),
+
+                                Forms\Components\TextInput::make('max_accrual_balance')
+                                    ->label('Max Accrual Balance')
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->nullable()
+                                    ->helperText('Maximum vacation balance cap in hours (leave empty for no limit)'),
+
+                                Forms\Components\Toggle::make('prorate_new_hires')
+                                    ->label('Prorate for New Hires')
+                                    ->default(true)
+                                    ->helperText('Prorate vacation accrual for employees hired mid-period'),
+                            ])
+                            ->columns(2),
+                    ]),
             ]);
     }
 
@@ -138,6 +250,26 @@ class CompanySetupResource extends Resource
                 Tables\Columns\TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')
                     ->sortable(),
+
+                // Vacation Configuration
+                Tables\Columns\TextColumn::make('vacation_accrual_method')
+                    ->label('Vacation Accrual Method')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'calendar_year' => 'info',
+                        'pay_period' => 'warning',
+                        'anniversary' => 'success',
+                        default => 'gray',
+                    }),
+
+                Tables\Columns\IconColumn::make('allow_carryover')
+                    ->label('Allow Carryover')
+                    ->boolean(),
+
+                Tables\Columns\TextColumn::make('max_carryover_hours')
+                    ->label('Max Carryover Hours')
+                    ->numeric(decimalPlaces: 2)
+                    ->placeholder('No limit'),
 
                 Tables\Columns\TextColumn::make('created_at')->dateTime()
                     ->label('Created At'),

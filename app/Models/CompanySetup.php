@@ -51,6 +51,23 @@ class CompanySetup extends Model
         'max_shift_length',
         'payroll_frequency_id',
         'payroll_start_date',
+        'vacation_accrual_method',
+        'allow_carryover',
+        'max_carryover_hours',
+        'max_accrual_balance',
+        'prorate_new_hires',
+        // Calendar Year Method Fields
+        'calendar_year_award_date',
+        'calendar_year_prorate_partial',
+        // Pay Period Method Fields
+        'pay_period_hours_per_period',
+        'pay_period_accrue_immediately',
+        'pay_period_waiting_periods',
+        // Anniversary Method Fields
+        'anniversary_first_year_waiting_period',
+        'anniversary_award_on_anniversary',
+        'anniversary_max_days_cap',
+        'anniversary_allow_partial_year',
     ];
 
     protected $casts = [
@@ -59,6 +76,20 @@ class CompanySetup extends Model
         'enforce_shift_schedules' => 'boolean',
         'allow_manual_time_edits' => 'boolean',
         'payroll_start_date' => 'date',
+        'allow_carryover' => 'boolean',
+        'max_carryover_hours' => 'decimal:2',
+        'max_accrual_balance' => 'decimal:2',
+        'prorate_new_hires' => 'boolean',
+        // Calendar Year Method Casts
+        'calendar_year_award_date' => 'date',
+        'calendar_year_prorate_partial' => 'boolean',
+        // Pay Period Method Casts
+        'pay_period_hours_per_period' => 'decimal:4',
+        'pay_period_accrue_immediately' => 'boolean',
+        // Anniversary Method Casts
+        'anniversary_first_year_waiting_period' => 'boolean',
+        'anniversary_award_on_anniversary' => 'boolean',
+        'anniversary_allow_partial_year' => 'boolean',
     ];
 
     /**

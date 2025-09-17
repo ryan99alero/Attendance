@@ -36,8 +36,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label('Employee Management')
-                    ->collapsible()
-                    ->collapsed(),
+                    ->collapsible(),
                 NavigationGroup::make()
                     ->label('Time Tracking')
                     ->collapsible()
