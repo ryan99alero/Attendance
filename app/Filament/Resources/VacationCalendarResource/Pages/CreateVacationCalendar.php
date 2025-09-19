@@ -14,79 +14,20 @@ class CreateVacationCalendar extends CreateRecord
 
     protected function handleRecordCreation(array $data): VacationCalendar
     {
-        \Log::info("Starting VacationCalendar creation process with data: ", $data);
+        \Log::info("Creating VacationCalendar with data: ", $data);
 
-        $startDate = Carbon::parse($data['start_date']);
-        $endDate = Carbon::parse($data['end_date']);
-        $isHalfDay = $data['is_half_day'] ?? false;
-        $isActive = $data['is_active'] ?? true;
+        // Simple creation for single employee, single date
+        $vacationCalendar = VacationCalendar::create([
+            'employee_id' => $data['employee_id'],
+            'vacation_date' => $data['vacation_date'],
+            'is_half_day' => $data['is_half_day'] ?? false,
+            'is_active' => $data['is_active'] ?? true,
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ]);
 
-        // Validation: Check if the selected date range includes only weekends
-        $currentDate = $startDate->copy();
-        $onlyWeekends = true;
+        \Log::info("VacationCalendar record created successfully: ", $vacationCalendar->toArray());
 
-        while ($currentDate->lte($endDate)) {
-            if ($currentDate->isWeekday()) {
-                $onlyWeekends = false;
-                break;
-            }
-            $currentDate->addDay();
-        }
-
-        if ($onlyWeekends) {
-            \Log::warning("Vacation dates selected are only weekends.");
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'start_date' => 'Vacation dates cannot include only weekends.',
-                'end_date' => 'Please select a date range that includes at least one weekday.',
-            ]);
-        }
-
-        // Determine employees to process
-        $employees = $data['vacation_pay']
-            ? Employee::where('vacation_pay', true)->get()
-            : Employee::where('id', $data['employee_id'])->get();
-
-        if ($employees->isEmpty()) {
-            \Log::error("No employees found matching the criteria.");
-            throw new \Exception('No employees found matching the criteria.');
-        }
-
-        \Log::info("Number of employees to process: {$employees->count()}");
-
-        $lastCreated = null;
-
-        foreach ($employees as $employee) {
-            $currentDate = $startDate->copy();
-
-            while ($currentDate->lte($endDate)) {
-                if ($currentDate->isWeekday()) {
-                    \Log::info("Creating vacation entry for Employee ID: {$employee->id} on {$currentDate->toDateString()}");
-
-                    $vacationCalendar = VacationCalendar::create([
-                        'employee_id' => $employee->id,
-                        'vacation_date' => $currentDate->toDateString(),
-                        'is_half_day' => $isHalfDay,
-                        'is_active' => $isActive,
-                        'created_by' => auth()->id(),
-                        'updated_by' => auth()->id(),
-                    ]);
-
-                    $lastCreated = $vacationCalendar;
-                    \Log::info("VacationCalendar record created: ", $vacationCalendar->toArray());
-                }
-
-                $currentDate->addDay();
-            }
-        }
-
-        // Ensure at least one record was created
-        if (!$lastCreated) {
-            \Log::error("No VacationCalendar records were created. Process failed.");
-            throw new \Exception('No valid vacation dates were found within the specified range.');
-        }
-
-        \Log::info("VacationCalendar creation process completed successfully. Returning the last created record.");
-
-        return $lastCreated;
+        return $vacationCalendar;
     }
 }

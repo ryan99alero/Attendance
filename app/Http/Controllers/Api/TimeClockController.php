@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Livewire\Controllers\Controller;
+use Illuminate\Routing\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\Device;
@@ -173,7 +173,6 @@ class TimeClockController extends Controller
                 'employee_id' => $employee?->id,
                 'device_id' => $device->id,
                 'credential_id' => $credential?->id,
-                'punch_type_id' => null, // Will be determined by processing
                 'event_time' => $eventTime,
                 'shift_date' => $eventTime->toDateString(),
                 'event_source' => 'device',

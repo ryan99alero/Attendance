@@ -31,6 +31,18 @@ class VacationTimeProcessAttendanceService
                 continue;
             }
 
+            // Check if attendance records already exist for this vacation
+            $existingAttendance = Attendance::where('employee_id', $employee->id)
+                ->whereDate('punch_time', $record->vacation_date)
+                ->where('issue_notes', 'like', '%Generated from Vacation Calendar%')
+                ->exists();
+
+            if ($existingAttendance) {
+                Log::info("⏭️ Attendance records already exist for Vacation Record ID: {$record->id}. Marking as recorded and skipping...");
+                $record->update(['is_recorded' => true]);
+                continue;
+            }
+
             $shiftSchedule = $this->getShiftScheduleForEmployee($employee);
 
             if (!$shiftSchedule) {
@@ -70,16 +82,24 @@ class VacationTimeProcessAttendanceService
             return;
         }
 
+        // Get Vacation classification ID
+        $vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
+
+        // Determine punch_state based on punch type
+        $punchState = ($punchType === 'Clock In') ? 'start' : 'stop';
+
         Attendance::create([
             'employee_id' => $employeeId,
             'punch_time' => $punchTime,
             'punch_type_id' => $punchTypeId,
+            'punch_state' => $punchState,
+            'classification_id' => $vacationClassificationId,
             'is_manual' => true,
             'status' => 'Complete',
             'issue_notes' => $issueNotes,
         ]);
 
-        Log::info("📝 Created {$punchType} attendance record for Employee ID: {$employeeId}, Time: {$punchTime}");
+        Log::info("📝 Created {$punchType} attendance record for Employee ID: {$employeeId}, Time: {$punchTime} (Vacation Classification)");
     }
 
     private function getPunchTypeId(string $type): ?int

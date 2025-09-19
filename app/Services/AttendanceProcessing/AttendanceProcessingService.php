@@ -19,6 +19,7 @@ class AttendanceProcessingService
     protected PunchMigrationService $punchMigrationService;
     protected UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService;
     protected AttendanceStatusUpdateService $attendanceStatusUpdateService;
+    protected AttendanceClassificationService $attendanceClassificationService;
 
     public function __construct(
         HolidayAttendanceProcessor $holidayAttendanceProcessor,
@@ -28,7 +29,8 @@ class AttendanceProcessingService
         PunchValidationService $punchValidationService,
         PunchMigrationService $punchMigrationService,
         UnresolvedAttendanceProcessorService $unresolvedAttendanceProcessorService,
-        AttendanceStatusUpdateService $attendanceStatusUpdateService
+        AttendanceStatusUpdateService $attendanceStatusUpdateService,
+        AttendanceClassificationService $attendanceClassificationService
     ) {
         Log::info("[AttendanceProcessing] Initializing AttendanceProcessingService...");
         $this->holidayAttendanceProcessor = $holidayAttendanceProcessor;
@@ -39,12 +41,57 @@ class AttendanceProcessingService
         $this->punchMigrationService = $punchMigrationService;
         $this->unresolvedAttendanceProcessorService = $unresolvedAttendanceProcessorService;
         $this->attendanceStatusUpdateService = $attendanceStatusUpdateService;
+        $this->attendanceClassificationService = $attendanceClassificationService;
     }
 
     public function processAll(PayPeriod $payPeriod): void
     {
         Log::info("[AttendanceProcessing] 🚀 Starting attendance processing for PayPeriod ID: {$payPeriod->id}");
 
+        // Check if vacation records exist before processing
+        $vacationRecordsBefore = \App\Models\Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+            ->where('classification_id', \DB::table('classifications')->where('code', 'VACATION')->value('id'))
+            ->where('status', 'Complete')
+            ->count();
+
+        $this->runProcessingSteps($payPeriod);
+
+        // Check if new vacation records were created during processing
+        $vacationRecordsAfter = \App\Models\Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+            ->where('classification_id', \DB::table('classifications')->where('code', 'VACATION')->value('id'))
+            ->where('status', 'Complete')
+            ->count();
+
+        // If vacation records were created, run processing again to ensure they're properly migrated
+        if ($vacationRecordsAfter > $vacationRecordsBefore) {
+            $newVacationCount = $vacationRecordsAfter - $vacationRecordsBefore;
+            Log::info("[AttendanceProcessing] 🔄 {$newVacationCount} new vacation records detected, running second processing pass...");
+
+            \Filament\Notifications\Notification::make()
+                ->info()
+                ->title('Vacation Records Detected')
+                ->body("Found {$newVacationCount} vacation records - automatically running second pass to ensure proper migration...")
+                ->duration(5000)
+                ->send();
+
+            $this->runProcessingSteps($payPeriod);
+
+            // Final confirmation
+            Log::info("[AttendanceProcessing] ✅ Second pass completed - vacation records should now be properly migrated");
+
+            \Filament\Notifications\Notification::make()
+                ->success()
+                ->title('Vacation Processing Complete')
+                ->body("Vacation records have been processed and migrated successfully!")
+                ->duration(3000)
+                ->send();
+        }
+
+        Log::info("[AttendanceProcessing] 🎯 All processing completed for PayPeriod ID: {$payPeriod->id}");
+    }
+
+    private function runProcessingSteps(PayPeriod $payPeriod): void
+    {
         $steps = [
             [
                 'name' => 'Removing duplicate records',
@@ -63,6 +110,10 @@ class AttendanceProcessingService
             [
                 'name' => 'Processing attendance time records',
                 'action' => fn() => $this->attendanceTimeProcessorService->processAttendanceForPayPeriod($payPeriod)
+            ],
+            [
+                'name' => 'Classifying attendance records',
+                'action' => fn() => $this->attendanceClassificationService->classifyAllUnclassifiedAttendance()
             ],
             [
                 'name' => 'Processing unresolved records',
@@ -120,7 +171,7 @@ class AttendanceProcessingService
             }
         }
 
-        Log::info("[AttendanceProcessing] 🎯 All {$totalSteps} processing steps completed for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[AttendanceProcessing] 🎯 Processing steps completed for PayPeriod ID: {$payPeriod->id}");
     }
 
     public function processCompletedAttendanceRecords(array $attendanceIds, bool $autoProcess): void

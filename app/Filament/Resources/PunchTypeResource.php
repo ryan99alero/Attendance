@@ -18,7 +18,7 @@ class PunchTypeResource extends Resource
     protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Punch Types';
     protected static ?string $navigationIcon = 'heroicon-o-tag';
-    protected static ?int $navigationSort = 40;
+    protected static ?int $navigationSort = -80;
 
     public static function form(Forms\Form $form): Forms\Form
     {

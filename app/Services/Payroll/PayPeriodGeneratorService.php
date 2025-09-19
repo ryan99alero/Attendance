@@ -49,9 +49,15 @@ class PayPeriodGeneratorService
             $currentDate->addMonth();
         }
 
-        return $periods->filter(function ($period) use ($startDate, $endDate) {
-            return $period->start_date->gte($startDate) && $period->end_date->lte($endDate);
+        // Remove duplicates and filter to requested range
+        $uniquePeriods = $periods->unique(function ($period) {
+            return $period->start_date->format('Y-m-d') . '|' . $period->end_date->format('Y-m-d');
         });
+
+        return $uniquePeriods->filter(function ($period) use ($startDate, $endDate) {
+            // Include periods that intersect with the requested range
+            return $period->start_date->lte($endDate) && $period->end_date->gte($startDate);
+        })->values(); // Reset keys after filtering
     }
 
     /**
@@ -74,27 +80,44 @@ class PayPeriodGeneratorService
     }
 
     /**
-     * Generate weekly pay periods
+     * Generate weekly pay periods - FIXED TO PREVENT OVERLAPS
+     *
+     * This method is called per month but we need to ensure weekly periods
+     * are continuous across month boundaries to prevent overlaps
      */
     private function generateWeeklyPeriods(Carbon $month, PayrollFrequency $frequency): Collection
     {
         $periods = collect();
+
+        // For weekly periods, we need to find periods that INTERSECT with this month
+        // rather than periods that START in this month
         $startOfMonth = $month->copy()->startOfMonth();
         $endOfMonth = $month->copy()->endOfMonth();
 
-        // Find first pay day of month
-        $payDay = $startOfMonth->copy();
+        // Find the first Friday pay day that could affect this month
+        // Go back to ensure we catch periods that start before the month but end in it
+        $searchStart = $startOfMonth->copy()->subWeeks(2);
+        $payDay = $searchStart->copy();
+
+        // Find first pay day (Friday) on or after search start
         while ($payDay->dayOfWeek !== $frequency->weekly_day) {
             $payDay->addDay();
         }
 
-        while ($payDay->lte($endOfMonth)) {
+        // Generate periods until we're well past the end of the month
+        $searchEnd = $endOfMonth->copy()->addWeeks(2);
+
+        while ($payDay->lte($searchEnd)) {
             $payDate = $this->adjustForWeekendsAndHolidays($payDay->copy(), $frequency);
 
+            // Weekly period: Saturday to Friday (7 days)
             $periodEnd = $payDate->copy();
             $periodStart = $periodEnd->copy()->subDays(6); // 7-day period
 
-            $periods->push($this->createPayPeriod($periodStart, $periodEnd, $payDate));
+            // Only include periods that intersect with this month
+            if ($periodStart->lte($endOfMonth) && $periodEnd->gte($startOfMonth)) {
+                $periods->push($this->createPayPeriod($periodStart, $periodEnd, $payDate));
+            }
 
             $payDay->addWeek(); // Next weekly pay date
         }
@@ -276,7 +299,6 @@ class PayPeriodGeneratorService
         return new PayPeriod([
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'pay_date' => $payDate,
             'is_processed' => false,
             'is_posted' => false,
         ]);

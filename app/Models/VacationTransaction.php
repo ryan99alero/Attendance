@@ -20,6 +20,9 @@ class VacationTransaction extends Model
         'description',
         'metadata',
         'created_by',
+        'pay_period_id',
+        'reference_id',
+        'reference_type',
     ];
 
     protected $casts = [
@@ -75,5 +78,70 @@ class VacationTransaction extends Model
     public function scopeForPeriod($query, string $period)
     {
         return $query->where('accrual_period', $period);
+    }
+
+    /**
+     * Get the pay period this transaction belongs to
+     */
+    public function payPeriod()
+    {
+        return $this->belongsTo(PayPeriod::class);
+    }
+
+    /**
+     * Create a vacation usage transaction
+     */
+    public static function createUsageTransaction($employeeId, $payPeriodId, $hoursUsed, $usageDate, $description = null)
+    {
+        return self::create([
+            'employee_id' => $employeeId,
+            'transaction_type' => 'usage',
+            'hours' => -abs($hoursUsed), // Usage is always negative
+            'transaction_date' => now(),
+            'effective_date' => $usageDate,
+            'pay_period_id' => $payPeriodId,
+            'description' => $description ?: "Vacation usage - {$usageDate}",
+            'created_by' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * Create a vacation accrual transaction
+     */
+    public static function createAccrualTransaction($employeeId, $hoursAccrued, $accrualDate, $description = null, $accrualPeriod = null)
+    {
+        return self::create([
+            'employee_id' => $employeeId,
+            'transaction_type' => 'accrual',
+            'hours' => abs($hoursAccrued), // Accrual is always positive
+            'transaction_date' => now(),
+            'effective_date' => $accrualDate,
+            'accrual_period' => $accrualPeriod,
+            'description' => $description ?: "Vacation accrual - {$accrualDate}",
+            'created_by' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * Calculate vacation balance for an employee
+     */
+    public static function calculateBalance($employeeId)
+    {
+        return self::where('employee_id', $employeeId)->sum('hours');
+    }
+
+    /**
+     * Get vacation balance breakdown for an employee
+     */
+    public static function getBalanceBreakdown($employeeId)
+    {
+        $transactions = self::where('employee_id', $employeeId);
+
+        return [
+            'total_accrued' => $transactions->clone()->accruals()->sum('hours'),
+            'total_used' => abs($transactions->clone()->usage()->sum('hours')),
+            'total_adjustments' => $transactions->clone()->adjustments()->sum('hours'),
+            'current_balance' => $transactions->sum('hours'),
+        ];
     }
 }

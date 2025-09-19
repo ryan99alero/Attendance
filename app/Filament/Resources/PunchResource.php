@@ -23,7 +23,8 @@ class PunchResource extends Resource
     protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Punches';
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = -90;
+
 
     public static function form(Form $form): Form
     {

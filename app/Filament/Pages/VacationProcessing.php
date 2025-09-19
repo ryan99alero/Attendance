@@ -23,7 +23,7 @@ class VacationProcessing extends Page implements HasTable
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationGroup = 'Employee Management';
+    protected static ?string $navigationGroup = 'Time Off Management';
     protected static ?string $navigationLabel = 'Vacation Processing';
     protected static ?int $navigationSort = 40;
     protected static string $view = 'filament.pages.vacation-processing';

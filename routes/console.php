@@ -21,3 +21,11 @@ Schedule::command('vacation:process-accruals')
     ->runInBackground()
     ->sendOutputTo(storage_path('logs/vacation-accruals.log'))
     ->emailOutputOnFailure(env('ADMIN_EMAIL'));
+
+// Holiday Auto-Creation - Yearly on December 1st at 4:00 AM (create next year's holidays)
+Schedule::command('holidays:create-upcoming')
+    ->yearlyOn(12, 1, '04:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/holiday-creation.log'))
+    ->emailOutputOnFailure(env('ADMIN_EMAIL'));

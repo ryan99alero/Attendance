@@ -167,6 +167,22 @@ class Punch extends Model
     }
 
     /**
+     * Relationship with Attendance model.
+     */
+    public function attendance(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Attendance::class, 'attendance_id');
+    }
+
+    /**
+     * Relationship with Classification model.
+     */
+    public function classification(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Classification::class, 'classification_id');
+    }
+
+    /**
      * Scope for shifts crossing midnight, grouping punches within a 24-hour window.
      *
      * @param \Illuminate\Database\Eloquent\Builder $query

@@ -51,6 +51,17 @@ class VacationBalance extends Model
         'cap_hours',
         'created_by',
         'updated_by',
+        // Anniversary-based accrual fields
+        'accrual_year',
+        'last_anniversary_date',
+        'next_anniversary_date',
+        'annual_days_earned',
+        'previous_year_balance',
+        'current_year_awarded',
+        'current_year_used',
+        'is_anniversary_based',
+        'accrual_history',
+        'policy_effective_date',
     ];
 
     protected $casts = [
@@ -59,6 +70,16 @@ class VacationBalance extends Model
         'used_hours' => 'decimal:2',
         'carry_over_hours' => 'decimal:2',
         'cap_hours' => 'decimal:2',
+        // Anniversary-based accrual casts
+        'last_anniversary_date' => 'date',
+        'next_anniversary_date' => 'date',
+        'annual_days_earned' => 'decimal:2',
+        'previous_year_balance' => 'decimal:2',
+        'current_year_awarded' => 'decimal:2',
+        'current_year_used' => 'decimal:2',
+        'is_anniversary_based' => 'boolean',
+        'accrual_history' => 'json',
+        'policy_effective_date' => 'date',
     ];
 
     public function employee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -74,5 +95,58 @@ class VacationBalance extends Model
     public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Get vacation transactions for this employee
+     */
+    public function transactions()
+    {
+        return $this->hasMany(VacationTransaction::class, 'employee_id', 'employee_id');
+    }
+
+    /**
+     * Calculate balance from transactions (alternative source of truth)
+     */
+    public function getCalculatedBalanceAttribute()
+    {
+        return VacationTransaction::calculateBalance($this->employee_id);
+    }
+
+    /**
+     * Get detailed balance breakdown from transactions
+     */
+    public function getTransactionBreakdownAttribute()
+    {
+        return VacationTransaction::getBalanceBreakdown($this->employee_id);
+    }
+
+    /**
+     * Sync balance fields with transaction calculations
+     * Useful for verifying data integrity or migrating to transaction-based system
+     */
+    public function syncWithTransactions()
+    {
+        $breakdown = $this->transaction_breakdown;
+
+        $this->update([
+            'accrued_hours' => $breakdown['total_accrued'],
+            'used_hours' => $breakdown['total_used'],
+        ]);
+
+        return $this;
+    }
+
+    /**
+     * Check if balance matches transaction calculations
+     */
+    public function isConsistentWithTransactions()
+    {
+        $breakdown = $this->transaction_breakdown;
+
+        return (
+            abs($this->accrued_hours - $breakdown['total_accrued']) < 0.01 &&
+            abs($this->used_hours - $breakdown['total_used']) < 0.01
+        );
     }
 }

@@ -53,6 +53,7 @@ class Classification extends Model
      */
     protected $fillable = [
         'name', // The name of the classification
+        'code', // Unique code identifier
         'description', // Description of the classification
         'created_by', // User who created this record
         'updated_by', // User who last updated this record

@@ -17,7 +17,7 @@ class VacationPolicyResource extends Resource
 {
     protected static ?string $model = VacationPolicy::class;
 
-    protected static ?string $navigationGroup = 'Employee Management';
+    protected static ?string $navigationGroup = 'Time Off Management';
     protected static ?string $navigationLabel = 'Vacation Policies';
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?int $navigationSort = 30;

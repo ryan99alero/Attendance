@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\PunchType;
 use App\Models\Employee;
 use App\Models\PayPeriod;
+use App\Models\Classification;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -32,7 +33,7 @@ class AttendanceResource extends Resource
     protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Attendances';
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = -100;
 
     public static function form(Form $form): Form
     {
@@ -87,6 +88,16 @@ class AttendanceResource extends Resource
                 ->nullable()
                 ->searchable(),
 
+            Select::make('classification_id')
+                ->label('Classification')
+                ->options(Classification::where('is_active', 1)->pluck('name', 'id'))
+                ->default(function () {
+                    return Classification::where('code', 'REGULAR')->value('id');
+                })
+                ->nullable()
+                ->searchable()
+                ->placeholder('Select Classification (e.g., Vacation, Holiday)'),
+
             Toggle::make('is_manual')
                 ->label('Manually Recorded')
                 ->default(true),
@@ -94,6 +105,7 @@ class AttendanceResource extends Resource
             Select::make('status')
                 ->label('Status')
                 ->options(fn () => Attendance::getStatusOptions())
+                ->default('Incomplete')
                 ->placeholder('Select a Status')
                 ->required(),
 
@@ -195,6 +207,13 @@ class AttendanceResource extends Resource
                     ->searchable()
                     ->extraAttributes(['class' => 'editable']),
 
+                SelectColumn::make('classification_id')
+                    ->label('Classification')
+                    ->options(Classification::where('is_active', 1)->pluck('name', 'id'))
+                    ->sortable()
+                    ->searchable()
+                    ->extraAttributes(['class' => 'editable']),
+
                 SelectColumn::make('status')
                     ->label('Status')
                     ->options(fn () => Attendance::getStatusOptions())
@@ -236,6 +255,11 @@ class AttendanceResource extends Resource
                 Tables\Filters\SelectFilter::make('punch_type_id')
                     ->label('Punch Type')
                     ->relationship('punchType', 'name')
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('classification_id')
+                    ->label('Classification')
+                    ->relationship('classification', 'name')
                     ->preload(),
 
                 Tables\Filters\SelectFilter::make('status')

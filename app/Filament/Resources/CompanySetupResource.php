@@ -93,6 +93,50 @@ class CompanySetupResource extends Resource
                     ->required()
                     ->label('Max Shift Length (Hours)'),
 
+                // Clock Event Processing Section
+                Forms\Components\Section::make('Clock Event Processing Settings')
+                    ->schema([
+                        // How frequently to sync clock events to attendance records
+                        Forms\Components\Select::make('clock_event_sync_frequency')
+                            ->label('Sync Frequency')
+                            ->options([
+                                'real_time' => 'Real-time (Push)',
+                                'every_minute' => 'Every Minute',
+                                'every_5_minutes' => 'Every 5 Minutes',
+                                'every_15_minutes' => 'Every 15 Minutes',
+                                'every_30_minutes' => 'Every 30 Minutes',
+                                'hourly' => 'Hourly',
+                                'twice_daily' => 'Twice Daily (8am, 6pm)',
+                                'daily' => 'Daily (6am)',
+                                'manual_only' => 'Manual Only',
+                            ])
+                            ->default('every_5_minutes')
+                            ->required()
+                            ->helperText('How often to process ClockEvents into Attendance records'),
+
+                        // Number of events to process per batch
+                        Forms\Components\TextInput::make('clock_event_batch_size')
+                            ->label('Batch Size')
+                            ->numeric()
+                            ->default(100)
+                            ->required()
+                            ->helperText('Number of clock events to process in each batch'),
+
+                        // Auto-retry failed processing
+                        Forms\Components\Toggle::make('clock_event_auto_retry_failed')
+                            ->label('Auto-retry Failed Events')
+                            ->default(true)
+                            ->helperText('Automatically retry events that failed processing'),
+
+                        // Time for daily sync
+                        Forms\Components\TimePicker::make('clock_event_daily_sync_time')
+                            ->label('Daily Sync Time')
+                            ->default('06:00:00')
+                            ->helperText('Time of day for daily sync (when using daily frequency)')
+                            ->visible(fn (Forms\Get $get): bool => in_array($get('clock_event_sync_frequency'), ['daily', 'twice_daily'])),
+                    ])
+                    ->columns(2),
+
                 // Company-wide payroll frequency
                 Forms\Components\Select::make('payroll_frequency_id')
                     ->label('Payroll Frequency')
@@ -250,6 +294,23 @@ class CompanySetupResource extends Resource
                 Tables\Columns\TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')
                     ->sortable(),
+
+                // Clock Event Processing
+                Tables\Columns\TextColumn::make('clock_event_sync_frequency')
+                    ->label('Clock Event Sync')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'real_time' => 'success',
+                        'every_minute', 'every_5_minutes' => 'info',
+                        'every_15_minutes', 'every_30_minutes', 'hourly' => 'warning',
+                        'daily', 'twice_daily' => 'gray',
+                        'manual_only' => 'danger',
+                        default => 'gray',
+                    }),
+
+                Tables\Columns\TextColumn::make('clock_event_batch_size')
+                    ->label('Batch Size')
+                    ->numeric(),
 
                 // Vacation Configuration
                 Tables\Columns\TextColumn::make('vacation_accrual_method')

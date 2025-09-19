@@ -45,6 +45,7 @@ class VacationCalendar extends Model
         'vacation_date',
         'is_half_day',
         'is_active',
+        'is_recorded',
         'created_by',
         'updated_by',
     ];
@@ -53,6 +54,7 @@ class VacationCalendar extends Model
         'vacation_date' => 'date',
         'is_half_day' => 'boolean',
         'is_active' => 'boolean',
+        'is_recorded' => 'boolean',
     ];
 
     public function employee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -68,5 +70,26 @@ class VacationCalendar extends Model
     public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function holidayTemplate(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(HolidayTemplate::class, 'holiday_template_id');
+    }
+
+    /**
+     * Scope for manual vacation entries (not auto-managed)
+     */
+    public function scopeManual($query)
+    {
+        return $query->where('auto_managed', false);
+    }
+
+    /**
+     * Scope for auto-managed vacation entries (holidays)
+     */
+    public function scopeAutoManaged($query)
+    {
+        return $query->where('auto_managed', true);
     }
 }

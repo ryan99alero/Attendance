@@ -19,7 +19,7 @@ class ClockEventResource extends Resource
     protected static ?string $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Clock Events';
     protected static ?string $navigationIcon = 'heroicon-o-clock';
-    protected static ?int $navigationSort = 15;
+    protected static ?int $navigationSort = -95;
 
     public static function form(Form $form): Form
     {

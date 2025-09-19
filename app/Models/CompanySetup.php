@@ -68,6 +68,11 @@ class CompanySetup extends Model
         'anniversary_award_on_anniversary',
         'anniversary_max_days_cap',
         'anniversary_allow_partial_year',
+        // Clock Event Processing Settings
+        'clock_event_sync_frequency',
+        'clock_event_batch_size',
+        'clock_event_auto_retry_failed',
+        'clock_event_daily_sync_time',
     ];
 
     protected $casts = [
@@ -90,6 +95,9 @@ class CompanySetup extends Model
         'anniversary_first_year_waiting_period' => 'boolean',
         'anniversary_award_on_anniversary' => 'boolean',
         'anniversary_allow_partial_year' => 'boolean',
+        // Clock Event Processing Casts
+        'clock_event_auto_retry_failed' => 'boolean',
+        'clock_event_daily_sync_time' => 'datetime:H:i:s',
     ];
 
     /**

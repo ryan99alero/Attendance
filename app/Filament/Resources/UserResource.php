@@ -25,10 +25,10 @@ class UserResource extends Resource
     protected static ?string $model = User::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Employee Management';
+    protected static ?string $navigationGroup = 'User Management';
     protected static ?string $navigationLabel = 'Users';
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {
