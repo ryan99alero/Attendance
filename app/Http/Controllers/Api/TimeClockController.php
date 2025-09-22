@@ -10,6 +10,7 @@ use App\Models\PayPeriod;
 use App\Models\Credential;
 use App\Models\ClockEvent;
 use App\Models\PunchType;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -66,9 +67,14 @@ class TimeClockController extends Controller
                 'data' => [
                     'device_id' => $device->device_id,
                     'device_name' => $device->device_name,
+                    'api_token' => $device->generateApiToken(),
+                    'registration_status' => $device->registration_status ?? 'approved',
                     'server_time' => now()->toISOString(),
                     'timezone' => config('app.timezone'),
-                    'api_version' => '1.0'
+                    'api_version' => '1.0',
+
+                    // Device timezone configuration with automatic DST
+                    'device_timezone' => $this->getDeviceTimezoneConfig($device)
                 ]
             ]);
 
@@ -101,6 +107,7 @@ class TimeClockController extends Controller
             'location' => 'nullable|string|max:191',
             'confidence' => 'nullable|integer|min:0|max:100',
             'meta' => 'nullable|array',
+            'device_timezone' => 'nullable|string|regex:/^[+-]?\d{1,2}$/', // e.g., "-5", "+7"
         ]);
 
         if ($validator->fails()) {
@@ -149,10 +156,14 @@ class TimeClockController extends Controller
                 }
             }
 
-            // 4. Event time and duplicate check
-            $eventTime = $request->event_time ?
-                Carbon::parse($request->event_time) :
-                now();
+            // 4. Event time handling - store device local time as-is
+            if ($request->event_time) {
+                // Store the device's local time exactly as recorded (no timezone conversion)
+                // This preserves the actual time the person clocked in at their location
+                $eventTime = Carbon::createFromFormat('Y-m-d H:i:s', $request->event_time);
+            } else {
+                $eventTime = now();
+            }
 
             // Check for duplicates within 10 seconds (only if we have a valid credential)
             if ($credential && ClockEvent::hasDuplicateWithin(
@@ -179,8 +190,12 @@ class TimeClockController extends Controller
                 'location' => $request->location,
                 'confidence' => $request->confidence,
                 'raw_payload' => array_merge(
-                    $request->only(['device_id', 'credential_kind', 'credential_value']),
-                    $request->meta ?? []
+                    $request->only(['device_id', 'credential_kind', 'credential_value', 'device_timezone']),
+                    $request->meta ?? [],
+                    [
+                        'original_device_time' => $request->event_time, // Store original device local time
+                        'device_timezone_offset' => $request->device_timezone ?? '0'
+                    ]
                 ),
             ]);
 
@@ -391,5 +406,245 @@ class TimeClockController extends Controller
             'server_time' => now()->toISOString(),
             'api_version' => '1.0'
         ]);
+    }
+
+    /**
+     * Register a new ESP32 time clock device
+     * POST /api/v1/timeclock/register
+     */
+    public function register(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'device_name' => 'required|string|max:100',
+            'mac_address' => 'required|string|max:17',
+            'firmware_version' => 'nullable|string|max:20',
+            'device_config' => 'nullable|array',
+            'device_config.ntp_server' => 'nullable|string|max:255',
+            'device_config.nfc_enabled' => 'nullable|boolean',
+            'device_config.buzzer_enabled' => 'nullable|boolean',
+            'device_config.led_enabled' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid device registration data',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        try {
+            // Check if device already exists by MAC address
+            $existingDevice = Device::where('mac_address', $request->mac_address)->first();
+
+            if ($existingDevice) {
+                // Handle re-registration of existing device
+                Log::info("[TimeClockAPI] Re-registering existing device", [
+                    'device_id' => $existingDevice->device_id,
+                    'mac_address' => $request->mac_address,
+                    'previous_name' => $existingDevice->device_name,
+                    'new_name' => $request->device_name
+                ]);
+
+                // Update existing device with new information
+                $defaultConfig = [
+                    'ntp_server' => $request->input('device_config.ntp_server', 'pool.ntp.org'),
+                    'nfc_enabled' => $request->input('device_config.nfc_enabled', true),
+                    'buzzer_enabled' => $request->input('device_config.buzzer_enabled', true),
+                    'led_enabled' => $request->input('device_config.led_enabled', true),
+                    'punch_timeout' => 30,
+                    'offline_storage' => true,
+                    'sync_interval' => 300,
+                ];
+
+                $existingDevice->update([
+                    'device_name' => $request->device_name,
+                    'firmware_version' => $request->firmware_version,
+                    'device_config' => array_merge($defaultConfig, $request->input('device_config', [])),
+                    'ip_address' => $request->ip(),
+                    'last_ip' => $request->ip(),
+                    'last_seen_at' => now(),
+                    'last_wakeup_at' => now(),
+                    'registration_status' => 'registered',
+                    'is_active' => true, // Set to active on re-registration
+                ]);
+
+                // Generate new API token
+                $apiToken = $existingDevice->generateApiToken();
+                $device = $existingDevice;
+                $isNewDevice = false;
+
+            } else {
+                // Create new device
+                $deviceId = 'ESP32_' . strtoupper(Str::random(8));
+
+                // Ensure device_id is unique
+                while (Device::where('device_id', $deviceId)->exists()) {
+                    $deviceId = 'ESP32_' . strtoupper(Str::random(8));
+                }
+
+                // Create device with default config
+                $defaultConfig = [
+                    'ntp_server' => $request->input('device_config.ntp_server', 'pool.ntp.org'),
+                    'nfc_enabled' => $request->input('device_config.nfc_enabled', true),
+                    'buzzer_enabled' => $request->input('device_config.buzzer_enabled', true),
+                    'led_enabled' => $request->input('device_config.led_enabled', true),
+                    'punch_timeout' => 30, // seconds
+                    'offline_storage' => true,
+                    'sync_interval' => 300, // 5 minutes
+                ];
+
+                $device = Device::create([
+                    'device_id' => $deviceId,
+                    'device_name' => $request->device_name,
+                    'mac_address' => $request->mac_address,
+                    'firmware_version' => $request->firmware_version,
+                    'device_type' => 'esp32_timeclock',
+                    'device_config' => array_merge($defaultConfig, $request->input('device_config', [])),
+                    'ip_address' => $request->ip(),
+                    'last_ip' => $request->ip(),
+                    'last_seen_at' => now(),
+                    'last_wakeup_at' => now(),
+                    'registration_status' => 'registered', // Auto-approve new devices
+                    'is_active' => true, // Set to active immediately
+                    'created_by' => null, // System created
+                ]);
+
+                $isNewDevice = true;
+
+                // Generate API token for new device
+                $apiToken = $device->generateApiToken();
+            }
+
+            Log::info("[TimeClockAPI] Device " . ($isNewDevice ? 'registered' : 're-registered'), [
+                'device_id' => $device->device_id,
+                'device_name' => $device->device_name,
+                'mac_address' => $device->mac_address,
+                'ip_address' => $request->ip(),
+                'registration_status' => $device->registration_status,
+                'is_new_device' => $isNewDevice
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $isNewDevice ? 'Device registered successfully' : 'Device re-registered successfully',
+                'data' => [
+                    'device_id' => $device->device_id,
+                    'device_name' => $device->device_name,
+                    'api_token' => $apiToken, // Give device the plain token to store
+                    'token_expires_at' => $device->token_expires_at->toISOString(),
+                    'registration_status' => $device->registration_status,
+                    'device_config' => $device->device_config,
+                    'server_time' => now()->toISOString(),
+                    'api_version' => '1.0'
+                ],
+                'instructions' => [
+                    'Store the api_token securely on your device',
+                    'Include Authorization: Bearer {api_token} in future API calls',
+                    'Device registration is pending admin approval',
+                    'Check registration status with GET /api/v1/timeclock/status'
+                ]
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error("[TimeClockAPI] Device registration failed", [
+                'device_name' => $request->device_name,
+                'mac_address' => $request->mac_address,
+                'error' => $e->getMessage(),
+                'ip_address' => $request->ip()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Device registration failed',
+                'error' => 'Internal server error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Check device registration status
+     * GET /api/v1/timeclock/status
+     */
+    public function status(Request $request)
+    {
+        $deviceId = $request->header('X-Device-ID');
+        $apiToken = $request->bearerToken();
+
+        if (!$deviceId || !$apiToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing device ID or API token'
+            ], 400);
+        }
+
+        $device = Device::where('device_id', $deviceId)->first();
+
+        if (!$device) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Device not found'
+            ], 404);
+        }
+
+        if (!$device->isTokenValid($apiToken)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired API token'
+            ], 401);
+        }
+
+        // Update last seen
+        $device->markAsSeen();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'device_id' => $device->device_id,
+                'device_name' => $device->device_name,
+                'registration_status' => $device->registration_status,
+                'is_active' => $device->is_active,
+                'is_approved' => $device->isApproved(),
+                'device_config' => $device->device_config,
+                'last_seen_at' => $device->last_seen_at->toISOString(),
+                'server_time' => now()->toISOString(),
+                'token_expires_at' => $device->token_expires_at->toISOString()
+            ]
+        ]);
+    }
+
+    /**
+     * Get device timezone configuration with automatic DST calculation
+     */
+    private function getDeviceTimezoneConfig($device)
+    {
+        // Get device's configured timezone (from device config or department)
+        $deviceTimezone = $device->department?->timezone ?? config('app.timezone');
+
+        try {
+            // Create Carbon instance in the device's timezone
+            $deviceTime = now()->setTimezone($deviceTimezone);
+
+            // Calculate the current UTC offset (includes DST automatically)
+            $offsetSeconds = $deviceTime->getOffset();
+            $offsetHours = $offsetSeconds / 3600;
+
+            return [
+                'timezone_name' => $deviceTimezone,
+                'current_offset' => (int)$offsetHours,
+                'is_dst' => $deviceTime->format('I') == '1', // 1 if DST, 0 if not
+                'timezone_abbr' => $deviceTime->format('T'), // e.g., "CDT", "CST"
+                'device_time' => $deviceTime->format('Y-m-d H:i:s'),
+            ];
+        } catch (\Exception $e) {
+            // Fallback to Central Time if timezone parsing fails
+            return [
+                'timezone_name' => 'America/Chicago',
+                'current_offset' => -5, // Default to CDT
+                'is_dst' => true,
+                'timezone_abbr' => 'CDT',
+                'device_time' => now()->subHours(5)->format('Y-m-d H:i:s'),
+            ];
+        }
     }
 }

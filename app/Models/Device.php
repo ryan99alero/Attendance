@@ -57,7 +57,89 @@ class Device extends Model
         'department_id',
         'created_by',
         'updated_by',
+        // ESP32 Time Clock fields
+        'device_type',
+        'device_config',
+        'api_token',
+        'token_expires_at',
+        'registration_status',
+        'registration_notes',
     ];
+
+    /**
+     * The attributes that should be cast.
+     */
+    protected $casts = [
+        'last_seen_at' => 'datetime',
+        'last_wakeup_at' => 'datetime',
+        'token_expires_at' => 'datetime',
+        'is_active' => 'boolean',
+        'device_config' => 'array',
+    ];
+
+    /**
+     * Generate a new API token for the device
+     */
+    public function generateApiToken(): string
+    {
+        $token = bin2hex(random_bytes(32));
+        $this->update([
+            'api_token' => hash('sha256', $token),
+            'token_expires_at' => now()->addDays(30) // Token valid for 30 days
+        ]);
+        return $token; // Return the plain token for the device to store
+    }
+
+    /**
+     * Check if the device token is valid
+     */
+    public function isTokenValid(string $token): bool
+    {
+        if (!$this->api_token || !$this->token_expires_at) {
+            return false;
+        }
+
+        if ($this->token_expires_at->isPast()) {
+            return false;
+        }
+
+        return hash_equals($this->api_token, hash('sha256', $token));
+    }
+
+    /**
+     * Check if device is approved for operation
+     */
+    public function isApproved(): bool
+    {
+        return $this->registration_status === 'approved' && $this->is_active;
+    }
+
+    /**
+     * Update device last seen timestamp
+     */
+    public function markAsSeen(): void
+    {
+        $this->update([
+            'last_seen_at' => now(),
+            'last_ip' => request()->ip(),
+        ]);
+    }
+
+    /**
+     * Scope for active time clocks
+     */
+    public function scopeTimeClocks($query)
+    {
+        return $query->where('device_type', 'esp32_timeclock');
+    }
+
+    /**
+     * Scope for approved devices
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('registration_status', 'approved')->where('is_active', true);
+    }
 
     /**
      * The department to which the device belongs.

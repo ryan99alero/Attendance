@@ -49,6 +49,14 @@ Route::prefix('v1/timeclock')->group(function () {
     Route::get('/health', [TimeClockController::class, 'health'])
         ->name('timeclock.health');
 
+    // Device registration (no auth required for initial registration)
+    Route::post('/register', [TimeClockController::class, 'register'])
+        ->name('timeclock.register');
+
+    // Device status check (requires device authentication)
+    Route::get('/status', [TimeClockController::class, 'status'])
+        ->name('timeclock.status');
+
     // Device authentication and handshake
     Route::post('/auth', [TimeClockController::class, 'authenticate'])
         ->name('timeclock.auth');
