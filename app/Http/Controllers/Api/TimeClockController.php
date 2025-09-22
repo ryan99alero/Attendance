@@ -25,9 +25,9 @@ class TimeClockController extends Controller
     public function authenticate(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'device_id' => 'required|string|max:100',
+            'mac_address' => 'required|string|max:17', // MAC address is now the primary identifier
             'device_name' => 'nullable|string|max:100',
-            'mac_address' => 'nullable|string|max:17',
+            'device_id' => 'nullable|string|max:100', // Optional legacy field
             'ip_address' => 'nullable|ip',
             'firmware_version' => 'nullable|string|max:50',
         ]);
@@ -41,18 +41,26 @@ class TimeClockController extends Controller
         }
 
         try {
-            // Find or create device
+            // Generate device_id from MAC address if not provided
+            $deviceId = $request->device_id ?? 'ESP32_' . strtoupper(str_replace([':', '-'], '', $request->mac_address));
+
+            // Find or create device using MAC address as primary identifier
             $device = Device::updateOrCreate(
-                ['device_id' => $request->device_id],
+                ['mac_address' => $request->mac_address],
                 [
-                    'device_name' => $request->device_name ?? 'ESP32-TimeClock',
-                    'mac_address' => $request->mac_address,
+                    'device_id' => $deviceId,
+                    'device_name' => $request->device_name ?? $deviceId,
+                    'display_name' => $request->device_name ?? 'TimeClock (' . substr($request->mac_address, -5) . ')',
                     'ip_address' => $request->ip_address ?? $request->ip(),
                     'last_seen_at' => now(),
                     'last_ip' => $request->ip(),
                     'last_mac' => $request->mac_address,
                     'firmware_version' => $request->firmware_version,
-                    'is_active' => true
+                    'device_type' => 'esp32_timeclock',
+                    'is_active' => true,
+                    'registration_status' => 'approved', // Auto-approve for now
+                    'timezone' => $device->timezone ?? 'America/Chicago', // Default timezone if not set
+                    'config_synced_at' => now(),
                 ]
             );
 
@@ -618,8 +626,8 @@ class TimeClockController extends Controller
      */
     private function getDeviceTimezoneConfig($device)
     {
-        // Get device's configured timezone (from device config or department)
-        $deviceTimezone = $device->department?->timezone ?? config('app.timezone');
+        // Get device's configured timezone (device -> department -> app default)
+        $deviceTimezone = $device->timezone ?? $device->department?->timezone ?? config('app.timezone');
 
         try {
             // Create Carbon instance in the device's timezone
@@ -645,6 +653,141 @@ class TimeClockController extends Controller
                 'timezone_abbr' => 'CDT',
                 'device_time' => now()->subHours(5)->format('Y-m-d H:i:s'),
             ];
+        }
+    }
+
+    /**
+     * Get device configuration updates
+     * GET /api/v1/timeclock/config
+     */
+    public function getConfig(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'mac_address' => 'required|string|max:17',
+            'current_config_version' => 'nullable|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid request',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        try {
+            // Find device by MAC address
+            $device = Device::where('mac_address', $request->mac_address)->first();
+
+            if (!$device) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Device not found',
+                ], 404);
+            }
+
+            // Check if configuration has been updated
+            $currentVersion = $request->current_config_version ?? 0;
+            $serverVersion = $device->config_version ?? 1;
+
+            if ($currentVersion >= $serverVersion) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Configuration is up to date',
+                    'config_version' => $serverVersion,
+                    'has_updates' => false,
+                ]);
+            }
+
+            // Return updated configuration
+            return response()->json([
+                'success' => true,
+                'message' => 'Configuration updates available',
+                'has_updates' => true,
+                'config_version' => $serverVersion,
+                'config' => [
+                    'device_name' => $device->device_name,
+                    'display_name' => $device->display_name,
+                    'timezone' => $device->timezone ?? 'America/Chicago',
+                    'ntp_server' => $device->ntp_server ?: 'pool.ntp.org',
+                    'registration_status' => $device->registration_status,
+                    'config_updated_at' => $device->config_updated_at?->toISOString(),
+                    'device_timezone' => $this->getDeviceTimezoneConfig($device),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("[TimeClockAPI] Config fetch failed", [
+                'mac_address' => $request->mac_address,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Configuration fetch failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update device configuration (for admin use)
+     * PUT /api/v1/timeclock/config/{deviceId}
+     */
+    public function updateConfig(Request $request, $deviceId)
+    {
+        $validator = Validator::make($request->all(), [
+            'display_name' => 'nullable|string|max:100',
+            'timezone' => 'nullable|string|max:50',
+            'registration_status' => 'nullable|string|in:pending,approved,rejected',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid configuration data',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        try {
+            $device = Device::findOrFail($deviceId);
+
+            // Update configuration fields
+            $updates = [];
+            if ($request->has('display_name')) {
+                $updates['display_name'] = $request->display_name;
+            }
+            if ($request->has('timezone')) {
+                $updates['timezone'] = $request->timezone;
+            }
+            if ($request->has('registration_status')) {
+                $updates['registration_status'] = $request->registration_status;
+            }
+
+            if (!empty($updates)) {
+                $updates['config_updated_at'] = now();
+                $updates['config_version'] = ($device->config_version ?? 1) + 1;
+                $device->update($updates);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Device configuration updated',
+                'config_version' => $device->config_version,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("[TimeClockAPI] Config update failed", [
+                'device_id' => $deviceId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Configuration update failed',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

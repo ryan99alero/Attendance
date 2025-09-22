@@ -73,6 +73,10 @@ class CompanySetup extends Model
         'clock_event_batch_size',
         'clock_event_auto_retry_failed',
         'clock_event_daily_sync_time',
+        // Device Management Settings
+        'config_poll_interval_minutes',
+        'firmware_check_interval_hours',
+        'allow_device_poll_override',
     ];
 
     protected $casts = [
@@ -98,6 +102,8 @@ class CompanySetup extends Model
         // Clock Event Processing Casts
         'clock_event_auto_retry_failed' => 'boolean',
         'clock_event_daily_sync_time' => 'datetime:H:i:s',
+        // Device Management Casts
+        'allow_device_poll_override' => 'boolean',
     ];
 
     /**

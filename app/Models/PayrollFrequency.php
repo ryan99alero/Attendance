@@ -53,6 +53,7 @@ class PayrollFrequency extends Model
         'frequency_type',
         'reference_start_date',
         'weekly_day',
+        'start_of_week',
         'first_pay_day',
         'second_pay_day',
         'month_end_handling',

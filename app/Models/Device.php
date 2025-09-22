@@ -46,6 +46,7 @@ class Device extends Model
     protected $fillable = [
         'device_id',
         'device_name',
+        'display_name',
         'mac_address',
         'ip_address',
         'last_seen_at',
@@ -64,6 +65,12 @@ class Device extends Model
         'token_expires_at',
         'registration_status',
         'registration_notes',
+        // Configuration and timezone fields
+        'timezone',
+        'ntp_server',
+        'config_updated_at',
+        'config_synced_at',
+        'config_version',
     ];
 
     /**
@@ -73,6 +80,8 @@ class Device extends Model
         'last_seen_at' => 'datetime',
         'last_wakeup_at' => 'datetime',
         'token_expires_at' => 'datetime',
+        'config_updated_at' => 'datetime',
+        'config_synced_at' => 'datetime',
         'is_active' => 'boolean',
         'device_config' => 'array',
     ];

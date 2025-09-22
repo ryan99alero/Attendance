@@ -10,8 +10,10 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Section;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Actions\EditAction;
 
 class DeviceResource extends Resource
 {
@@ -26,22 +28,172 @@ class DeviceResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            TextInput::make('device_name')->label('Device Name')->required(),
-            TextInput::make('ip_address')->label('IP Address')->nullable(),
-            Select::make('department_id')
-                ->relationship('department', 'name')
-                ->label('Department'),
-            Toggle::make('is_active')->label('Active')->default(true),
+            Section::make('Basic Device Information')
+                ->schema([
+                    TextInput::make('device_name')
+                        ->label('Device Name')
+                        ->required()
+                        ->helperText('Internal device identifier'),
+
+                    TextInput::make('display_name')
+                        ->label('Display Name')
+                        ->nullable()
+                        ->helperText('Human-friendly name (e.g., "Front Office Clock")'),
+
+                    TextInput::make('device_id')
+                        ->label('Device ID')
+                        ->disabled()
+                        ->helperText('Auto-generated unique identifier'),
+
+                    TextInput::make('mac_address')
+                        ->label('MAC Address')
+                        ->disabled()
+                        ->helperText('Hardware MAC address'),
+
+                    Select::make('department_id')
+                        ->relationship('department', 'name')
+                        ->label('Department')
+                        ->nullable(),
+
+                    Toggle::make('is_active')
+                        ->label('Active')
+                        ->default(true),
+                ])
+                ->columns(2),
+
+            Section::make('Time Clock Configuration')
+                ->schema([
+                    Select::make('timezone')
+                        ->label('Timezone')
+                        ->options([
+                            'America/New_York' => 'Eastern Time (EST/EDT)',
+                            'America/Chicago' => 'Central Time (CST/CDT)',
+                            'America/Denver' => 'Mountain Time (MST/MDT)',
+                            'America/Phoenix' => 'Arizona Time (MST - No DST)',
+                            'America/Los_Angeles' => 'Pacific Time (PST/PDT)',
+                            'America/Anchorage' => 'Alaska Time (AKST/AKDT)',
+                            'Pacific/Honolulu' => 'Hawaii Time (HST)',
+                            'UTC' => 'UTC',
+                        ])
+                        ->nullable()
+                        ->helperText('Device timezone for time recording'),
+
+                    TextInput::make('ntp_server')
+                        ->label('NTP Server')
+                        ->placeholder('pool.ntp.org')
+                        ->helperText('Leave empty to use default NTP servers'),
+
+                    Select::make('device_type')
+                        ->label('Device Type')
+                        ->options([
+                            'esp32_timeclock' => 'ESP32 Time Clock',
+                            'network_scanner' => 'Network Scanner',
+                            'mobile_app' => 'Mobile App',
+                            'web_browser' => 'Web Browser',
+                        ])
+                        ->default('esp32_timeclock'),
+                ])
+                ->columns(2),
+
+            Section::make('Network & Status Information')
+                ->schema([
+                    TextInput::make('ip_address')
+                        ->label('Current IP Address')
+                        ->disabled()
+                        ->helperText('Last known IP address'),
+
+                    TextInput::make('last_ip')
+                        ->label('Last IP')
+                        ->disabled()
+                        ->helperText('Previous IP address'),
+
+                    TextInput::make('firmware_version')
+                        ->label('Firmware Version')
+                        ->disabled()
+                        ->helperText('Current firmware version'),
+
+                    Select::make('registration_status')
+                        ->label('Registration Status')
+                        ->options([
+                            'pending' => 'Pending Approval',
+                            'approved' => 'Approved',
+                            'rejected' => 'Rejected',
+                            'suspended' => 'Suspended',
+                        ])
+                        ->default('pending'),
+                ])
+                ->columns(2),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('device_name')->label('Device Name'),
-            TextColumn::make('ip_address')->label('IP Address'),
-            TextColumn::make('department.name')->label('Department'),
-            IconColumn::make('is_active')->label('Active'),
+            TextColumn::make('device_name')
+                ->label('Device Name')
+                ->searchable(),
+
+            TextColumn::make('display_name')
+                ->label('Display Name')
+                ->searchable()
+                ->placeholder('No display name'),
+
+            TextColumn::make('device_type')
+                ->label('Type')
+                ->badge()
+                ->color(fn (string $state): string => match ($state) {
+                    'esp32_timeclock' => 'success',
+                    'network_scanner' => 'info',
+                    'mobile_app' => 'warning',
+                    'web_browser' => 'gray',
+                    default => 'gray',
+                }),
+
+            TextColumn::make('mac_address')
+                ->label('MAC Address')
+                ->searchable()
+                ->copyable(),
+
+            TextColumn::make('ip_address')
+                ->label('IP Address')
+                ->placeholder('Not connected'),
+
+            TextColumn::make('timezone')
+                ->label('Timezone')
+                ->placeholder('Not set'),
+
+            TextColumn::make('registration_status')
+                ->label('Status')
+                ->badge()
+                ->color(fn (string $state): string => match ($state) {
+                    'approved' => 'success',
+                    'pending' => 'warning',
+                    'rejected' => 'danger',
+                    'suspended' => 'gray',
+                    default => 'gray',
+                }),
+
+            TextColumn::make('department.name')
+                ->label('Department')
+                ->placeholder('Unassigned'),
+
+            IconColumn::make('is_active')
+                ->label('Active')
+                ->boolean(),
+
+            TextColumn::make('last_seen_at')
+                ->label('Last Seen')
+                ->dateTime()
+                ->since()
+                ->placeholder('Never'),
+
+            TextColumn::make('firmware_version')
+                ->label('Firmware')
+                ->placeholder('Unknown'),
+        ])
+        ->defaultSort('device_name')
+        ->actions([
+            EditAction::make(),
         ]);
     }
 

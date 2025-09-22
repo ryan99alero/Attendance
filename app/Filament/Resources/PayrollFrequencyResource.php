@@ -54,7 +54,8 @@ class PayrollFrequencyResource extends Resource
 
             // Weekly Configuration
             Select::make('weekly_day')
-                ->label('Day of Week')
+                ->label('Pay Day (Day of Week)')
+                ->helperText('Which day of the week employees are paid')
                 ->options([
                     0 => 'Sunday',
                     1 => 'Monday',
@@ -64,8 +65,24 @@ class PayrollFrequencyResource extends Resource
                     5 => 'Friday',
                     6 => 'Saturday',
                 ])
-                ->visible(fn (Get $get) => $get('frequency_type') === 'weekly')
-                ->required(fn (Get $get) => $get('frequency_type') === 'weekly'),
+                ->visible(fn (Get $get) => in_array($get('frequency_type'), ['weekly', 'biweekly']))
+                ->required(fn (Get $get) => in_array($get('frequency_type'), ['weekly', 'biweekly'])),
+
+            Select::make('start_of_week')
+                ->label('Start of Work Week')
+                ->helperText('Which day the work week begins (determines pay period boundaries)')
+                ->options([
+                    0 => 'Sunday',
+                    1 => 'Monday',
+                    2 => 'Tuesday',
+                    3 => 'Wednesday',
+                    4 => 'Thursday',
+                    5 => 'Friday',
+                    6 => 'Saturday',
+                ])
+                ->default(0)
+                ->visible(fn (Get $get) => in_array($get('frequency_type'), ['weekly', 'biweekly']))
+                ->required(fn (Get $get) => in_array($get('frequency_type'), ['weekly', 'biweekly'])),
 
             DatePicker::make('reference_start_date')
                 ->label('Reference Start Date')

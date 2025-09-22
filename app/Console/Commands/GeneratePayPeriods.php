@@ -72,12 +72,13 @@ class GeneratePayPeriods extends Command
 
                 // Show summary
                 $this->table(
-                    ['Start Date', 'End Date', 'Pay Date'],
+                    ['Start Date', 'End Date', 'Days'],
                     $createdPeriods->map(function ($period) {
+                        $days = $period->start_date->diffInDays($period->end_date) + 1;
                         return [
                             $period->start_date->format('M j, Y'),
                             $period->end_date->format('M j, Y'),
-                            $period->pay_date->format('M j, Y'),
+                            $days . ' days',
                         ];
                     })->toArray()
                 );

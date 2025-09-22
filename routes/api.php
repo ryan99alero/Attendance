@@ -65,6 +65,13 @@ Route::prefix('v1/timeclock')->group(function () {
     Route::post('/punch', [TimeClockController::class, 'recordPunch'])
         ->name('timeclock.punch');
 
+    // Configuration sync endpoints
+    Route::get('/config', [TimeClockController::class, 'getConfig'])
+        ->name('timeclock.config.get');
+
+    Route::put('/config/{deviceId}', [TimeClockController::class, 'updateConfig'])
+        ->name('timeclock.config.update');
+
     // Get employee information and hours
     Route::get('/employee/{card_id}', [TimeClockController::class, 'getEmployeeInfo'])
         ->name('timeclock.employee.info');

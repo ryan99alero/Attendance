@@ -80,46 +80,55 @@ class PayPeriodGeneratorService
     }
 
     /**
-     * Generate weekly pay periods - FIXED TO PREVENT OVERLAPS
+     * Generate weekly pay periods - 7-DAY PERIODS WITH CONFIGURABLE START DAY
      *
-     * This method is called per month but we need to ensure weekly periods
-     * are continuous across month boundaries to prevent overlaps
+     * Weekly periods are ALWAYS 7 days. The weekly_day is just when paychecks are distributed.
      */
     private function generateWeeklyPeriods(Carbon $month, PayrollFrequency $frequency): Collection
     {
         $periods = collect();
 
         // For weekly periods, we need to find periods that INTERSECT with this month
-        // rather than periods that START in this month
         $startOfMonth = $month->copy()->startOfMonth();
         $endOfMonth = $month->copy()->endOfMonth();
 
-        // Find the first Friday pay day that could affect this month
+        // Get the start of week day (0=Sunday, 1=Monday, etc.)
+        $startOfWeek = $frequency->start_of_week ?? 0; // Default to Sunday if not set
+
+        // Find the first start_of_week that could affect this month
         // Go back to ensure we catch periods that start before the month but end in it
         $searchStart = $startOfMonth->copy()->subWeeks(2);
-        $payDay = $searchStart->copy();
+        $periodStart = $searchStart->copy();
 
-        // Find first pay day (Friday) on or after search start
-        while ($payDay->dayOfWeek !== $frequency->weekly_day) {
-            $payDay->addDay();
+        // Find first start_of_week day on or after search start
+        while ($periodStart->dayOfWeek !== $startOfWeek) {
+            $periodStart->addDay();
         }
 
         // Generate periods until we're well past the end of the month
         $searchEnd = $endOfMonth->copy()->addWeeks(2);
 
-        while ($payDay->lte($searchEnd)) {
-            $payDate = $this->adjustForWeekendsAndHolidays($payDay->copy(), $frequency);
+        while ($periodStart->lte($searchEnd)) {
+            // Weekly period is always 7 days: start_of_week to start_of_week + 6 days
+            $periodEnd = $periodStart->copy()->addDays(6); // 7-day period (0-6 = 7 days)
 
-            // Weekly period: Saturday to Friday (7 days)
-            $periodEnd = $payDate->copy();
-            $periodStart = $periodEnd->copy()->subDays(6); // 7-day period
+            // Calculate the pay date for this period (when checks are distributed)
+            $payDate = $periodStart->copy();
+
+            // Find the weekly_day within this period
+            while ($payDate->dayOfWeek !== $frequency->weekly_day && $payDate->lte($periodEnd)) {
+                $payDate->addDay();
+            }
+
+            // Apply weekend/holiday adjustments to pay date
+            $adjustedPayDate = $this->adjustForWeekendsAndHolidays($payDate, $frequency);
 
             // Only include periods that intersect with this month
             if ($periodStart->lte($endOfMonth) && $periodEnd->gte($startOfMonth)) {
-                $periods->push($this->createPayPeriod($periodStart, $periodEnd, $payDate));
+                $periods->push($this->createPayPeriod($periodStart, $periodEnd));
             }
 
-            $payDay->addWeek(); // Next weekly pay date
+            $periodStart->addWeek(); // Next weekly period start
         }
 
         return $periods;
@@ -161,7 +170,7 @@ class PayPeriodGeneratorService
                 $periodEnd = $payDate->copy();
                 $periodStart = $periodEnd->copy()->subDays(13); // 14-day period
 
-                $periods->push($this->createPayPeriod($periodStart, $periodEnd, $payDate));
+                $periods->push($this->createPayPeriod($periodStart, $periodEnd));
             }
 
             $payDay->addWeeks(2); // Next bi-weekly pay date
@@ -188,12 +197,12 @@ class PayPeriodGeneratorService
         // First period: 1st to middle of month
         $firstPeriodStart = $month->copy()->startOfMonth();
         $firstPeriodEnd = $firstPayDay->copy();
-        $periods->push($this->createPayPeriod($firstPeriodStart, $firstPeriodEnd, $firstPayDay));
+        $periods->push($this->createPayPeriod($firstPeriodStart, $firstPeriodEnd));
 
         // Second period: middle to end of month
         $secondPeriodStart = $firstPayDay->copy()->addDay();
         $secondPeriodEnd = $secondPayDay->copy();
-        $periods->push($this->createPayPeriod($secondPeriodStart, $secondPeriodEnd, $secondPayDay));
+        $periods->push($this->createPayPeriod($secondPeriodStart, $secondPeriodEnd));
 
         return $periods;
     }
@@ -209,7 +218,7 @@ class PayPeriodGeneratorService
         $periodEnd = $month->copy()->endOfMonth();
 
         return collect([
-            $this->createPayPeriod($periodStart, $periodEnd, $payDay)
+            $this->createPayPeriod($periodStart, $periodEnd)
         ]);
     }
 
@@ -294,7 +303,7 @@ class PayPeriodGeneratorService
     /**
      * Create a PayPeriod model instance
      */
-    private function createPayPeriod(Carbon $startDate, Carbon $endDate, Carbon $payDate): PayPeriod
+    private function createPayPeriod(Carbon $startDate, Carbon $endDate): PayPeriod
     {
         return new PayPeriod([
             'start_date' => $startDate,

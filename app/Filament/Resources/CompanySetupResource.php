@@ -28,70 +28,123 @@ class CompanySetupResource extends Resource
                     ->disabled()
                     ->dehydrated(false),
 
-                // Number of minutes allowed before/after a shift for attendance matching
-                Forms\Components\TextInput::make('attendance_flexibility_minutes')
-                    ->numeric()
-                    ->default(30)
-                    ->required()
-                    ->label('Attendance Flexibility (Minutes)'),
+                // Basic Company Settings
+                Forms\Components\Section::make('Basic Company Settings')
+                    ->schema([
+                        // Company-wide payroll frequency
+                        Forms\Components\Select::make('payroll_frequency_id')
+                            ->label('Payroll Frequency')
+                            ->relationship('payrollFrequency', 'frequency_name')
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->helperText('All employees will follow this payroll schedule'),
 
-                // Defines the level of logging in the system (None, Error, Warning, Info, Debug)
-                Forms\Components\Select::make('logging_level')
-                    ->options([
-                        'none' => 'None',      // No logging
-                        'error' => 'Error',    // Only critical errors
-                        'warning' => 'Warning',// Errors + potential issues
-                        'info' => 'Info',      // General system events
-                        'debug' => 'Debug',    // Most detailed logs for troubleshooting
+                        // Number of minutes allowed before/after a shift for attendance matching
+                        Forms\Components\TextInput::make('attendance_flexibility_minutes')
+                            ->numeric()
+                            ->default(30)
+                            ->required()
+                            ->label('Attendance Flexibility (Minutes)')
+                            ->helperText('Minutes allowed before/after shift for attendance matching'),
+
+                        // Maximum shift length (in hours) before requiring admin approval
+                        Forms\Components\TextInput::make('max_shift_length')
+                            ->numeric()
+                            ->default(12)
+                            ->required()
+                            ->label('Max Shift Length (Hours)')
+                            ->helperText('Maximum hours in a shift before requiring approval'),
+
+                        // If enabled, employees must adhere to assigned shift schedules
+                        Forms\Components\Toggle::make('enforce_shift_schedules')
+                            ->default(true)
+                            ->label('Enforce Shift Schedules')
+                            ->helperText('Require employees to follow assigned shift times'),
+
+                        // Allow admins to manually edit time records
+                        Forms\Components\Toggle::make('allow_manual_time_edits')
+                            ->default(true)
+                            ->label('Allow Manual Time Edits')
+                            ->helperText('Allow administrators to manually edit time records'),
                     ])
-                    ->default('error')
-                    ->required()
-                    ->label('Logging Level'),
-                            // Temporary Debug Mode in  for Development (None, Error, Warning, Info, Debug)
-                Forms\Components\Select::make('debug_punch_assignment_mode')
-                    ->options([
-                        'heuristic' => 'Heuristic Only',
-                        'ml' => 'Machine Learning Only',
-                        'consensus' => 'Consensus (Both Engines)',
-                        'all' => 'All Engines',
+                    ->columns(2),
+
+                // Device Management Settings
+                Forms\Components\Section::make('Device Management Settings')
+                    ->schema([
+                        Forms\Components\TextInput::make('config_poll_interval_minutes')
+                            ->label('Configuration Poll Interval (Minutes)')
+                            ->numeric()
+                            ->default(5)
+                            ->required()
+                            ->helperText('How often devices should check for configuration updates'),
+
+                        Forms\Components\TextInput::make('firmware_check_interval_hours')
+                            ->label('Firmware Check Interval (Hours)')
+                            ->numeric()
+                            ->default(24)
+                            ->required()
+                            ->helperText('How often devices should check for firmware updates'),
+
+                        Forms\Components\Toggle::make('allow_device_poll_override')
+                            ->label('Allow Device Poll Override')
+                            ->default(false)
+                            ->helperText('Allow individual devices to override company polling settings'),
                     ])
-                    ->default('all')
-                    ->required()
-                    ->label('PunchType Debug Mode'),
+                    ->columns(3),
 
-                // Whether to automatically adjust punch types for incomplete records
-                Forms\Components\Toggle::make('auto_adjust_punches')
-                    ->default(false)
-                    ->label('Auto Adjust Punches'),
+                // Punch Processing Settings
+                Forms\Components\Section::make('Punch Processing Settings')
+                    ->schema([
+                        Forms\Components\Select::make('debug_punch_assignment_mode')
+                            ->label('Punch Assignment Engine')
+                            ->options([
+                                'heuristic' => 'Heuristic Only',
+                                'ml' => 'Machine Learning Only',
+                                'consensus' => 'Consensus (Both Engines)',
+                                'all' => 'All Engines',
+                            ])
+                            ->default('all')
+                            ->required()
+                            ->helperText('Which engine(s) to use for punch type assignment'),
 
-                // Defines the minimum hours required between two punches for auto-assigning Clock In/Out instead of Needs Review.
-                Forms\Components\TextInput::make('heuristic_min_punch_gap')
-                    ->numeric()
-                    ->default(6)
-                    ->required()
-                    ->label('heuristic Min Punch Gap'),
+                        Forms\Components\TextInput::make('heuristic_min_punch_gap')
+                            ->label('Minimum Punch Gap (Hours)')
+                            ->numeric()
+                            ->default(6)
+                            ->required()
+                            ->helperText('Minimum hours between punches for auto Clock In/Out assignment'),
 
-                // Enable ML-based punch classification for better accuracy in punch assignments
-                Forms\Components\Toggle::make('use_ml_for_punch_matching')
-                    ->default(true)
-                    ->label('Use ML for Punch Matching'),
+                        Forms\Components\Toggle::make('use_ml_for_punch_matching')
+                            ->label('Use ML for Punch Matching')
+                            ->default(true)
+                            ->helperText('Enable machine learning for punch classification'),
 
-                // If enabled, employees must adhere to assigned shift schedules
-                Forms\Components\Toggle::make('enforce_shift_schedules')
-                    ->default(true)
-                    ->label('Enforce Shift Schedules'),
+                        Forms\Components\Toggle::make('auto_adjust_punches')
+                            ->label('Auto Adjust Punches')
+                            ->default(false)
+                            ->helperText('Automatically adjust punch types for incomplete records'),
+                    ])
+                    ->columns(2),
 
-                // Allow admins to manually edit time records (If disabled, all changes must be system-generated)
-                Forms\Components\Toggle::make('allow_manual_time_edits')
-                    ->default(true)
-                    ->label('Allow Manual Time Edits'),
-
-                // Maximum shift length (in hours) before requiring admin approval
-                Forms\Components\TextInput::make('max_shift_length')
-                    ->numeric()
-                    ->default(12)
-                    ->required()
-                    ->label('Max Shift Length (Hours)'),
+                // System Settings
+                Forms\Components\Section::make('System Settings')
+                    ->schema([
+                        Forms\Components\Select::make('logging_level')
+                            ->label('System Logging Level')
+                            ->options([
+                                'none' => 'None',
+                                'error' => 'Error',
+                                'warning' => 'Warning',
+                                'info' => 'Info',
+                                'debug' => 'Debug',
+                            ])
+                            ->default('error')
+                            ->required()
+                            ->helperText('Level of system logging detail'),
+                    ])
+                    ->columns(1),
 
                 // Clock Event Processing Section
                 Forms\Components\Section::make('Clock Event Processing Settings')
@@ -137,14 +190,6 @@ class CompanySetupResource extends Resource
                     ])
                     ->columns(2),
 
-                // Company-wide payroll frequency
-                Forms\Components\Select::make('payroll_frequency_id')
-                    ->label('Payroll Frequency')
-                    ->relationship('payrollFrequency', 'frequency_name')
-                    ->searchable()
-                    ->preload()
-                    ->nullable()
-                    ->helperText('All employees will follow this payroll schedule'),
 
                 // Vacation Configuration Section
                 Forms\Components\Section::make('Vacation Configuration')
@@ -294,6 +339,23 @@ class CompanySetupResource extends Resource
                 Tables\Columns\TextColumn::make('payrollFrequency.frequency_name')
                     ->label('Payroll Frequency')
                     ->sortable(),
+
+                // Device Management columns
+                Tables\Columns\TextColumn::make('config_poll_interval_minutes')
+                    ->label('Config Poll (min)')
+                    ->sortable()
+                    ->badge()
+                    ->color('info'),
+
+                Tables\Columns\TextColumn::make('firmware_check_interval_hours')
+                    ->label('Firmware Check (hrs)')
+                    ->sortable()
+                    ->badge()
+                    ->color('warning'),
+
+                Tables\Columns\IconColumn::make('allow_device_poll_override')
+                    ->label('Device Override')
+                    ->boolean(),
 
                 // Clock Event Processing
                 Tables\Columns\TextColumn::make('clock_event_sync_frequency')

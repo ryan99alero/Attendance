@@ -117,6 +117,32 @@ class ClockEventResource extends Resource
                     ->suffix('%')
                     ->sortable(),
 
+                Tables\Columns\IconColumn::make('is_processed')
+                    ->label('Processed')
+                    ->boolean()
+                    ->trueColor('success')
+                    ->falseColor('warning')
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-clock')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('attendance.id')
+                    ->label('Attendance ID')
+                    ->placeholder('Not processed')
+                    ->url(fn ($record) => $record->attendance_id ? route('filament.admin.resources.attendances.edit', $record->attendance_id) : null)
+                    ->color('info')
+                    ->sortable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('processing_error')
+                    ->label('Error')
+                    ->placeholder('None')
+                    ->color('danger')
+                    ->wrap()
+                    ->limit(50)
+                    ->tooltip(fn ($record) => $record->processing_error)
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()
@@ -133,6 +159,26 @@ class ClockEventResource extends Resource
                     ->label('Employee')
                     ->relationship('employee', 'full_names'),
 
+                Tables\Filters\TernaryFilter::make('is_processed')
+                    ->label('Processing Status')
+                    ->placeholder('All Events')
+                    ->trueLabel('Processed Only')
+                    ->falseLabel('Unprocessed Only')
+                    ->queries(
+                        true: fn (Builder $query) => $query->where('is_processed', true),
+                        false: fn (Builder $query) => $query->where('is_processed', false),
+                        blank: fn (Builder $query) => $query,
+                    ),
+
+                Tables\Filters\Filter::make('has_errors')
+                    ->label('Has Processing Errors')
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('processing_error'))
+                    ->toggle(),
+
+                Tables\Filters\Filter::make('ready_for_processing')
+                    ->label('Ready for Processing')
+                    ->query(fn (Builder $query): Builder => $query->readyForProcessing())
+                    ->toggle(),
 
                 Tables\Filters\Filter::make('event_time')
                     ->form([

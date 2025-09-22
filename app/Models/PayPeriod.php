@@ -130,10 +130,28 @@ class PayPeriod extends Model
 
     public function processAttendance(): int
     {
-        $service = app(\App\Services\AttendanceProcessing\AttendanceProcessingService::class);
-        $service->processAll($this);
+        // Step 1: Process any unprocessed ClockEvents for this pay period first
+        $clockEventService = app(\App\Services\ClockEventProcessing\ClockEventProcessingService::class);
 
-        return 0; // Return count if needed
+        // Get ClockEvents within this pay period that are ready for processing
+        $clockEventsInPeriod = \App\Models\ClockEvent::readyForProcessing()
+            ->whereBetween('event_time', [
+                $this->start_date->startOfDay(),
+                $this->end_date->endOfDay()
+            ])
+            ->count();
+
+        if ($clockEventsInPeriod > 0) {
+            \Log::info("[PayPeriod] Processing {$clockEventsInPeriod} ClockEvents for PayPeriod {$this->id}");
+            $clockEventResult = $clockEventService->processUnprocessedEvents(500); // Process all events
+            \Log::info("[PayPeriod] ClockEvent processing result", $clockEventResult);
+        }
+
+        // Step 2: Process Attendance records (assign punch types, ML analysis, etc.)
+        $attendanceService = app(\App\Services\AttendanceProcessing\AttendanceProcessingService::class);
+        $attendanceService->processAll($this);
+
+        return $clockEventsInPeriod;
     }
     public static function current()
     {
