@@ -107,10 +107,7 @@ class HolidayTemplate extends Model
     }
 
     /**
-     * Get vacation calendars using this template
+     * Note: VacationCalendar entries are not directly linked to HolidayTemplates
+     * Holiday instances would be created in a separate holidays table when implemented
      */
-    public function vacationCalendars()
-    {
-        return $this->hasMany(VacationCalendar::class);
-    }
 }

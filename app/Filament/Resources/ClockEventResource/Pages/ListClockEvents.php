@@ -16,7 +16,7 @@ class ListClockEvents extends ListRecords
     {
         return [
             Actions\Action::make('process_batch')
-                ->label('Process Batch')
+                ->label('Process Events')
                 ->icon('heroicon-o-play')
                 ->color('success')
                 ->requiresConfirmation()

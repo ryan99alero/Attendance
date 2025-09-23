@@ -244,10 +244,9 @@ class HolidayTemplateResource extends Resource
                     ->label('All Employees')
                     ->boolean(),
 
-                Tables\Columns\TextColumn::make('vacationCalendars_count')
+                Tables\Columns\TextColumn::make('created_entries')
                     ->label('Created Entries')
-                    ->counts('vacationCalendars')
-                    ->sortable(),
+                    ->default('0'),
 
                 Tables\Columns\TextColumn::make('auto_create_days_ahead')
                     ->label('Days Ahead')

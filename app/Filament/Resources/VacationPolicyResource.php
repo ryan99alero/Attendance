@@ -22,6 +22,42 @@ class VacationPolicyResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?int $navigationSort = 30;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('view_any_vacation::policy') ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('view_any_vacation::policy') ?? false;
+    }
+
+    public static function canView($record): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('view_vacation::policy') ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('create_vacation::policy') ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('update_vacation::policy') ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('delete_vacation::policy') ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

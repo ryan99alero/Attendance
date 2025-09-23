@@ -28,6 +28,18 @@ class VacationProcessing extends Page implements HasTable
     protected static ?int $navigationSort = 40;
     protected static string $view = 'filament.pages.vacation-processing';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('page_VacationProcessing') ?? false;
+    }
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user?->hasRole('super_admin') || $user?->can('page_VacationProcessing') ?? false;
+    }
+
     public $processDate;
     public $selectedEmployee;
     public $dryRun = true;
