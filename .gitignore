@@ -5,9 +5,6 @@
 /public/storage
 /storage/*.key
 /storage/pail
-# Re-include everything else in storage
-!/storage/
-!/storage/**
 /vendor
 .env
 .env.backup
@@ -24,7 +21,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-/storage/ml/punch_model.serialized
 /.phpstorm.meta.php
 /public/vendor/livewire/livewire.esm.js
 /public/vendor/livewire/livewire.esm.js.map
