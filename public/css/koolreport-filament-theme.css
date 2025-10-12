@@ -1,0 +1,541 @@
+/* KoolReport Filament Theme Integration */
+/* This CSS file makes KoolReport honor Filament's light/dark theme settings */
+
+/* =============================================================================
+   CORE PANEL STYLING
+   ============================================================================= */
+
+/* Light mode (default) */
+.report-container {
+    background-color: #f9fafb; /* gray-50 */
+    color: #111827; /* gray-900 */
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.report-container .panel,
+.report-container .koolreport-widget,
+.report-container .card {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb; /* gray-200 */
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    color: #111827; /* gray-900 */
+}
+
+.report-container .panel-heading,
+.report-container .card-header {
+    background-color: #f9fafb; /* gray-50 */
+    border-bottom: 1px solid #e5e7eb; /* gray-200 */
+    color: #111827; /* gray-900 */
+    font-weight: 600;
+    padding: 1rem 1.5rem;
+}
+
+.report-container .panel-body,
+.report-container .card-body {
+    background-color: #ffffff;
+    color: #374151; /* gray-700 */
+    padding: 1.5rem;
+}
+
+/* =============================================================================
+   DARK MODE OVERRIDES
+   ============================================================================= */
+
+.dark .report-container {
+    background-color: #111827; /* gray-900 */
+    color: #f9fafb; /* gray-50 */
+}
+
+.dark .report-container .panel,
+.dark .report-container .koolreport-widget,
+.dark .report-container .card {
+    background-color: #1f2937; /* gray-800 */
+    border: 1px solid #374151; /* gray-700 */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    color: #f9fafb; /* gray-50 */
+}
+
+.dark .report-container .panel-heading,
+.dark .report-container .card-header {
+    background-color: #374151; /* gray-700 */
+    border-bottom: 1px solid #4b5563; /* gray-600 */
+    color: #f9fafb; /* gray-50 */
+}
+
+.dark .report-container .panel-body,
+.dark .report-container .card-body {
+    background-color: #1f2937; /* gray-800 */
+    color: #d1d5db; /* gray-300 */
+}
+
+/* =============================================================================
+   TABLE STYLING
+   ============================================================================= */
+
+/* Light mode tables */
+.report-container table,
+.report-container .table {
+    background-color: #ffffff;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid #e5e7eb; /* gray-200 */
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.report-container table th,
+.report-container .table th {
+    background-color: #f9fafb; /* gray-50 */
+    border-bottom: 1px solid #e5e7eb; /* gray-200 */
+    color: #374151; /* gray-700 */
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    text-align: left;
+}
+
+.report-container table td,
+.report-container .table td {
+    background-color: #ffffff;
+    border-bottom: 1px solid #f3f4f6; /* gray-100 */
+    color: #111827; /* gray-900 */
+    padding: 0.75rem 1rem;
+}
+
+.report-container table tbody tr:hover,
+.report-container .table tbody tr:hover {
+    background-color: #f9fafb; /* gray-50 */
+}
+
+/* Dark mode tables */
+.dark .report-container table,
+.dark .report-container .table {
+    background-color: #1f2937; /* gray-800 */
+    border: 1px solid #374151; /* gray-700 */
+}
+
+.dark .report-container table th,
+.dark .report-container .table th {
+    background-color: #374151; /* gray-700 */
+    border-bottom: 1px solid #4b5563; /* gray-600 */
+    color: #f9fafb; /* gray-50 */
+}
+
+.dark .report-container table td,
+.dark .report-container .table td {
+    background-color: #1f2937; /* gray-800 */
+    border-bottom: 1px solid #374151; /* gray-700 */
+    color: #e5e7eb; /* gray-200 */
+}
+
+.dark .report-container table tbody tr:hover,
+.dark .report-container .table tbody tr:hover {
+    background-color: #374151; /* gray-700 */
+}
+
+/* =============================================================================
+   FORM ELEMENTS
+   ============================================================================= */
+
+/* Light mode forms */
+.report-container input,
+.report-container select,
+.report-container textarea {
+    background-color: #ffffff;
+    border: 1px solid #d1d5db; /* gray-300 */
+    border-radius: 0.375rem;
+    color: #111827; /* gray-900 */
+    padding: 0.5rem 0.75rem;
+}
+
+.report-container input:focus,
+.report-container select:focus,
+.report-container textarea:focus {
+    border-color: #3b82f6; /* blue-500 */
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+.report-container label {
+    color: #374151; /* gray-700 */
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+/* Dark mode forms */
+.dark .report-container input,
+.dark .report-container select,
+.dark .report-container textarea {
+    background-color: #374151; /* gray-700 */
+    border: 1px solid #4b5563; /* gray-600 */
+    color: #f9fafb; /* gray-50 */
+}
+
+.dark .report-container input:focus,
+.dark .report-container select:focus,
+.dark .report-container textarea:focus {
+    border-color: #60a5fa; /* blue-400 */
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.dark .report-container label {
+    color: #e5e7eb; /* gray-200 */
+}
+
+/* =============================================================================
+   BUTTONS
+   ============================================================================= */
+
+/* Primary buttons */
+.report-container .btn-primary,
+.report-container button.primary {
+    background-color: #3b82f6; /* blue-500 */
+    border: 1px solid #3b82f6;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+}
+
+.report-container .btn-primary:hover,
+.report-container button.primary:hover {
+    background-color: #2563eb; /* blue-600 */
+    border-color: #2563eb;
+}
+
+.dark .report-container .btn-primary,
+.dark .report-container button.primary {
+    background-color: #60a5fa; /* blue-400 */
+    border-color: #60a5fa;
+}
+
+.dark .report-container .btn-primary:hover,
+.dark .report-container button.primary:hover {
+    background-color: #3b82f6; /* blue-500 */
+    border-color: #3b82f6;
+}
+
+/* Secondary buttons */
+.report-container .btn-secondary,
+.report-container button.secondary {
+    background-color: #6b7280; /* gray-500 */
+    border: 1px solid #6b7280;
+    color: #ffffff;
+}
+
+.report-container .btn-secondary:hover,
+.report-container button.secondary:hover {
+    background-color: #4b5563; /* gray-600 */
+    border-color: #4b5563;
+}
+
+.dark .report-container .btn-secondary,
+.dark .report-container button.secondary {
+    background-color: #9ca3af; /* gray-400 */
+    border-color: #9ca3af;
+    color: #111827; /* gray-900 */
+}
+
+.dark .report-container .btn-secondary:hover,
+.dark .report-container button.secondary:hover {
+    background-color: #6b7280; /* gray-500 */
+    border-color: #6b7280;
+    color: #ffffff;
+}
+
+/* =============================================================================
+   CHARTS AND VISUALIZATIONS
+   ============================================================================= */
+
+.report-container .chart-container {
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.dark .report-container .chart-container {
+    background-color: #1f2937; /* gray-800 */
+}
+
+/* Chart text colors */
+.dark .report-container .chart-container text,
+.dark .report-container .chart-container .chart-text {
+    fill: #e5e7eb !important; /* gray-200 */
+    color: #e5e7eb !important;
+}
+
+.dark .report-container .chart-container .chart-axis {
+    stroke: #6b7280 !important; /* gray-500 */
+}
+
+.dark .report-container .chart-container .chart-grid {
+    stroke: #374151 !important; /* gray-700 */
+}
+
+/* =============================================================================
+   PAGINATION
+   ============================================================================= */
+
+.report-container .pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.report-container .pagination a,
+.report-container .pagination span {
+    background-color: #ffffff;
+    border: 1px solid #d1d5db; /* gray-300 */
+    color: #374151; /* gray-700 */
+    padding: 0.5rem 0.75rem;
+    margin: 0 0.125rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+}
+
+.report-container .pagination a:hover {
+    background-color: #f9fafb; /* gray-50 */
+}
+
+.report-container .pagination .current {
+    background-color: #3b82f6; /* blue-500 */
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
+.dark .report-container .pagination a,
+.dark .report-container .pagination span {
+    background-color: #374151; /* gray-700 */
+    border-color: #4b5563; /* gray-600 */
+    color: #e5e7eb; /* gray-200 */
+}
+
+.dark .report-container .pagination a:hover {
+    background-color: #4b5563; /* gray-600 */
+}
+
+.dark .report-container .pagination .current {
+    background-color: #60a5fa; /* blue-400 */
+    border-color: #60a5fa;
+    color: #111827; /* gray-900 */
+}
+
+/* =============================================================================
+   ALERTS AND MESSAGES
+   ============================================================================= */
+
+.report-container .alert {
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.report-container .alert-info {
+    background-color: #dbeafe; /* blue-100 */
+    border: 1px solid #93c5fd; /* blue-300 */
+    color: #1e40af; /* blue-800 */
+}
+
+.report-container .alert-success {
+    background-color: #d1fae5; /* green-100 */
+    border: 1px solid #86efac; /* green-300 */
+    color: #065f46; /* green-800 */
+}
+
+.report-container .alert-warning {
+    background-color: #fef3c7; /* yellow-100 */
+    border: 1px solid #fcd34d; /* yellow-300 */
+    color: #92400e; /* yellow-800 */
+}
+
+.report-container .alert-danger {
+    background-color: #fee2e2; /* red-100 */
+    border: 1px solid #fca5a5; /* red-300 */
+    color: #991b1b; /* red-800 */
+}
+
+/* Dark mode alerts */
+.dark .report-container .alert-info {
+    background-color: #1e3a8a; /* blue-900 */
+    border-color: #3b82f6; /* blue-500 */
+    color: #dbeafe; /* blue-100 */
+}
+
+.dark .report-container .alert-success {
+    background-color: #14532d; /* green-900 */
+    border-color: #22c55e; /* green-500 */
+    color: #d1fae5; /* green-100 */
+}
+
+.dark .report-container .alert-warning {
+    background-color: #92400e; /* yellow-800 */
+    border-color: #eab308; /* yellow-500 */
+    color: #fef3c7; /* yellow-100 */
+}
+
+.dark .report-container .alert-danger {
+    background-color: #991b1b; /* red-800 */
+    border-color: #ef4444; /* red-500 */
+    color: #fee2e2; /* red-100 */
+}
+
+/* =============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .report-container .panel-heading,
+    .report-container .card-header {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .report-container .panel-body,
+    .report-container .card-body {
+        padding: 1rem;
+    }
+
+    .report-container table th,
+    .report-container table td,
+    .report-container .table th,
+    .report-container .table td {
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* =============================================================================
+   UTILITY CLASSES - OVERRIDE TAILWIND/BOOTSTRAP DEFAULTS
+   ============================================================================= */
+
+.report-container .text-primary {
+    color: #3b82f6 !important; /* blue-500 */
+}
+
+.dark .report-container .text-primary {
+    color: #60a5fa !important; /* blue-400 */
+}
+
+.report-container .text-secondary {
+    color: #6b7280 !important; /* gray-500 */
+}
+
+.dark .report-container .text-secondary {
+    color: #9ca3af !important; /* gray-400 */
+}
+
+.report-container .bg-primary {
+    background-color: #3b82f6 !important; /* blue-500 */
+}
+
+.dark .report-container .bg-primary {
+    background-color: #60a5fa !important; /* blue-400 */
+}
+
+/* Override common Tailwind utility classes that KoolReport might use */
+.dark .report-container .bg-white,
+.dark .bg-white {
+    background-color: rgb(31 41 55 / var(--tw-bg-opacity, 1)) !important; /* gray-800 - Filament dark */
+}
+
+.dark .report-container .text-black,
+.dark .text-black {
+    color: rgb(249 250 251 / var(--tw-text-opacity, 1)) !important; /* gray-50 - Filament dark text */
+}
+
+.dark .report-container .text-gray-900,
+.dark .text-gray-900 {
+    color: rgb(249 250 251 / var(--tw-text-opacity, 1)) !important; /* gray-50 */
+}
+
+.dark .report-container .text-gray-800,
+.dark .text-gray-800 {
+    color: rgb(229 231 235 / var(--tw-text-opacity, 1)) !important; /* gray-200 */
+}
+
+.dark .report-container .text-gray-700,
+.dark .text-gray-700 {
+    color: rgb(209 213 219 / var(--tw-text-opacity, 1)) !important; /* gray-300 */
+}
+
+.dark .report-container .text-gray-600,
+.dark .text-gray-600 {
+    color: rgb(156 163 175 / var(--tw-text-opacity, 1)) !important; /* gray-400 */
+}
+
+.dark .report-container .bg-gray-50,
+.dark .bg-gray-50 {
+    background-color: rgb(55 65 81 / var(--tw-bg-opacity, 1)) !important; /* gray-700 */
+}
+
+.dark .report-container .bg-gray-100,
+.dark .bg-gray-100 {
+    background-color: rgb(55 65 81 / var(--tw-bg-opacity, 1)) !important; /* gray-700 */
+}
+
+.dark .report-container .border-gray-200,
+.dark .border-gray-200 {
+    border-color: rgb(75 85 99 / var(--tw-border-opacity, 1)) !important; /* gray-600 */
+}
+
+.dark .report-container .border-gray-300,
+.dark .border-gray-300 {
+    border-color: rgb(75 85 99 / var(--tw-border-opacity, 1)) !important; /* gray-600 */
+}
+
+/* =============================================================================
+   AGGRESSIVE OVERRIDES FOR KOOLREPORT CONTENT
+   ============================================================================= */
+
+/* Target KoolReport content specifically - use highest specificity */
+.dark body .bg-white,
+.dark html .bg-white,
+.dark .koolreport .bg-white,
+.dark [class*="koolreport"] .bg-white,
+.dark div[class*="report"] .bg-white {
+    background-color: rgb(31 41 55) !important; /* Filament gray-800 */
+}
+
+/* Also target any white backgrounds without specific classes */
+.dark body [style*="background-color: white"],
+.dark body [style*="background-color: #ffffff"],
+.dark body [style*="background-color: #fff"],
+.dark .koolreport [style*="background-color: white"],
+.dark .koolreport [style*="background-color: #ffffff"],
+.dark .koolreport [style*="background-color: #fff"] {
+    background-color: rgb(31 41 55) !important; /* Filament gray-800 */
+}
+
+/* Target any potential Bootstrap or other framework white backgrounds */
+.dark .card,
+.dark .card-body,
+.dark .panel,
+.dark .panel-body,
+.dark .widget,
+.dark .content,
+.dark .main-content,
+.dark .report-content {
+    background-color: rgb(31 41 55) !important; /* Filament gray-800 */
+    color: rgb(249 250 251) !important; /* Filament gray-50 */
+}
+
+/* Override any black text in dark mode */
+.dark body [style*="color: black"],
+.dark body [style*="color: #000000"],
+.dark body [style*="color: #000"],
+.dark .koolreport [style*="color: black"],
+.dark .koolreport [style*="color: #000000"],
+.dark .koolreport [style*="color: #000"] {
+    color: rgb(249 250 251) !important; /* Filament gray-50 */
+}
+
+/* =============================================================================
+   TRANSITIONS
+   ============================================================================= */
+
+.report-container * {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 200ms;
+    transition-timing-function: ease-in-out;
+}

@@ -73,11 +73,12 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-finger-print')
                     ->group('Time Tracking'),
 
-                // Reports & Analytics (placeholder for future reports)
+                // Reports & Analytics
                 NavigationItem::make('Reports Dashboard')
-                    ->url('/admin/reports-placeholder')
+                    ->url('/reports/dashboard')
                     ->icon('heroicon-o-chart-pie')
-                    ->group('Reports & Analytics'),
+                    ->group('Reports & Analytics')
+                    ->openUrlInNewTab(),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
@@ -88,6 +89,10 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 Widgets\AccountWidget::class,
                 Widgets\FilamentInfoWidget::class,
+                \App\Filament\Widgets\AttendanceStatsWidget::class,
+                \App\Filament\Widgets\AttendanceChartWidget::class,
+                \App\Filament\Widgets\DepartmentBreakdownWidget::class,
+                \App\Filament\Widgets\KoolReportWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

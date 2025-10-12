@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Controllers;
 
+use Illuminate\Routing\Controller;
 use App\Services\AttendanceProcessing\AttendanceFetchService;
 use Illuminate\Http\Request;
 

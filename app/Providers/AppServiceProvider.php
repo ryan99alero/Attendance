@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Shift\ShiftScheduleService;
 use App\Services\Logging\AutoLogger;
+use App\Helpers\KoolReportLaravelCompatibility;
 use Illuminate\Support\ServiceProvider;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\View;
@@ -17,6 +18,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Initialize KoolReport Laravel 11 compatibility fixes early
+        KoolReportLaravelCompatibility::initialize();
+
         // Correct namespace for ShiftScheduleService
         $this->app->singleton(ShiftScheduleService::class, function ($app) {
             return new ShiftScheduleService();
