@@ -1,0 +1,77 @@
+Command: ninja flash
+[1/5] cd /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/esptool_py && /Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python /Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/partition_table/partition-table.bin /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp32_p4_nfc_reader.bin
+esp32_p4_nfc_reader.bin binary size 0x11ba00 bytes. Smallest app partition is 0x300000 bytes. 0x1e4600 bytes (63%) free.
+[2/5] Performing build step for 'bootloader'
+[1/1] cd /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/bootloader/esp-idf/esptool_py && /Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python /Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/bootloader/bootloader.bin
+Bootloader binary size 0x5ba0 bytes. 0x460 bytes (5%) free.
+[3/5] No install step for 'bootloader'
+[4/5] Completed 'bootloader'
+[4/5] cd /Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esptool_py && /Users/ryangoff/.espressif/tools/cmake/3.30.2/CMake.app/Contents/bin/cmake -D IDF_PATH=/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1 -D "SERIAL_TOOL=/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python;;/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esptool_py/esptool/esptool.py;--chip;esp32p4" -D "SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args" -D WORKING_DIRECTORY=/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build -P /Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esptool_py/run_serial_tool.cmake
+esptool.py --chip esp32p4 -p /dev/cu.usbmodem2101 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x2000 bootloader/bootloader.bin 0x20000 esp32_p4_nfc_reader.bin 0x8000 partition_table/partition-table.bin
+esptool.py v4.10.0
+Serial port /dev/cu.usbmodem2101
+Connecting...
+Chip is ESP32-P4 (revision v1.3)
+Features: High-Performance MCU
+Crystal is 40MHz
+USB mode: USB-Serial/JTAG
+MAC: 30:ed:a0:e2:20:73
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00002000 to 0x00007fff...
+Flash will be erased from 0x00020000 to 0x0013bfff...
+Flash will be erased from 0x00008000 to 0x00008fff...
+SHA digest in image updated
+Compressed 23456 bytes to 14352...
+Writing at 0x00002000... (100 %)
+Wrote 23456 bytes (14352 compressed) at 0x00002000 in 0.4 seconds (effective 496.1 kbit/s)...
+Hash of data verified.
+Compressed 1161728 bytes to 568442...
+Writing at 0x00020000... (2 %)
+Writing at 0x0002f3fd... (5 %)
+Writing at 0x0003eee6... (8 %)
+Writing at 0x0004b825... (11 %)
+Writing at 0x0005b1a0... (14 %)
+Writing at 0x0006431a... (17 %)
+Writing at 0x0006aa6c... (20 %)
+Writing at 0x00071d5a... (22 %)
+Writing at 0x00078e48... (25 %)
+Writing at 0x00082fc6... (28 %)
+Writing at 0x0008be2b... (31 %)
+Writing at 0x00093f49... (34 %)
+Writing at 0x0009b59c... (37 %)
+Writing at 0x000a1da3... (40 %)
+Writing at 0x000a8064... (42 %)
+Writing at 0x000ae562... (45 %)
+Writing at 0x000b59dc... (48 %)
+Writing at 0x000bb9dd... (51 %)
+Writing at 0x000c1b1a... (54 %)
+Writing at 0x000c7904... (57 %)
+Writing at 0x000cf18e... (60 %)
+Writing at 0x000d7900... (62 %)
+Writing at 0x000e0d6b... (65 %)
+Writing at 0x000e7a5b... (68 %)
+Writing at 0x000ee543... (71 %)
+Writing at 0x000f5792... (74 %)
+Writing at 0x000fc81c... (77 %)
+Writing at 0x00103440... (80 %)
+Writing at 0x0010a8da... (82 %)
+Writing at 0x00111f1b... (85 %)
+Writing at 0x00118d38... (88 %)
+Writing at 0x0011f689... (91 %)
+Writing at 0x001267e8... (94 %)
+Writing at 0x0012dc5d... (97 %)
+Writing at 0x00134ed1... (100 %)
+Wrote 1161728 bytes (568442 compressed) at 0x00020000 in 9.5 seconds (effective 982.3 kbit/s)...
+Hash of data verified.
+Compressed 3072 bytes to 122...
+Writing at 0x00008000... (100 %)
+Wrote 3072 bytes (122 compressed) at 0x00008000 in 0.1 seconds (effective 491.1 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...

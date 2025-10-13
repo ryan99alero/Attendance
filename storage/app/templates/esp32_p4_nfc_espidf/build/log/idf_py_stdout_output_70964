@@ -1,0 +1,237 @@
+Command: /Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python /Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/tools/idf_monitor.py -p /dev/cu.usbmodem2101 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp32_p4_nfc_reader.elf /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/bootloader/bootloader.elf -m '/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python' '/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/tools/idf.py' '-p' '/dev/cu.usbmodem2101'
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0x304 (DOWNLOAD(USB/UART0/SPI))
+waiting for download
+[0;32mI (1363) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (1372) cpu_start: Pro cpu start user code[0m
+[0;32mI (1372) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (1372) app_init: Application information:[0m
+[0;32mI (1372) app_init: Project name:     esp32_p4_nfc_reader[0m
+[0;32mI (1373) app_init: App version:      c76a2c6[0m
+[0;32mI (1373) app_init: Compile time:     Oct 12 2025 20:39:14[0m
+[0;32mI (1373) app_init: ELF file SHA256:  ac46f4913...[0m
+[0;32mI (1373) app_init: ESP-IDF:          v5.5.1-dirty[0m
+[0;32mI (1374) efuse_init: Min chip rev:     v0.1[0m
+[0;32mI (1374) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (1374) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (1374) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (1375) heap_init: At 4FF24BD0 len 000163F0 (88 KiB): RAM[0m
+[0;32mI (1375) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (1375) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (1376) heap_init: At 501080A0 len 00007F60 (31 KiB): RTCRAM[0m
+[0;32mI (1376) heap_init: At 30100088 len 00001F78 (7 KiB): TCM[0m
+[0;32mI (1377) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;32mI (1377) spi_flash: detected chip: gd[0m
+[0;32mI (1378) spi_flash: flash io: qio[0m
+[0;32mI (1378) host_init: ESP Hosted : Host chip_ip[18][0m
+[0;32mI (1378) H_API: ESP-Hosted starting. Hosted_Tasks: prio:23, stack: 5120 RPC_task_stack: 5120[0m
+[0;32mI (1378) H_API: ** add_esp_wifi_remote_channels **[0m
+[0;32mI (1379) transport: Add ESP-Hosted channel IF[1]: S[0] Tx[0x4000abc8] Rx[0x4001e944][0m
+[0;32mI (1379) transport: Add ESP-Hosted channel IF[2]: S[0] Tx[0x4000ab0c] Rx[0x4001e944][0m
+sdio_mempool_create free:33672896 min-free:33672896 lfb-def:33030144 lfb-8bit:33030144
+
+[0;32mI (1381) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (1381) main_task: Started on CPU0[0m
+[0;32mI (1391) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (1391) main_task: Calling app_main()[0m
+
+
+=== ESP32-P4 NFC TIME CLOCK ===
+Firmware Version: Oct 12 2025 20:39:21
+Build Date: Oct 12 2025
+Build Time: 20:39:21
+
+NVS initialized
+
+Initializing display (allocating frame buffer)...
+[0;32mI (1411) LVGL: Starting LVGL task[0m
+[0;33mW (1411) ledc: GPIO 26 is not usable, maybe conflict with others[0m
+[0;32mI (1411) ESP32_P4_EV: MIPI DSI PHY Powered on[0m
+[0;32mI (1411) ESP32_P4_EV: Install MIPI DSI LCD control panel[0m
+[0;32mI (1411) ESP32_P4_EV: Install EK79007 LCD control panel[0m
+[0;32mI (1411) ek79007: version: 1.0.3[0m
+[0;32mI (1581) ESP32_P4_EV: Display initialized[0m
+[0;32mI (1581) ESP32_P4_EV: Display resolution 1024x600[0m
+[0;33mW (1581) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs[0m
+[0;32mI (1581) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (1581) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (1581) GT911: TouchPad_Config_Version:89[0m
+[0;32mI (1581) ESP32_P4_EV: Setting LCD backlight: 100%[0m
+[0;32mI (1581) UI_MANAGER: Initializing UI Manager[0m
+[0;32mI (1591) UI_MANAGER: UI initialized[0m
+Display initialized!
+Free heap after display: 32555852 bytes
+
+Initializing network manager...
+[0;32mI (1611) NETWORK_MANAGER: Initializing network manager...[0m
+[0;32mI (1611) NETWORK_MANAGER: Network mode NVS not found, using default: Ethernet Only[0m
+[0;32mI (1611) NETWORK_MANAGER: Network mode: Ethernet Only[0m
+[0;32mI (1611) NETWORK_MANAGER: Initializing Ethernet manager...[0m
+[0;32mI (1611) ETH_MANAGER: Initializing Ethernet[0m
+[0;31mE (1611) esp.emac.gpio: emac_esp_iomux_init(87): GPIO 50 is already reserved[0m
+[0;31mE (1611) esp.emac.gpio: emac_esp_iomux_rmii_clk_input(196): invalid RMII CLK input GPIO number[0m
+[0;31mE (1611) esp.emac: emac_esp_config_data_interface(757): invalid EMAC RMII clock input GPIO[0m
+[0;31mE (1611) esp.emac: esp_eth_mac_new_esp32(841): config emac interface failed[0m
+[0;31mE (1611) ETH_MANAGER: Failed to create MAC[0m
+[0;31mE (1611) NETWORK_MANAGER: ❌ Ethernet manager initialization failed[0m
+[0;31mE (1621) NETWORK_MANAGER: No network interfaces initialized![0m
+❌ Failed to initialize network manager
+
+API disabled
+
+Initializing PN532 NFC Module V3...
+DIP Switches: SEL0=1, SEL1=0 (SPI mode)
+
+[0;32mI (1621) NFC_READER: Initializing PN532 reader[0m
+[0;32mI (1621) NFC_READER:   SPI Host: 2[0m
+[0;32mI (1621) NFC_READER:   MISO Pin: 21[0m
+[0;32mI (1621) NFC_READER:   MOSI Pin: 22[0m
+[0;32mI (1621) NFC_READER:   SCK Pin: 20[0m
+[0;32mI (1621) NFC_READER:   CS Pin: 23[0m
+[0;32mI (1621) NFC_READER:   RST Pin: 32[0m
+[0;32mI (1621) NFC_READER:   IRQ Pin: -1[0m
+[0;32mI (2031) NFC_READER: PN532 initialized successfully[0m
+✅ PN532 initialized successfully!
+   Firmware: PN532 v1.6
+
+Ready to read cards. Place a card near the reader...
+
+💓 Heartbeat - Cards read: 0, Heap: 32545028 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes
+💓 Heartbeat - Cards read: 0, Heap: 32545036 bytes

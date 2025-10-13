@@ -1,0 +1,56 @@
+Command: /Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python /Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/tools/idf_monitor.py -p /dev/cu.usbmodem2101 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp32_p4_nfc_reader.elf /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/bootloader/bootloader.elf -m '/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python' '/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/tools/idf.py' '-p' '/dev/cu.usbmodem2101'
+[0;33m--- esp-idf-monitor 1.8.0 on /dev/cu.usbmodem2101 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+[0m--- 0x4ff29ed0: [0;33mesp_bootloader_get_description[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_bootloader_format/esp_bootloader_desc.c[0m[0m:[1;31m39[0m
+[0m--- 0x4ff2cbd0: [0;33mesp_flash_encryption_enabled[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/bootloader_support/src/flash_encrypt.c[0m[0m:[1;31m89[0m
+[0m--- 0x4ff29eda: [0;33mcall_start_cpu0[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m25[0m
+[0m--- 0x4ff0032c: [0;33mcall_start_cpu1[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/port/cpu_start.c[0m[0m:[1;31m197[0m
+[0m--- 0x4000024e: [0;33m__esp_system_init_fn_init_efuse_check[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/efuse/src/esp_efuse_startup.c[0m[0m:[1;31m37[0m
+[0m--- 0x400008dc: [0;33m__esp_system_init_fn_init_show_cpu_freq[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/startup_funcs.c[0m[0m:[1;31m64[0m
+[0m--- 0x400000e0: [0;33m__esp_system_init_fn_init_show_app_info[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_app_format/esp_app_desc.c[0m[0m:[1;31m123[0m
+[0m--- 0x40000260: [0;33m__esp_system_init_fn_init_efuse_show_app_info[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/efuse/src/esp_efuse_startup.c[0m[0m:[1;31m47[0m
+[0m--- 0x40002fb8: [0;33m__esp_system_init_fn_init_heap[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/heap/heap_caps_init.c[0m[0m:[1;31m26[0m
+[0m--- 0x30100000: [0;33mclk_ll_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/hal/esp32p4/include/hal/clk_tree_ll.h[0m[0m:[1;31m165[0m
+[0m--- (inlined by) [0;33mrtc_clk_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_hw_support/port/esp32p4/rtc_clk.c[0m[0m:[1;31m586[0m
+[0m--- 0x4ff00000: [0;33m_vector_table[0m[0m at [0;32m??[0m[0m:[1;31m?[0m
+[0m--- 0x4ff00000: [0;33m_vector_table[0m[0m at [0;32m??[0m[0m:[1;31m?[0m
+[0m--- 0x4ff00000: [0;33m_vector_table[0m[0m at [0;32m??[0m[0m:[1;31m?[0m
+[0m--- 0x4ff00000: [0;33m_vector_table[0m[0m at [0;32m??[0m[0m:[1;31m?[0m
+[0m--- 0x30100000: [0;33mclk_ll_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/hal/esp32p4/include/hal/clk_tree_ll.h[0m[0m:[1;31m165[0m
+[0m--- (inlined by) [0;33mrtc_clk_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_hw_support/port/esp32p4/rtc_clk.c[0m[0m:[1;31m586[0m
+[0m--- 0x30100000: [0;33mclk_ll_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/hal/esp32p4/include/hal/clk_tree_ll.h[0m[0m:[1;31m165[0m
+[0m--- (inlined by) [0;33mrtc_clk_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_hw_support/port/esp32p4/rtc_clk.c[0m[0m:[1;31m586[0m
+[0m--- 0x30100000: [0;33mclk_ll_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/hal/esp32p4/include/hal/clk_tree_ll.h[0m[0m:[1;31m165[0m
+[0m--- (inlined by) [0;33mrtc_clk_mpll_disable[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_hw_support/port/esp32p4/rtc_clk.c[0m[0m:[1;31m586[0m
+[0m--- 0x400081ec: [0;33m__esp_system_init_fn_esp_timer_init_nonos[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_timer/src/esp_timer_init.c[0m[0m:[1;31m28[0m
+[0m--- 0x40007982: [0;33m__esp_system_init_fn_init_libc[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/newlib/src/init.c[0m[0m:[1;31m12[0m
+[0m--- 0x4000a9b6: [0;33m__esp_system_init_fn_add_psram_to_heap[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_psram/system_layer/esp_psram.c[0m[0m:[1;31m115[0m
+[0m--- 0x4000095c: [0;33m__esp_system_init_fn_init_brownout[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/startup_funcs.c[0m[0m:[1;31m79[0m
+[0m--- 0x40000980: [0;33m__esp_system_init_fn_init_newlib_time[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/startup_funcs.c[0m[0m:[1;31m104[0m
+[0m--- 0x40008b56: [0;33m__esp_system_init_fn_init_vfs_usj[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag_vfs.c[0m[0m:[1;31m649[0m
+[0m--- 0x4000a442: [0;33m__esp_system_init_fn_init_vfs_nullfs[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/vfs/nullfs.c[0m[0m:[1;31m322[0m
+[0m--- 0x40008dce: [0;33m__esp_system_init_fn_init_vfs_console[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_vfs_console/vfs_console.c[0m[0m:[1;31m271[0m
+[0m--- 0x40007990: [0;33m__esp_system_init_fn_init_libc_stdio[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/newlib/src/init.c[0m[0m:[1;31m18[0m
+[0m--- 0x40000990: [0;33m__esp_system_init_fn_init_flash[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/startup_funcs.c[0m[0m:[1;31m111[0m
+[0m--- 0x40000352: [0;33m__esp_system_init_fn_init_efuse[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/efuse/src/esp_efuse_startup.c[0m[0m:[1;31m158[0m
+[0m--- 0x400a9da6: [0;33m_GLOBAL__sub_I__ZN17__eh_globals_init7_S_initE[0m[0m at [0;32m/builds/idf/crosstool-NG/.build/riscv32-esp-elf/build/build-cc-gcc-final/riscv32-esp-elf/rv32imafc_zicsr_zifencei/ilp32f/no-rtti/libstdc++-v3/include/riscv32-esp-elf/bits/gthr-default.h[0m[0m:[1;31m721[0m
+[0m--- (inlined by) [0;33m__eh_globals_init::__eh_globals_init()[0m[0m at [0;32m/builds/idf/crosstool-NG/.build/riscv32-esp-elf/src/gcc/libstdc++-v3/libsupc++/eh_globals.cc[0m[0m:[1;31m105[0m
+[0m--- (inlined by) [0;33m__static_initialization_and_destruction_0[0m[0m at [0;32m/builds/idf/crosstool-NG/.build/riscv32-esp-elf/src/gcc/libstdc++-v3/libsupc++/eh_globals.cc[0m[0m:[1;31m126[0m
+[0m--- (inlined by) [0;33m_GLOBAL__sub_I__ZN17__eh_globals_init7_S_initE[0m[0m at [0;32m/builds/idf/crosstool-NG/.build/riscv32-esp-elf/src/gcc/libstdc++-v3/libsupc++/eh_globals.cc[0m[0m:[1;31m162[0m
+[0m--- 0x400a9a60: [0;33mesp_ds_conn_lock[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/mbedtls/port/esp_ds/esp_ds_common.c[0m[0m:[1;31m55[0m
+[0m--- 0x4007532c: [0;33mesp_ipc_init[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/esp_ipc.c[0m[0m:[1;31m107[0m
+[0m--- 0x4001eaa6: [0;33mesp_hosted_host_init[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_hosted/host/port/esp/freertos/src/port_esp_hosted_host_init.c[0m[0m:[1;31m18[0m
+[0m--- 0x40020aa0: [0;33mesp_wifi_remote_channel_rx[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote_net.c[0m[0m:[1;31m19[0m
+[0m--- 0x4000b3a8: [0;33mtransport_drv_sta_tx[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_hosted/host/drivers/transport/transport_drv.c[0m[0m:[1;31m245[0m
+[0m--- 0x40020aa0: [0;33mesp_wifi_remote_channel_rx[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote_net.c[0m[0m:[1;31m19[0m
+[0m--- 0x40020aa0: [0;33mesp_wifi_remote_channel_rx[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote_net.c[0m[0m:[1;31m19[0m
+[0m--- 0x4000b2ec: [0;33mtransport_drv_ap_tx[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_hosted/host/drivers/transport/transport_drv.c[0m[0m:[1;31m275[0m
+[0m--- 0x40020aa0: [0;33mesp_wifi_remote_channel_rx[0m[0m at [0;32m/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote_net.c[0m[0m:[1;31m19[0m
+[0m--- 0x4ff091d2: [0;33menable_timer_group0_for_calibration[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_hw_support/port/esp32p4/rtc_time.c[0m[0m:[1;31m230[0m
+[0m--- 0x400022ec: [0;33m__esp_system_init_fn_esp_hw_stack_guard_init[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/hw_stack_guard.c[0m[0m:[1;31m15[0m
+[0m--- 0x40003836: [0;33m__esp_system_init_fn_esp_security_init[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_security/src/init.c[0m[0m:[1;31m42[0m
+[0m--- 0x400c171a: [0;33m__esp_system_init_fn_sleep_clock_startup_init[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_hw_support/lowpower/port/esp32p4/sleep_clock.c[0m[0m:[1;31m64[0m
+[0m--- 0x4000828a: [0;33m__esp_system_init_fn_usb_serial_jtag_conn_status_init[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag_connection_monitor.c[0m[0m:[1;31m75[0m
+[0m--- 0x400009e2: [0;33m__esp_system_init_fn_init_disable_rtc_wdt[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_system/startup_funcs.c[0m[0m:[1;31m179[0m
+[0m--- 0x40092fde: [0;33mesp_netif_new_api[0m[0m at [0;32m/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_netif/lwip/esp_netif_lwip.c[0m[0m:[1;31m769[0m
+[0m
