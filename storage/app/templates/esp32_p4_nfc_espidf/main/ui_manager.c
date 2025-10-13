@@ -780,163 +780,181 @@ static void create_network_config_ui(void) {
         network_config_container = NULL;
     }
 
-    // Create scrollable config container (320px height, leaves room for keyboard)
+    // Create compact config container (no scrolling needed)
     network_config_container = lv_obj_create(network_config_screen);
-    lv_obj_set_size(network_config_container, 900, 320);
+    lv_obj_set_size(network_config_container, 900, 520);
     lv_obj_align(network_config_container, LV_ALIGN_TOP_MID, 0, 15);
     lv_obj_set_style_bg_color(network_config_container, COLOR_STATUS_BG, 0);
     lv_obj_set_style_border_color(network_config_container, COLOR_PRIMARY, 0);
     lv_obj_set_style_border_width(network_config_container, 2, 0);
-    lv_obj_set_flex_flow(network_config_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(network_config_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_all(network_config_container, 15, 0);
-    lv_obj_set_style_pad_row(network_config_container, 8, 0);
+    lv_obj_clear_flag(network_config_container, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Title
-    lv_obj_t *title = lv_label_create(network_config_container);
+    // Title and Status row
+    lv_obj_t *header_row = lv_obj_create(network_config_container);
+    lv_obj_set_size(header_row, 850, 40);
+    lv_obj_align(header_row, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_set_style_bg_opa(header_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(header_row, 0, 0);
+    lv_obj_set_style_pad_all(header_row, 0, 0);
+    lv_obj_clear_flag(header_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *title = lv_label_create(header_row);
     lv_label_set_text(title, "WiFi Configuration");
     lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(title, COLOR_PRIMARY, 0);
+    lv_obj_align(title, LV_ALIGN_LEFT_MID, 0, 0);
 
-    // Status label
-    network_status_label = lv_label_create(network_config_container);
+    network_status_label = lv_label_create(header_row);
     lv_label_set_text(network_status_label, wifi_manager_is_connected() ? "Connected" : "Disconnected");
     lv_obj_set_style_text_font(network_status_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(network_status_label, COLOR_TEXT_DIM, 0);
+    lv_obj_align(network_status_label, LV_ALIGN_RIGHT_MID, 0, 0);
 
-    // SSID input
-    lv_obj_t *ssid_label = lv_label_create(network_config_container);
+    // SSID row
+    lv_obj_t *ssid_row = lv_obj_create(network_config_container);
+    lv_obj_set_size(ssid_row, 850, 35);
+    lv_obj_align(ssid_row, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_set_style_bg_opa(ssid_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ssid_row, 0, 0);
+    lv_obj_set_style_pad_all(ssid_row, 0, 0);
+    lv_obj_clear_flag(ssid_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *ssid_label = lv_label_create(ssid_row);
     lv_label_set_text(ssid_label, "SSID:");
     lv_obj_set_style_text_font(ssid_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(ssid_label, LV_ALIGN_LEFT_MID, 0, 0);
 
-    network_ssid_input = lv_textarea_create(network_config_container);
-    lv_obj_set_size(network_ssid_input, 850, 35);
+    network_ssid_input = lv_textarea_create(ssid_row);
+    lv_obj_set_size(network_ssid_input, 680, 35);
+    lv_obj_align(network_ssid_input, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_textarea_set_placeholder_text(network_ssid_input, "WiFi network name");
     lv_textarea_set_one_line(network_ssid_input, true);
     lv_obj_set_style_text_font(network_ssid_input, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(network_ssid_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    // Password input
-    lv_obj_t *pwd_label = lv_label_create(network_config_container);
+    // Password row
+    lv_obj_t *pwd_row = lv_obj_create(network_config_container);
+    lv_obj_set_size(pwd_row, 850, 35);
+    lv_obj_align(pwd_row, LV_ALIGN_TOP_MID, 0, 105);
+    lv_obj_set_style_bg_opa(pwd_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(pwd_row, 0, 0);
+    lv_obj_set_style_pad_all(pwd_row, 0, 0);
+    lv_obj_clear_flag(pwd_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *pwd_label = lv_label_create(pwd_row);
     lv_label_set_text(pwd_label, "Password:");
     lv_obj_set_style_text_font(pwd_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(pwd_label, LV_ALIGN_LEFT_MID, 0, 0);
 
-    network_password_input = lv_textarea_create(network_config_container);
-    lv_obj_set_size(network_password_input, 850, 35);
+    network_password_input = lv_textarea_create(pwd_row);
+    lv_obj_set_size(network_password_input, 680, 35);
+    lv_obj_align(network_password_input, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_textarea_set_placeholder_text(network_password_input, "WiFi password");
     lv_textarea_set_password_mode(network_password_input, true);
     lv_textarea_set_one_line(network_password_input, true);
     lv_obj_set_style_text_font(network_password_input, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(network_password_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    // Hostname input
-    lv_obj_t *hostname_label = lv_label_create(network_config_container);
+    // Hostname row
+    lv_obj_t *host_row = lv_obj_create(network_config_container);
+    lv_obj_set_size(host_row, 850, 35);
+    lv_obj_align(host_row, LV_ALIGN_TOP_MID, 0, 150);
+    lv_obj_set_style_bg_opa(host_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(host_row, 0, 0);
+    lv_obj_set_style_pad_all(host_row, 0, 0);
+    lv_obj_clear_flag(host_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *hostname_label = lv_label_create(host_row);
     lv_label_set_text(hostname_label, "Hostname:");
     lv_obj_set_style_text_font(hostname_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(hostname_label, LV_ALIGN_LEFT_MID, 0, 0);
 
-    network_hostname_input = lv_textarea_create(network_config_container);
-    lv_obj_set_size(network_hostname_input, 850, 35);
-    lv_textarea_set_placeholder_text(network_hostname_input, "Device hostname (e.g., Clock1)");
+    network_hostname_input = lv_textarea_create(host_row);
+    lv_obj_set_size(network_hostname_input, 680, 35);
+    lv_obj_align(network_hostname_input, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_textarea_set_placeholder_text(network_hostname_input, "e.g., Clock1");
     lv_textarea_set_one_line(network_hostname_input, true);
     lv_obj_set_style_text_font(network_hostname_input, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(network_hostname_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    // DHCP toggle
-    lv_obj_t *dhcp_container = lv_obj_create(network_config_container);
-    lv_obj_set_size(dhcp_container, 850, 35);
-    lv_obj_set_style_bg_opa(dhcp_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(dhcp_container, 0, 0);
-    lv_obj_clear_flag(dhcp_container, LV_OBJ_FLAG_SCROLLABLE);
+    // DHCP toggle row
+    lv_obj_t *dhcp_row = lv_obj_create(network_config_container);
+    lv_obj_set_size(dhcp_row, 850, 35);
+    lv_obj_align(dhcp_row, LV_ALIGN_TOP_MID, 0, 195);
+    lv_obj_set_style_bg_opa(dhcp_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(dhcp_row, 0, 0);
+    lv_obj_set_style_pad_all(dhcp_row, 0, 0);
+    lv_obj_clear_flag(dhcp_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *dhcp_label = lv_label_create(dhcp_container);
+    lv_obj_t *dhcp_label = lv_label_create(dhcp_row);
     lv_label_set_text(dhcp_label, "DHCP (Auto IP):");
     lv_obj_set_style_text_font(dhcp_label, &lv_font_montserrat_14, 0);
     lv_obj_align(dhcp_label, LV_ALIGN_LEFT_MID, 0, 0);
 
-    network_dhcp_switch = lv_switch_create(dhcp_container);
+    network_dhcp_switch = lv_switch_create(dhcp_row);
     lv_obj_align(network_dhcp_switch, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_add_state(network_dhcp_switch, LV_STATE_CHECKED);  // DHCP enabled by default
     lv_obj_add_event_cb(network_dhcp_switch, network_dhcp_toggled, LV_EVENT_VALUE_CHANGED, NULL);
 
-    // Static IP fields container (hidden by default)
+    // Static IP fields container (hidden by default) - note: not displayed on initial screen
     network_static_container = lv_obj_create(network_config_container);
     lv_obj_set_size(network_static_container, 850, 200);
-    lv_obj_set_style_bg_color(network_static_container, COLOR_BG, 0);
-    lv_obj_set_flex_flow(network_static_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(network_static_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_all(network_static_container, 10, 0);
-    lv_obj_set_style_pad_row(network_static_container, 5, 0);
+    lv_obj_align(network_static_container, LV_ALIGN_TOP_MID, 0, 240);
+    lv_obj_set_style_bg_opa(network_static_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(network_static_container, 0, 0);
+    lv_obj_set_style_pad_all(network_static_container, 0, 0);
     lv_obj_add_flag(network_static_container, LV_OBJ_FLAG_HIDDEN);  // Hidden by default
+    lv_obj_clear_flag(network_static_container, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Static IP inputs
-    lv_obj_t *ip_label = lv_label_create(network_static_container);
-    lv_label_set_text(ip_label, "IP Address:");
-    lv_obj_set_style_text_font(ip_label, &lv_font_montserrat_14, 0);
+    // Static IP inputs - compact inline layout
     network_ip_input = lv_textarea_create(network_static_container);
-    lv_obj_set_size(network_ip_input, 800, 30);
-    lv_textarea_set_placeholder_text(network_ip_input, "e.g., 192.168.1.100");
+    lv_obj_set_size(network_ip_input, 400, 30);
+    lv_obj_align(network_ip_input, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_textarea_set_placeholder_text(network_ip_input, "IP: 192.168.1.100");
     lv_textarea_set_one_line(network_ip_input, true);
     lv_obj_add_event_cb(network_ip_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    lv_obj_t *gw_label = lv_label_create(network_static_container);
-    lv_label_set_text(gw_label, "Gateway:");
-    lv_obj_set_style_text_font(gw_label, &lv_font_montserrat_14, 0);
     network_gateway_input = lv_textarea_create(network_static_container);
-    lv_obj_set_size(network_gateway_input, 800, 30);
-    lv_textarea_set_placeholder_text(network_gateway_input, "e.g., 192.168.1.1");
+    lv_obj_set_size(network_gateway_input, 400, 30);
+    lv_obj_align(network_gateway_input, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_textarea_set_placeholder_text(network_gateway_input, "Gateway: 192.168.1.1");
     lv_textarea_set_one_line(network_gateway_input, true);
     lv_obj_add_event_cb(network_gateway_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    lv_obj_t *nm_label = lv_label_create(network_static_container);
-    lv_label_set_text(nm_label, "Netmask:");
-    lv_obj_set_style_text_font(nm_label, &lv_font_montserrat_14, 0);
     network_netmask_input = lv_textarea_create(network_static_container);
-    lv_obj_set_size(network_netmask_input, 800, 30);
-    lv_textarea_set_placeholder_text(network_netmask_input, "e.g., 255.255.255.0");
+    lv_obj_set_size(network_netmask_input, 400, 30);
+    lv_obj_align(network_netmask_input, LV_ALIGN_TOP_LEFT, 0, 40);
+    lv_textarea_set_placeholder_text(network_netmask_input, "Netmask: 255.255.255.0");
     lv_textarea_set_one_line(network_netmask_input, true);
     lv_obj_add_event_cb(network_netmask_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    lv_obj_t *dns1_label = lv_label_create(network_static_container);
-    lv_label_set_text(dns1_label, "DNS Primary:");
-    lv_obj_set_style_text_font(dns1_label, &lv_font_montserrat_14, 0);
     network_dns1_input = lv_textarea_create(network_static_container);
-    lv_obj_set_size(network_dns1_input, 800, 30);
-    lv_textarea_set_placeholder_text(network_dns1_input, "e.g., 8.8.8.8");
+    lv_obj_set_size(network_dns1_input, 400, 30);
+    lv_obj_align(network_dns1_input, LV_ALIGN_TOP_RIGHT, 0, 40);
+    lv_textarea_set_placeholder_text(network_dns1_input, "DNS1: 8.8.8.8");
     lv_textarea_set_one_line(network_dns1_input, true);
     lv_obj_add_event_cb(network_dns1_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    lv_obj_t *dns2_label = lv_label_create(network_static_container);
-    lv_label_set_text(dns2_label, "DNS Secondary:");
-    lv_obj_set_style_text_font(dns2_label, &lv_font_montserrat_14, 0);
     network_dns2_input = lv_textarea_create(network_static_container);
-    lv_obj_set_size(network_dns2_input, 800, 30);
-    lv_textarea_set_placeholder_text(network_dns2_input, "e.g., 8.8.4.4 (optional)");
+    lv_obj_set_size(network_dns2_input, 400, 30);
+    lv_obj_align(network_dns2_input, LV_ALIGN_TOP_LEFT, 0, 80);
+    lv_textarea_set_placeholder_text(network_dns2_input, "DNS2: 8.8.4.4 (optional)");
     lv_textarea_set_one_line(network_dns2_input, true);
     lv_obj_add_event_cb(network_dns2_input, network_input_focused, LV_EVENT_FOCUSED, NULL);
 
-    // Buttons container
-    lv_obj_t *btn_container = lv_obj_create(network_config_container);
-    lv_obj_set_size(btn_container, 850, 40);
-    lv_obj_set_style_bg_opa(btn_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(btn_container, 0, 0);
-    lv_obj_set_flex_flow(btn_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(btn_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_clear_flag(btn_container, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Scan Networks button - DISABLED (WiFi scanning not available)
-    // Manual SSID/password entry only
-    // lv_obj_t *btn_scan = lv_btn_create(btn_container);
-    // lv_obj_set_size(btn_scan, 150, 35);
-    // lv_obj_set_style_bg_color(btn_scan, COLOR_PRIMARY, 0);
-    // lv_obj_add_event_cb(btn_scan, network_scan_clicked, LV_EVENT_CLICKED, NULL);
-    // lv_obj_t *btn_scan_label = lv_label_create(btn_scan);
-    // lv_label_set_text(btn_scan_label, LV_SYMBOL_WIFI " Scan");
-    // lv_obj_set_style_text_font(btn_scan_label, &lv_font_montserrat_14, 0);
-    // lv_obj_center(btn_scan_label);
+    // Buttons at bottom
+    lv_obj_t *btn_row = lv_obj_create(network_config_container);
+    lv_obj_set_size(btn_row, 850, 45);
+    lv_obj_align(btn_row, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_set_style_bg_opa(btn_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn_row, 0, 0);
+    lv_obj_set_style_pad_all(btn_row, 0, 0);
+    lv_obj_clear_flag(btn_row, LV_OBJ_FLAG_SCROLLABLE);
 
     // Save & Connect button
-    lv_obj_t *btn_save = lv_btn_create(btn_container);
-    lv_obj_set_size(btn_save, 250, 35);
+    lv_obj_t *btn_save = lv_btn_create(btn_row);
+    lv_obj_set_size(btn_save, 250, 40);
+    lv_obj_align(btn_save, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_set_style_bg_color(btn_save, COLOR_SUCCESS, 0);
     lv_obj_add_event_cb(btn_save, network_save_and_connect_clicked, LV_EVENT_CLICKED, NULL);
     lv_obj_t *btn_save_label = lv_label_create(btn_save);
@@ -945,8 +963,9 @@ static void create_network_config_ui(void) {
     lv_obj_center(btn_save_label);
 
     // Back button
-    lv_obj_t *btn_back = lv_btn_create(btn_container);
-    lv_obj_set_size(btn_back, 150, 35);
+    lv_obj_t *btn_back = lv_btn_create(btn_row);
+    lv_obj_set_size(btn_back, 150, 40);
+    lv_obj_align(btn_back, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_style_bg_color(btn_back, COLOR_ERROR, 0);
     lv_obj_add_event_cb(btn_back, network_back_clicked, LV_EVENT_CLICKED, NULL);
     lv_obj_t *btn_back_label = lv_label_create(btn_back);

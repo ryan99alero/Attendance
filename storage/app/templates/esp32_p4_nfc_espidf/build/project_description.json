@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "esp32_p4_nfc_reader",
-    "project_version":    "f128188-dirty",
+    "project_version":    "2c0767f-dirty",
     "project_path":       "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf",
     "idf_path":           "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1",
     "build_dir":          "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build",
