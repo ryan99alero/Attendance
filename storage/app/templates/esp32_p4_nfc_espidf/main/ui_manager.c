@@ -515,7 +515,7 @@ static void create_interface_selection_screen(void) {
 
     // Create interface selection container
     network_config_container = lv_obj_create(network_config_screen);
-    lv_obj_set_size(network_config_container, 900, 320);
+    lv_obj_set_size(network_config_container, 900, 280);
     lv_obj_align(network_config_container, LV_ALIGN_TOP_MID, 0, 15);
     lv_obj_set_style_bg_color(network_config_container, COLOR_STATUS_BG, 0);
     lv_obj_set_style_border_color(network_config_container, COLOR_PRIMARY, 0);
@@ -529,10 +529,20 @@ static void create_interface_selection_screen(void) {
     lv_obj_set_style_text_color(title, COLOR_PRIMARY, 0);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
 
+    // Left column container for WiFi and Ethernet buttons
+    lv_obj_t *left_container = lv_obj_create(network_config_container);
+    lv_obj_set_size(left_container, 500, 200);
+    lv_obj_align(left_container, LV_ALIGN_LEFT_MID, 20, 15);
+    lv_obj_set_style_bg_opa(left_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(left_container, 0, 0);
+    lv_obj_set_style_pad_all(left_container, 0, 0);
+    lv_obj_set_flex_flow(left_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(left_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(left_container, LV_OBJ_FLAG_SCROLLABLE);
+
     // WiFi button
-    lv_obj_t *btn_wifi = lv_btn_create(network_config_container);
-    lv_obj_set_size(btn_wifi, 400, 80);
-    lv_obj_align(btn_wifi, LV_ALIGN_CENTER, 0, -50);
+    lv_obj_t *btn_wifi = lv_btn_create(left_container);
+    lv_obj_set_size(btn_wifi, 450, 70);
     lv_obj_set_style_bg_color(btn_wifi, COLOR_PRIMARY, 0);
     lv_obj_add_event_cb(btn_wifi, network_interface_selected, LV_EVENT_CLICKED, (void*)0); // 0 = WiFi
 
@@ -542,9 +552,8 @@ static void create_interface_selection_screen(void) {
     lv_obj_center(btn_wifi_label);
 
     // Ethernet button
-    lv_obj_t *btn_ethernet = lv_btn_create(network_config_container);
-    lv_obj_set_size(btn_ethernet, 400, 80);
-    lv_obj_align(btn_ethernet, LV_ALIGN_CENTER, 0, 50);
+    lv_obj_t *btn_ethernet = lv_btn_create(left_container);
+    lv_obj_set_size(btn_ethernet, 450, 70);
     lv_obj_set_style_bg_color(btn_ethernet, COLOR_PRIMARY, 0);
     lv_obj_add_event_cb(btn_ethernet, network_interface_selected, LV_EVENT_CLICKED, (void*)1); // 1 = Ethernet
 
@@ -553,10 +562,20 @@ static void create_interface_selection_screen(void) {
     lv_obj_set_style_text_font(btn_ethernet_label, &lv_font_montserrat_14, 0);
     lv_obj_center(btn_ethernet_label);
 
+    // Right column container for Back button
+    lv_obj_t *right_container = lv_obj_create(network_config_container);
+    lv_obj_set_size(right_container, 320, 200);
+    lv_obj_align(right_container, LV_ALIGN_RIGHT_MID, -20, 15);
+    lv_obj_set_style_bg_opa(right_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(right_container, 0, 0);
+    lv_obj_set_style_pad_all(right_container, 0, 0);
+    lv_obj_set_flex_flow(right_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(right_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(right_container, LV_OBJ_FLAG_SCROLLABLE);
+
     // Back button
-    lv_obj_t *btn_back = lv_btn_create(network_config_container);
-    lv_obj_set_size(btn_back, 150, 40);
-    lv_obj_align(btn_back, LV_ALIGN_BOTTOM_MID, 0, -15);
+    lv_obj_t *btn_back = lv_btn_create(right_container);
+    lv_obj_set_size(btn_back, 200, 70);
     lv_obj_set_style_bg_color(btn_back, COLOR_ERROR, 0);
     lv_obj_add_event_cb(btn_back, network_back_clicked, LV_EVENT_CLICKED, NULL);
 
