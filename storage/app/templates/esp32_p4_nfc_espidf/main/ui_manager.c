@@ -2292,6 +2292,7 @@ static void time_settings_back_clicked(lv_event_t *e) {
 
 static void setup_time_clicked(lv_event_t *e) {
     ESP_LOGI(TAG, "Time settings clicked");
+    time_settings_init_nvs();
 
     // Create overlay screen if it doesn't exist
     if (network_config_screen == NULL) {
@@ -2462,7 +2463,7 @@ static void setup_time_clicked(lv_event_t *e) {
     lv_obj_align(tz_label, LV_ALIGN_TOP_LEFT, 0, 0);
 
     // Use the time_settings module to create timezone dropdown (with scrollable popup)
-    lv_obj_t *tz_dropdown = time_settings_create_timezone_selector(tz_container);
+    lv_obj_t *tz_dropdown = time_settings_create(tz_container);
     // Note: sizing is handled by time_settings module, just position it
     lv_obj_align(tz_dropdown, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
