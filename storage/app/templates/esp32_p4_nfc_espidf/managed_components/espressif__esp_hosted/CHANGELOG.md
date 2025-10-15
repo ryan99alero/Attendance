@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.5.12
+
+### Features
+
+- Add SPI (full and half duplex) and UART support for ESP32-C61
+- Updated documentation on applying optimised Wi-Fi settings to sdkconfigs
+
+### Bug Fixes
+
+- Fixed build issues when raw throughput testing is enabled
+- Fixed bug in co-processor causing SDIO to operate only in packet mode
+
+## 2.5.11
+
+### Bug Fixes
+
+- Fixes to use compatible version of `idf-build-apps` and constraints during CI pipeline builds
+- Renamed CI pipelines to "sanity" and "regression"
+- Prefix jobs with `sanity_` or `regression_` to make their names unique
+- Enabled building of ESP-Hosted examples in regression pipeline
+- Various bug fixes found in the process of fixing the CI pipelines
+
 ## 2.5.10
 
 ### Features
@@ -134,3 +156,27 @@
 - `esp_wifi_set_okc_support`
 - `esp_eap_client_set_domain_name`
 - `esp_eap_client_set_eap_methods`
+
+## 2.3.3
+
+### Features
+
+- Added SDIO support for ESP32-C61
+
+## 2.3.2
+
+### Features
+
+- Add host example to showcase transport config before `esp_hosted_init()`
+
+## 2.3.1
+
+### Bug Fixes
+
+- Fixed a build break caused by refactoring
+
+## 2.3.0
+
+### Features
+
+- Refactored common and port specific code

@@ -1203,7 +1203,7 @@ static void show_keyboard_for(lv_obj_t *ta) {
         // Add event handler to catch all keyboard events for debugging
         lv_obj_add_event_cb(network_keyboard, keyboard_done_clicked, LV_EVENT_ALL, NULL);
 
-        // Red preview label
+        // Red preview label (display only, not clickable)
         input_preview_label = lv_label_create(network_config_screen);
         lv_obj_set_size(input_preview_label, 950, 50);
         lv_obj_align_to(input_preview_label, network_keyboard, LV_ALIGN_OUT_TOP_MID, 0, -10);
@@ -1215,8 +1215,13 @@ static void show_keyboard_for(lv_obj_t *ta) {
         lv_obj_set_style_pad_all(input_preview_label, 10, 0);
         lv_obj_set_style_text_color(input_preview_label, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_text_font(input_preview_label, &lv_font_montserrat_14, 0);
-        lv_label_set_text(input_preview_label, "");
+        lv_label_set_text(input_preview_label, "Preview: Type using keyboard below");
         lv_label_set_long_mode(input_preview_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        // Make it non-clickable and block all events
+        lv_obj_clear_flag(input_preview_label, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_clear_flag(input_preview_label, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(input_preview_label, LV_OBJ_FLAG_EVENT_BUBBLE);
+        lv_obj_set_style_opa(input_preview_label, LV_OPA_90, LV_PART_MAIN);
     }
 
     // Attach keyboard to this textarea

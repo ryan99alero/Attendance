@@ -177,8 +177,8 @@
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp32_p4_function_ev_board/libespressif__esp32_p4_function_ev_board.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/fatfs/libfatfs.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_codec_dev/libespressif__esp_codec_dev.a
-/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/usb/libusb.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/spiffs/libspiffs.a
+/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/usb/libusb.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_lcd_ek79007/libespressif__esp_lcd_ek79007.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_lcd_ili9881c/libespressif__esp_lcd_ili9881c.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_lcd_lt8912b/libespressif__esp_lcd_lt8912b.a

@@ -36093,6 +36093,26 @@
                     {
                         "children": [],
                         "depends_on": null,
+                        "help": null,
+                        "id": "ESP_IDF_VERSION",
+                        "name": "ESP_IDF_VERSION",
+                        "range": null,
+                        "title": null,
+                        "type": "string"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "ESP_IDF_VERSION >= 5.3",
+                        "help": "Enable this option for backward compatibility with the old I2C driver",
+                        "id": "CODEC_I2C_BACKWARD_COMPATIBLE",
+                        "name": "CODEC_I2C_BACKWARD_COMPATIBLE",
+                        "range": null,
+                        "title": "Enable backward compatibility for the I2C driver (force use of the old i2c_driver above v5.3)",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
                         "help": "Enable this option to support codec ES8311.",
                         "id": "CODEC_ES8311_SUPPORT",
                         "name": "CODEC_ES8311_SUPPORT",
@@ -36153,6 +36173,16 @@
                     {
                         "children": [],
                         "depends_on": null,
+                        "help": "Enable this option to support codec ES8389.",
+                        "id": "CODEC_ES8389_SUPPORT",
+                        "name": "CODEC_ES8389_SUPPORT",
+                        "range": null,
+                        "title": "Support ES8389 Codec Chip",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
                         "help": "Enable this option to support codec ES8374.",
                         "id": "CODEC_ES8374_SUPPORT",
                         "name": "CODEC_ES8374_SUPPORT",
@@ -36188,6 +36218,16 @@
                         "name": "CODEC_ZL38063_SUPPORT",
                         "range": null,
                         "title": "Support ZL38063 Codec Chip",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Enable this option to support codec CJC8910.",
+                        "id": "CODEC_CJC8910_SUPPORT",
+                        "name": "CODEC_CJC8910_SUPPORT",
+                        "range": null,
+                        "title": "Support CJC8910 Codec Chip",
                         "type": "bool"
                     }
                 ],
@@ -36890,7 +36930,7 @@
                             },
                             {
                                 "children": [],
-                                "depends_on": "(SLAVE_IDF_TARGET_ESP32C2 || SLAVE_IDF_TARGET_ESP32C3 || SLAVE_IDF_TARGET_ESP32S2 || SLAVE_IDF_TARGET_ESP32S3 || SLAVE_IDF_TARGET_ESP32C5) && ESP_HOSTED_SPI_HOST_INTERFACE && ESP_HOSTED_ENABLED",
+                                "depends_on": "(SLAVE_IDF_TARGET_ESP32C2 || SLAVE_IDF_TARGET_ESP32C3 || SLAVE_IDF_TARGET_ESP32S2 || SLAVE_IDF_TARGET_ESP32S3 || SLAVE_IDF_TARGET_ESP32C5 || SLAVE_IDF_TARGET_ESP32C61) && ESP_HOSTED_SPI_HOST_INTERFACE && ESP_HOSTED_ENABLED",
                                 "help": "\"Optimize SPI CLK by increasing till host practically can support\"",
                                 "id": "ESP_HOSTED_SPI_FREQ_ESP32XX",
                                 "name": "ESP_HOSTED_SPI_FREQ_ESP32XX",
@@ -37919,7 +37959,7 @@
                             },
                             {
                                 "children": [],
-                                "depends_on": "(SLAVE_IDF_TARGET_ESP32C2 || SLAVE_IDF_TARGET_ESP32C3 || SLAVE_IDF_TARGET_ESP32S2 || SLAVE_IDF_TARGET_ESP32S3 || SLAVE_IDF_TARGET_ESP32C5) && ESP_HOSTED_SPI_HD_HOST_INTERFACE && ESP_HOSTED_ENABLED",
+                                "depends_on": "(SLAVE_IDF_TARGET_ESP32C2 || SLAVE_IDF_TARGET_ESP32C3 || SLAVE_IDF_TARGET_ESP32S2 || SLAVE_IDF_TARGET_ESP32S3 || SLAVE_IDF_TARGET_ESP32C5 || SLAVE_IDF_TARGET_ESP32C61) && ESP_HOSTED_SPI_HD_HOST_INTERFACE && ESP_HOSTED_ENABLED",
                                 "help": "\"Optimize CLK by increasing till host practically can support\"",
                                 "id": "ESP_HOSTED_SPI_HD_FREQ_ESP32XX",
                                 "name": "ESP_HOSTED_SPI_HD_FREQ_ESP32XX",

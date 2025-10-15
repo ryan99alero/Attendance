@@ -1,7 +1,7 @@
 dependencies:
   esp_codec_dev:
     public: true
-    version: 1.2.*
+    version: ~1.5
   esp_lcd_ek79007: 1.*
   esp_lcd_ili9881c: 1.*
   esp_lcd_touch_gt911: ^1
@@ -15,11 +15,11 @@ dependencies:
 description: Board Support Package (BSP) for ESP32-P4 Function EV Board (preview)
 repository: git://github.com/espressif/esp-bsp.git
 repository_info:
-  commit_sha: ca6290a9e2d65aa43af6297c9646cce09103f7be
+  commit_sha: 1bd663be5317bfc4457335011889eec5db33098d
   path: bsp/esp32_p4_function_ev_board
 tags:
 - bsp
 targets:
 - esp32p4
 url: https://github.com/espressif/esp-bsp/tree/master/bsp/esp32_p4_function_ev_board
-version: 5.0.1
+version: 5.0.2

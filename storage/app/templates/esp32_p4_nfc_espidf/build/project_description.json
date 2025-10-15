@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "esp32_p4_nfc_reader",
-    "project_version":    "7f764e5-dirty",
+    "project_version":    "b0d7045-dirty",
     "project_path":       "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf",
     "idf_path":           "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1",
     "build_dir":          "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build",
@@ -1085,8 +1085,8 @@
             "dir": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp32_p4_function_ev_board",
             "type": "LIBRARY",
             "lib": "__idf_espressif__esp32_p4_function_ev_board",
-            "reqs": [ "driver", "vfs", "fatfs", "espressif__esp_codec_dev", "espressif__esp_lvgl_port" ],
-            "priv_reqs": [ "esp_lcd", "usb", "spiffs", "esp_psram", "espressif__esp_lcd_ek79007", "espressif__esp_lcd_ili9881c", "espressif__esp_lcd_lt8912b", "espressif__esp_lcd_touch_gt911", "lvgl__lvgl" ],
+            "reqs": [ "esp_driver_gpio", "esp_driver_i2s", "esp_driver_sdmmc", "esp_driver_sdspi", "esp_driver_i2c", "fatfs", "espressif__esp_codec_dev", "espressif__esp_lvgl_port" ],
+            "priv_reqs": [ "esp_driver_spi", "esp_driver_ledc", "esp_lcd", "spiffs", "esp_psram", "usb", "espressif__esp_lcd_ek79007", "espressif__esp_lcd_ili9881c", "espressif__esp_lcd_lt8912b", "espressif__esp_lcd_touch_gt911", "lvgl__lvgl" ],
             "managed_reqs": [ "espressif__esp_codec_dev", "espressif__esp_lvgl_port" ],
             "managed_priv_reqs": [ "espressif__esp_lcd_ek79007", "espressif__esp_lcd_ili9881c", "espressif__esp_lcd_lt8912b", "espressif__esp_lcd_touch_gt911", "lvgl__lvgl" ],
             "file": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp32_p4_function_ev_board/libespressif__esp32_p4_function_ev_board.a",
@@ -1100,12 +1100,12 @@
             "dir": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev",
             "type": "LIBRARY",
             "lib": "__idf_espressif__esp_codec_dev",
-            "reqs": [ "driver" ],
-            "priv_reqs": [ "freertos" ],
+            "reqs": [],
+            "priv_reqs": [ "freertos", "esp_driver_gpio", "esp_driver_i2c", "esp_driver_i2s", "esp_driver_spi" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_codec_dev/libespressif__esp_codec_dev.a",
-            "sources": [ "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/esp_codec_dev.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/esp_codec_dev_vol.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/esp_codec_dev_if.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/audio_codec_sw_vol.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_gpio.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_ctrl_i2c.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_data_i2s.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_ctrl_spi.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/esp_codec_dev_os.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8311/es8311.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8156/es8156.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es7243e/es7243e.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es7210/es7210.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es7243/es7243.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8388/es8388.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/tas5805m/tas5805m.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8374/es8374.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/aw88298/aw88298.c" ],
+            "sources": [ "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/esp_codec_dev.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/esp_codec_dev_vol.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/esp_codec_dev_if.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/audio_codec_sw_vol.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_gpio.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_ctrl_i2c.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_data_i2s.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/audio_codec_ctrl_spi.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/platform/esp_codec_dev_os.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8311/es8311.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8156/es8156.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es7243e/es7243e.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es7210/es7210.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es7243/es7243.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8388/es8388.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/tas5805m/tas5805m.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8374/es8374.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/aw88298/aw88298.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev/device/es8389/es8389.c" ],
             "include_dirs": [ "include", "interface", "device/include" ]
         },
         "espressif__esp_hosted": {
@@ -1240,7 +1240,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__esp_hosted", "espressif__wifi_remote_over_eppp" ],
             "file": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_wifi_remote/libespressif__esp_wifi_remote.a",
-            "sources": [ "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote_net.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/dummy_src.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_wifi_remote_weak.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_eap_client_remote_weak.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_wifi_with_remote.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_eap_client_with_remote.c", "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_wifi/src/wifi_default.c", "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_wifi/src/wifi_netif.c", "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_wifi/src/wifi_default_ap.c" ],
+            "sources": [ "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/esp_wifi_remote_net.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_wifi_remote_weak.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_eap_client_remote_weak.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_wifi_with_remote.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_wifi_remote/idf_v5.5/esp_eap_client_with_remote.c", "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_wifi/src/wifi_default.c", "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_wifi/src/wifi_netif.c", "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/esp_wifi/src/wifi_default_ap.c" ],
             "include_dirs": [ "include" ]
         },
         "espressif__wifi_remote_over_eppp": {
@@ -3180,8 +3180,8 @@
             "prefix": "idf",
             "dir": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp32_p4_function_ev_board",
             "lib": "__idf_espressif__esp32_p4_function_ev_board",
-            "reqs": [ "driver", "vfs", "fatfs", "espressif__esp_codec_dev", "espressif__esp_lvgl_port" ],
-            "priv_reqs": [ "esp_lcd", "usb", "spiffs", "esp_psram", "espressif__esp_lcd_ek79007", "espressif__esp_lcd_ili9881c", "espressif__esp_lcd_lt8912b", "espressif__esp_lcd_touch_gt911", "lvgl__lvgl" ],
+            "reqs": [ "esp_driver_gpio", "esp_driver_i2s", "esp_driver_sdmmc", "esp_driver_sdspi", "esp_driver_i2c", "fatfs", "espressif__esp_codec_dev", "espressif__esp_lvgl_port" ],
+            "priv_reqs": [ "esp_driver_spi", "esp_driver_ledc", "esp_lcd", "spiffs", "esp_psram", "usb", "espressif__esp_lcd_ek79007", "espressif__esp_lcd_ili9881c", "espressif__esp_lcd_lt8912b", "espressif__esp_lcd_touch_gt911", "lvgl__lvgl" ],
             "managed_reqs": [ "espressif__esp_codec_dev", "espressif__esp_lvgl_port" ],
             "managed_priv_reqs": [ "espressif__esp_lcd_ek79007", "espressif__esp_lcd_ili9881c", "espressif__esp_lcd_lt8912b", "espressif__esp_lcd_touch_gt911", "lvgl__lvgl" ],
             "include_dirs": [ "include" ]
@@ -3192,8 +3192,8 @@
             "prefix": "idf",
             "dir": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/managed_components/espressif__esp_codec_dev",
             "lib": "__idf_espressif__esp_codec_dev",
-            "reqs": [ "driver" ],
-            "priv_reqs": [ "freertos" ],
+            "reqs": [],
+            "priv_reqs": [ "freertos", "esp_driver_gpio", "esp_driver_i2c", "esp_driver_i2s", "esp_driver_spi" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "include_dirs": [ "include", "interface", "device/include" ]

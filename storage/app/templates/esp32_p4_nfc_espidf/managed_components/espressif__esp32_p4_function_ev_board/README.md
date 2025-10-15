@@ -60,7 +60,7 @@ This BSP supports HDMI converter Lontium LT8912B. Follow these rules for using i
 |:heavy_check_mark:|:black_circle: LVGL_PORT|                          |                                                                                                              [espressif/esp_lvgl_port](https://components.espressif.com/components/espressif/esp_lvgl_port)                                                                                                              |                   ^2                   |
 |:heavy_check_mark:|    :point_up: TOUCH    |           gt911          |                                                                                                        [espressif/esp_lcd_touch_gt911](https://components.espressif.com/components/espressif/esp_lcd_touch_gt911)                                                                                                        |                   ^1                   |
 |        :x:       | :radio_button: BUTTONS |                          |                                                                                                                                                                                                                                                                                                                          |                                        |
-|:heavy_check_mark:|  :musical_note: AUDIO  |                          |                                                                                                              [espressif/esp_codec_dev](https://components.espressif.com/components/espressif/esp_codec_dev)                                                                                                              |                  1.2.*                 |
+|:heavy_check_mark:|  :musical_note: AUDIO  |                          |                                                                                                              [espressif/esp_codec_dev](https://components.espressif.com/components/espressif/esp_codec_dev)                                                                                                              |                  ~1.5                  |
 |:heavy_check_mark:| :speaker: AUDIO_SPEAKER|          es8311          |                                                                                                                                                                                                                                                                                                                          |                                        |
 |:heavy_check_mark:| :microphone: AUDIO_MIC |          es8311          |                                                                                                                                                                                                                                                                                                                          |                                        |
 |:heavy_check_mark:|  :floppy_disk: SDCARD  |                          |                                                                                                                                                            idf                                                                                                                                                           |                  >=5.3                 |
@@ -89,29 +89,29 @@ This BSP supports HDMI converter Lontium LT8912B. Follow these rules for using i
 
 ## LVGL Benchmark
 
-**DATE:** 19.08.2025 02:45
+**DATE:** 01.10.2025 13:12
 
 **LVGL version:** 9.3.0
 
 | Name | Avg. CPU | Avg. FPS | Avg. time | render time | flush time |
 | ---- | :------: | :------: | :-------: | :---------: | :--------: |
-| Empty screen | 61%  | 88  | 5  | 2  | 3  |
-| Moving wallpaper | 89%  | 70  | 10  | 8  | 2  |
-| Single rectangle | 23%  | 88  | 1  | 1  | 0  |
-| Multiple rectangles | 39%  | 90  | 3  | 3  | 0  |
-| Multiple RGB images | 31%  | 97  | 2  | 2  | 0  |
-| Multiple ARGB images | 56%  | 93  | 5  | 5  | 0  |
-| Rotated ARGB images | 88%  | 61  | 13  | 13  | 0  |
-| Multiple labels | 92%  | 61  | 13  | 12  | 1  |
-| Screen sized text | 99%  | 13  | 69  | 66  | 3  |
-| Multiple arcs | 98%  | 46  | 18  | 16  | 2  |
-| Containers | 25%  | 87  | 3  | 3  | 0  |
-| Containers with overlay | 95%  | 28  | 32  | 30  | 2  |
-| Containers with opa | 32%  | 89  | 4  | 4  | 0  |
-| Containers with opa_layer | 63%  | 75  | 13  | 13  | 0  |
-| Containers with scrolling | 96%  | 28  | 31  | 30  | 1  |
-| Widgets demo | 99%  | 17  | 51  | 49  | 2  |
-| All scenes avg. | 67%  | 64  | 17  | 16  | 1  |
+| Empty screen | 55%  | 88  | 5  | 2  | 3  |
+| Moving wallpaper | 92%  | 73  | 11  | 9  | 2  |
+| Single rectangle | 22%  | 89  | 1  | 1  | 0  |
+| Multiple rectangles | 40%  | 91  | 3  | 3  | 0  |
+| Multiple RGB images | 28%  | 97  | 1  | 1  | 0  |
+| Multiple ARGB images | 55%  | 90  | 6  | 6  | 0  |
+| Rotated ARGB images | 77%  | 75  | 10  | 10  | 0  |
+| Multiple labels | 95%  | 61  | 13  | 12  | 1  |
+| Screen sized text | 99%  | 13  | 70  | 68  | 2  |
+| Multiple arcs | 98%  | 45  | 18  | 16  | 2  |
+| Containers | 28%  | 88  | 3  | 3  | 0  |
+| Containers with overlay | 91%  | 28  | 31  | 29  | 2  |
+| Containers with opa | 36%  | 91  | 4  | 4  | 0  |
+| Containers with opa_layer | 62%  | 76  | 12  | 12  | 0  |
+| Containers with scrolling | 98%  | 28  | 31  | 29  | 2  |
+| Widgets demo | 99%  | 17  | 50  | 48  | 2  |
+| All scenes avg. | 67%  | 65  | 16  | 15  | 1  |
 
 
 
