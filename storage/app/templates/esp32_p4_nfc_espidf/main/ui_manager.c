@@ -124,6 +124,7 @@ static void create_password_screen(void);
 static void password_entered(lv_event_t *e);
 static void main_clock_tick(lv_timer_t *t);  // Timer callback for main landing page clock
 static void keyboard_done_clicked(lv_event_t *e);  // Keyboard Done/Cancel handler
+static void textarea_kb_close_cb(lv_event_t *e);  // Textarea keyboard close handler
 
 lv_obj_t* ui_manager_init(const char *device_name) {
     ESP_LOGI(TAG, "Initializing UI Manager");
@@ -1149,6 +1150,36 @@ static void keyboard_done_clicked(lv_event_t *e) {
     }
 }
 
+// Textarea keyboard close callback - handles textarea events for keyboard close
+static void textarea_kb_close_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+
+    // Update preview label when value changes
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        if (input_preview_label) {
+            const char *txt = lv_textarea_get_text(lv_event_get_target(e));
+            lv_label_set_text(input_preview_label, txt ? txt : "");
+        }
+        return;
+    }
+
+    // Close keyboard on READY, CANCEL, or DEFOCUSED events
+    if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL || code == LV_EVENT_DEFOCUSED) {
+        ESP_LOGI(TAG, "Textarea event %d - closing keyboard", code);
+
+        // Just hide, don't delete (safer during event processing)
+        if (network_keyboard) {
+            lv_obj_add_flag(network_keyboard, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (network_config_screen) {
+            lv_obj_add_flag(network_config_screen, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (input_preview_label) {
+            lv_obj_add_flag(input_preview_label, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
 // Robust keyboard helper - ensures keyboard shows and is wired correctly (ChatGPT fix)
 static void show_keyboard_for(lv_obj_t *ta) {
     if (!ta) return;
@@ -1161,6 +1192,8 @@ static void show_keyboard_for(lv_obj_t *ta) {
         lv_obj_set_style_bg_opa(network_config_screen, LV_OPA_90, 0);
         lv_obj_center(network_config_screen);
     }
+    // Make sure overlay is visible
+    lv_obj_clear_flag(network_config_screen, LV_OBJ_FLAG_HIDDEN);
     if (network_keyboard == NULL) {
         network_keyboard = lv_keyboard_create(network_config_screen);
         lv_obj_set_size(network_keyboard, LV_PCT(100), 240);
@@ -1189,10 +1222,17 @@ static void show_keyboard_for(lv_obj_t *ta) {
     // Attach keyboard to this textarea
     lv_keyboard_set_textarea(network_keyboard, ta);
 
-    // Make sure keyboard is visible and on top
+    // Remove any existing callback first to prevent duplicates, then add new one
+    lv_obj_remove_event_cb(ta, textarea_kb_close_cb);
+    lv_obj_add_event_cb(ta, textarea_kb_close_cb, LV_EVENT_ALL, NULL);
+
+    // Make sure keyboard and preview are visible and on top
     lv_obj_clear_flag(network_keyboard, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(network_keyboard);
-    if (input_preview_label) lv_obj_move_foreground(input_preview_label);
+    if (input_preview_label) {
+        lv_obj_clear_flag(input_preview_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(input_preview_label);
+    }
 
     // Focus the textarea explicitly (helps on some builds)
     lv_obj_add_state(ta, LV_STATE_FOCUSED);
@@ -2134,6 +2174,13 @@ static void main_clock_tick(lv_timer_t *t) {
 static void time_sync_clicked(lv_event_t *e) {
     ESP_LOGI(TAG, "Time sync button clicked");
 
+    // Check if network is connected before attempting any sync
+    if (!network_manager_is_connected()) {
+        ESP_LOGE(TAG, "❌ Cannot sync time: No network connection");
+        ESP_LOGW(TAG, "Please connect to WiFi or Ethernet first");
+        return;
+    }
+
     // Check if we should use TimeClock server or NTP
     if (time_use_server_switch != NULL && lv_obj_has_state(time_use_server_switch, LV_STATE_CHECKED)) {
         ESP_LOGI(TAG, "Syncing time with TimeClock Server");
@@ -2184,9 +2231,6 @@ static void time_sync_clicked(lv_event_t *e) {
         }
     } else {
         ESP_LOGI(TAG, "Syncing time with NTP");
-        if (esp_sntp_enabled()) {
-            esp_sntp_stop();
-        }
 
         // Get NTP server from input
         const char *ntp_server = "pool.ntp.org";  // default
@@ -2197,11 +2241,18 @@ static void time_sync_clicked(lv_event_t *e) {
             }
         }
 
+        // Stop SNTP if running
+        if (esp_sntp_enabled()) {
+            esp_sntp_stop();
+        }
+
+        // Configure and start SNTP
         esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
         esp_sntp_setservername(0, ntp_server);
         esp_sntp_init();
 
-        ESP_LOGI(TAG, "SNTP sync initiated with server: %s", ntp_server);
+        ESP_LOGI(TAG, "✅ SNTP sync initiated with server: %s", ntp_server);
+        ESP_LOGI(TAG, "Time synchronization may take a few seconds...");
     }
 }
 
@@ -2377,20 +2428,48 @@ static void setup_time_clicked(lv_event_t *e) {
 
     // Time rollers row
     lv_obj_t *time_row = lv_obj_create(time_settings_container);
-    lv_obj_set_size(time_row, 850, 100);
+    lv_obj_set_size(time_row, 850, 120);
     lv_obj_set_flex_flow(time_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(time_row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_bg_opa(time_row, LV_OPA_0, 0);
     lv_obj_set_style_border_width(time_row, 0, 0);
+    lv_obj_clear_flag(time_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(time_row, LV_SCROLLBAR_MODE_OFF);
 
-    // Hour roller (1-12)
-    time_hour_roller = lv_roller_create(time_row);
+    // Hour roller with label
+    lv_obj_t *hour_container = lv_obj_create(time_row);
+    lv_obj_set_size(hour_container, 80, 110);
+    lv_obj_set_style_bg_opa(hour_container, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(hour_container, 0, 0);
+    lv_obj_set_flex_flow(hour_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(hour_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(hour_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(hour_container, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *hour_label = lv_label_create(hour_container);
+    lv_label_set_text(hour_label, "Hour");
+    lv_obj_set_style_text_color(hour_label, COLOR_TEXT, 0);
+
+    time_hour_roller = lv_roller_create(hour_container);
     lv_roller_set_options(time_hour_roller, "01\n02\n03\n04\n05\n06\n07\n08\n09\n10\n11\n12", LV_ROLLER_MODE_NORMAL);
-    lv_obj_set_size(time_hour_roller, 70, 90);
+    lv_obj_set_size(time_hour_roller, 80, 90);
     lv_roller_set_visible_row_count(time_hour_roller, 3);
 
-    // Minute roller (00-59)
-    time_minute_roller = lv_roller_create(time_row);
+    // Minute roller with label
+    lv_obj_t *minute_container = lv_obj_create(time_row);
+    lv_obj_set_size(minute_container, 80, 110);
+    lv_obj_set_style_bg_opa(minute_container, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(minute_container, 0, 0);
+    lv_obj_set_flex_flow(minute_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(minute_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(minute_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(minute_container, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *minute_label = lv_label_create(minute_container);
+    lv_label_set_text(minute_label, "Minute");
+    lv_obj_set_style_text_color(minute_label, COLOR_TEXT, 0);
+
+    time_minute_roller = lv_roller_create(minute_container);
     char minute_opts[300];
     minute_opts[0] = '\0';
     for (int i = 0; i < 60; i++) {
@@ -2399,31 +2478,72 @@ static void setup_time_clicked(lv_event_t *e) {
         strcat(minute_opts, buf);
     }
     lv_roller_set_options(time_minute_roller, minute_opts, LV_ROLLER_MODE_NORMAL);
-    lv_obj_set_size(time_minute_roller, 70, 90);
+    lv_obj_set_size(time_minute_roller, 80, 90);
     lv_roller_set_visible_row_count(time_minute_roller, 3);
 
-    // AM/PM roller
-    time_ampm_roller = lv_roller_create(time_row);
+    // AM/PM roller with label
+    lv_obj_t *ampm_container = lv_obj_create(time_row);
+    lv_obj_set_size(ampm_container, 80, 110);
+    lv_obj_set_style_bg_opa(ampm_container, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(ampm_container, 0, 0);
+    lv_obj_set_flex_flow(ampm_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(ampm_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(ampm_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(ampm_container, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *ampm_label = lv_label_create(ampm_container);
+    lv_label_set_text(ampm_label, "AM/PM");
+    lv_obj_set_style_text_color(ampm_label, COLOR_TEXT, 0);
+
+    time_ampm_roller = lv_roller_create(ampm_container);
     lv_roller_set_options(time_ampm_roller, "AM\nPM", LV_ROLLER_MODE_NORMAL);
-    lv_obj_set_size(time_ampm_roller, 70, 90);
+    lv_obj_set_size(time_ampm_roller, 80, 90);
     lv_roller_set_visible_row_count(time_ampm_roller, 2);
 
     // Date rollers row
     lv_obj_t *date_row = lv_obj_create(time_settings_container);
-    lv_obj_set_size(date_row, 850, 100);
+    lv_obj_set_size(date_row, 850, 120);
     lv_obj_set_flex_flow(date_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(date_row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_bg_opa(date_row, LV_OPA_0, 0);
     lv_obj_set_style_border_width(date_row, 0, 0);
+    lv_obj_clear_flag(date_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(date_row, LV_SCROLLBAR_MODE_OFF);
 
-    // Month roller
-    time_month_roller = lv_roller_create(date_row);
+    // Month roller with label
+    lv_obj_t *month_container = lv_obj_create(date_row);
+    lv_obj_set_size(month_container, 80, 110);
+    lv_obj_set_style_bg_opa(month_container, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(month_container, 0, 0);
+    lv_obj_set_flex_flow(month_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(month_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(month_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(month_container, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *month_label = lv_label_create(month_container);
+    lv_label_set_text(month_label, "Month");
+    lv_obj_set_style_text_color(month_label, COLOR_TEXT, 0);
+
+    time_month_roller = lv_roller_create(month_container);
     lv_roller_set_options(time_month_roller, "Jan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec", LV_ROLLER_MODE_NORMAL);
     lv_obj_set_size(time_month_roller, 80, 90);
     lv_roller_set_visible_row_count(time_month_roller, 3);
 
-    // Day roller (1-31)
-    time_day_roller = lv_roller_create(date_row);
+    // Day roller with label
+    lv_obj_t *day_container = lv_obj_create(date_row);
+    lv_obj_set_size(day_container, 80, 110);
+    lv_obj_set_style_bg_opa(day_container, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(day_container, 0, 0);
+    lv_obj_set_flex_flow(day_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(day_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(day_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(day_container, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *day_label = lv_label_create(day_container);
+    lv_label_set_text(day_label, "Day");
+    lv_obj_set_style_text_color(day_label, COLOR_TEXT, 0);
+
+    time_day_roller = lv_roller_create(day_container);
     char day_opts[150];
     day_opts[0] = '\0';
     for (int i = 1; i <= 31; i++) {
@@ -2432,13 +2552,26 @@ static void setup_time_clicked(lv_event_t *e) {
         strcat(day_opts, buf);
     }
     lv_roller_set_options(time_day_roller, day_opts, LV_ROLLER_MODE_NORMAL);
-    lv_obj_set_size(time_day_roller, 70, 90);
+    lv_obj_set_size(time_day_roller, 80, 90);
     lv_roller_set_visible_row_count(time_day_roller, 3);
 
-    // Year roller (2025-2035)
-    time_year_roller = lv_roller_create(date_row);
+    // Year roller with label
+    lv_obj_t *year_container = lv_obj_create(date_row);
+    lv_obj_set_size(year_container, 80, 110);
+    lv_obj_set_style_bg_opa(year_container, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(year_container, 0, 0);
+    lv_obj_set_flex_flow(year_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(year_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(year_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(year_container, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *year_label = lv_label_create(year_container);
+    lv_label_set_text(year_label, "Year");
+    lv_obj_set_style_text_color(year_label, COLOR_TEXT, 0);
+
+    time_year_roller = lv_roller_create(year_container);
     lv_roller_set_options(time_year_roller, "2025\n2026\n2027\n2028\n2029\n2030\n2031\n2032\n2033\n2034\n2035", LV_ROLLER_MODE_NORMAL);
-    lv_obj_set_size(time_year_roller, 90, 90);
+    lv_obj_set_size(time_year_roller, 80, 90);
     lv_roller_set_visible_row_count(time_year_roller, 3);
 
     // Settings row
@@ -2450,6 +2583,8 @@ static void setup_time_clicked(lv_event_t *e) {
     lv_obj_set_style_border_width(settings_row, 0, 0);
     lv_obj_set_style_pad_left(settings_row, 20, 0);
     lv_obj_set_style_pad_right(settings_row, 20, 0);
+    lv_obj_clear_flag(settings_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(settings_row, LV_SCROLLBAR_MODE_OFF);
 
     // Timezone selector (using modular time_settings component)
     lv_obj_t *tz_container = lv_obj_create(settings_row);
@@ -2485,6 +2620,7 @@ static void setup_time_clicked(lv_event_t *e) {
     lv_textarea_set_placeholder_text(time_ntp_input, "pool.ntp.org");
     lv_obj_add_flag(time_ntp_input, LV_OBJ_FLAG_CLICKABLE);  // Make sure it's clickable
     lv_obj_clear_flag(time_ntp_input, LV_OBJ_FLAG_SCROLLABLE);  // Disable scrolling
+    lv_obj_set_scrollbar_mode(time_ntp_input, LV_SCROLLBAR_MODE_OFF);  // Hide scrollbar
     lv_obj_add_event_cb(time_ntp_input, network_input_focused, LV_EVENT_PRESSED, NULL);  // Use PRESSED event
     lv_obj_add_event_cb(time_ntp_input, network_input_focused, LV_EVENT_CLICKED, NULL);  // Also CLICKED
     lv_obj_add_event_cb(time_ntp_input, network_input_focused, LV_EVENT_FOCUSED, NULL);  // And FOCUSED
@@ -2510,6 +2646,8 @@ static void setup_time_clicked(lv_event_t *e) {
     lv_obj_set_flex_align(btn_row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_bg_opa(btn_row, LV_OPA_0, 0);
     lv_obj_set_style_border_width(btn_row, 0, 0);
+    lv_obj_clear_flag(btn_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(btn_row, LV_SCROLLBAR_MODE_OFF);
 
     // Apply button
     lv_obj_t *btn_apply = lv_btn_create(btn_row);
