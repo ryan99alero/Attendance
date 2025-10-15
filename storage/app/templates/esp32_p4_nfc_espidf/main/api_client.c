@@ -370,6 +370,114 @@ esp_err_t api_get_server_time(char *time_str, size_t time_str_size) {
     return ret;
 }
 
+esp_err_t api_get_employee_info(const char *card_id, employee_info_t *employee_info) {
+    if (card_id == NULL || employee_info == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Build URL
+    char url[256];
+    snprintf(url, sizeof(url), "http://%s:%d/api/v1/timeclock/employee/%s",
+             g_api_config.server_host, g_api_config.server_port, card_id);
+
+    ESP_LOGI(TAG, "Fetching employee info: %s", url);
+
+    // Configure HTTP client
+    esp_http_client_config_t config = {
+        .url = url,
+        .event_handler = http_event_handler,
+        .timeout_ms = 5000,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    // Perform GET request
+    esp_err_t err = esp_http_client_perform(client);
+    esp_err_t ret = ESP_FAIL;
+
+    if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
+
+        if (status_code == 200) {
+            char response_buffer[1024];
+            int data_read = esp_http_client_read(client, response_buffer, sizeof(response_buffer) - 1);
+            if (data_read > 0) {
+                response_buffer[data_read] = '\0';
+                ESP_LOGD(TAG, "Response: %s", response_buffer);
+
+                // Parse response
+                cJSON *response_json = cJSON_Parse(response_buffer);
+                if (response_json != NULL) {
+                    cJSON *success = cJSON_GetObjectItem(response_json, "success");
+                    if (success != NULL && cJSON_IsTrue(success)) {
+                        // Get employee data
+                        cJSON *employee = cJSON_GetObjectItem(response_json, "employee");
+                        if (employee != NULL) {
+                            cJSON *name = cJSON_GetObjectItem(employee, "name");
+                            cJSON *emp_id = cJSON_GetObjectItem(employee, "id");
+                            cJSON *dept = cJSON_GetObjectItem(employee, "department");
+
+                            if (name != NULL && cJSON_IsString(name)) {
+                                strncpy(employee_info->name, name->valuestring, sizeof(employee_info->name) - 1);
+                            }
+                            if (emp_id != NULL && cJSON_IsNumber(emp_id)) {
+                                snprintf(employee_info->employee_id, sizeof(employee_info->employee_id), "%d", emp_id->valueint);
+                            }
+                            if (dept != NULL && cJSON_IsString(dept)) {
+                                strncpy(employee_info->department, dept->valuestring, sizeof(employee_info->department) - 1);
+                            }
+                            employee_info->is_authorized = true;
+                        }
+
+                        // Get hours data
+                        cJSON *hours = cJSON_GetObjectItem(response_json, "hours");
+                        if (hours != NULL) {
+                            cJSON *today = cJSON_GetObjectItem(hours, "today_hours");
+                            cJSON *week = cJSON_GetObjectItem(hours, "week_hours");
+                            cJSON *pay_period = cJSON_GetObjectItem(hours, "pay_period_hours");
+
+                            if (today != NULL && cJSON_IsNumber(today)) {
+                                employee_info->today_hours = (float)today->valuedouble;
+                            }
+                            if (week != NULL && cJSON_IsNumber(week)) {
+                                employee_info->week_hours = (float)week->valuedouble;
+                            }
+                            if (pay_period != NULL && cJSON_IsNumber(pay_period)) {
+                                employee_info->pay_period_hours = (float)pay_period->valuedouble;
+                            }
+                        }
+
+                        // Get vacation balance (if available)
+                        cJSON *vacation = cJSON_GetObjectItem(response_json, "vacation_balance");
+                        if (vacation != NULL && cJSON_IsNumber(vacation)) {
+                            employee_info->vacation_balance = (float)vacation->valuedouble;
+                        } else {
+                            employee_info->vacation_balance = 0.0f;
+                        }
+
+                        ESP_LOGI(TAG, "✅ Employee found: %s (ID: %s)",
+                                 employee_info->name, employee_info->employee_id);
+                        ESP_LOGI(TAG, "   Today: %.1f hrs, Week: %.1f hrs, Pay Period: %.1f hrs",
+                                 employee_info->today_hours, employee_info->week_hours, employee_info->pay_period_hours);
+                        ret = ESP_OK;
+                    } else {
+                        ESP_LOGW(TAG, "Employee not found or unauthorized");
+                        employee_info->is_authorized = false;
+                    }
+                    cJSON_Delete(response_json);
+                }
+            }
+        } else {
+            ESP_LOGW(TAG, "Employee lookup failed with status %d", status_code);
+        }
+    } else {
+        ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
+    }
+
+    esp_http_client_cleanup(client);
+    return ret;
+}
+
 api_config_t* api_get_config(void) {
     return &g_api_config;
 }

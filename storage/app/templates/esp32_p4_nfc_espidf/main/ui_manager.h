@@ -36,6 +36,10 @@ typedef struct {
     char department[64];
     char photo_url[128];
     bool is_authorized;
+    float today_hours;          // Hours worked today
+    float week_hours;           // Hours worked this week
+    float pay_period_hours;     // Hours worked this pay period
+    float vacation_balance;     // Vacation hours balance
 } employee_info_t;
 
 // Card scan result structure

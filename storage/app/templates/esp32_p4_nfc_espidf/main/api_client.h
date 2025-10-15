@@ -7,6 +7,7 @@
 #define API_CLIENT_H
 
 #include "esp_err.h"
+#include "ui_manager.h"  // For employee_info_t structure
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -79,6 +80,14 @@ esp_err_t api_health_check(void);
  * @return ESP_OK on success
  */
 esp_err_t api_get_server_time(char *time_str, size_t time_str_size);
+
+/**
+ * Get employee information and hours by card ID
+ * @param card_id Card UID to lookup
+ * @param employee_info Pointer to structure to fill with employee data
+ * @return ESP_OK on success
+ */
+esp_err_t api_get_employee_info(const char *card_id, employee_info_t *employee_info);
 
 /**
  * Get API configuration

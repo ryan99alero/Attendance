@@ -190,5 +190,6 @@
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_serial_slave_link/libespressif__esp_serial_slave_link.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp_wifi_remote/libespressif__esp_wifi_remote.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/main/libmain.a
+/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/json/libjson.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/espressif__esp32_p4_function_ev_board/libespressif__esp32_p4_function_ev_board.a
 /Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/protocol_examples_common/libprotocol_examples_common.a

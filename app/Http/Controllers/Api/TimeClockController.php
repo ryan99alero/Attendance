@@ -417,6 +417,87 @@ class TimeClockController extends Controller
     }
 
     /**
+     * Lightweight time synchronization endpoint for ESP32 devices
+     * GET /api/v1/timeclock/time?mac_address={mac}
+     *
+     * Returns current server time with timezone information for device time sync.
+     * This is more efficient than calling /auth or /health for time-only updates.
+     */
+    public function getTime(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'mac_address' => 'nullable|string|max:17',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid request',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        try {
+            $now = now();
+            $device = null;
+
+            // Try to find device by MAC address if provided
+            if ($request->has('mac_address')) {
+                $device = Device::where('mac_address', $request->mac_address)->first();
+
+                // Update last seen timestamp for registered devices
+                if ($device) {
+                    $device->update(['last_seen_at' => $now]);
+                }
+            }
+
+            // Build response data
+            $responseData = [
+                'success' => true,
+                'server_time' => $now->toISOString(),
+                'unix_timestamp' => $now->timestamp,
+                'formatted_time' => $now->format('Y-m-d H:i:s'),
+                'server_timezone' => config('app.timezone'),
+            ];
+
+            // If we found a device, include its specific timezone configuration
+            if ($device) {
+                $responseData['device_timezone'] = $this->getDeviceTimezoneConfig($device);
+                $responseData['device_registered'] = true;
+            } else {
+                // Return default timezone info for unregistered devices
+                $defaultTimezone = config('app.timezone', 'America/Chicago');
+                $defaultTime = $now->setTimezone($defaultTimezone);
+                $offsetSeconds = $defaultTime->getOffset();
+                $offsetHours = $offsetSeconds / 3600;
+
+                $responseData['device_timezone'] = [
+                    'timezone_name' => $defaultTimezone,
+                    'current_offset' => (int)$offsetHours,
+                    'is_dst' => $defaultTime->format('I') == '1',
+                    'timezone_abbr' => $defaultTime->format('T'),
+                    'device_time' => $defaultTime->format('Y-m-d H:i:s'),
+                ];
+                $responseData['device_registered'] = false;
+            }
+
+            return response()->json($responseData);
+
+        } catch (\Exception $e) {
+            Log::error("[TimeClockAPI] Time sync failed", [
+                'mac_address' => $request->mac_address ?? 'none',
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Time synchronization failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Register a new ESP32 time clock device
      * POST /api/v1/timeclock/register
      */

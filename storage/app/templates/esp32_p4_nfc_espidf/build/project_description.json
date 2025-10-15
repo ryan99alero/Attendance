@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "esp32_p4_nfc_reader",
-    "project_version":    "2c0767f-dirty",
+    "project_version":    "118922e-dirty",
     "project_path":       "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf",
     "idf_path":           "/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1",
     "build_dir":          "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build",
@@ -1445,12 +1445,12 @@
             "dir": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main",
             "type": "LIBRARY",
             "lib": "__idf_main",
-            "reqs": [ "driver", "esp_timer", "nvs_flash", "esp_wifi", "esp_netif", "esp_eth", "lwip", "espressif__esp32_p4_function_ev_board", "espressif__esp_lvgl_port" ],
+            "reqs": [ "driver", "esp_timer", "nvs_flash", "esp_wifi", "esp_netif", "esp_eth", "lwip", "spi_flash", "esp_partition", "esp_psram", "app_update", "esp_http_client", "json", "espressif__esp32_p4_function_ev_board", "espressif__esp_lvgl_port" ],
             "priv_reqs": [ "espressif__esp32_p4_function_ev_board", "espressif__esp_wifi_remote" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__esp32_p4_function_ev_board", "espressif__esp_wifi_remote" ],
             "file": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/main/libmain.a",
-            "sources": [ "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/main.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/nfc_reader.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver_spi.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver_i2c.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver_hsu.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/ui_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/wifi_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/ethernet_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/network_manager.c" ],
+            "sources": [ "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/main.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/nfc_reader.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver_spi.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver_i2c.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/pn532_driver_hsu.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/ui_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/time_settings.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/wifi_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/ethernet_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/network_manager.c", "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main/api_client.c" ],
             "include_dirs": [ "." ]
         },
         "mbedtls": {
@@ -3132,7 +3132,7 @@
             "prefix": "idf",
             "dir": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/main",
             "lib": "__idf_main",
-            "reqs": [ "driver", "esp_timer", "nvs_flash", "esp_wifi", "esp_netif", "esp_eth", "lwip", "espressif__esp32_p4_function_ev_board", "espressif__esp_lvgl_port" ],
+            "reqs": [ "driver", "esp_timer", "nvs_flash", "esp_wifi", "esp_netif", "esp_eth", "lwip", "spi_flash", "esp_partition", "esp_psram", "app_update", "esp_http_client", "json", "espressif__esp32_p4_function_ev_board", "espressif__esp_lvgl_port" ],
             "priv_reqs": [ "espressif__esp32_p4_function_ev_board", "espressif__esp_wifi_remote" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__esp32_p4_function_ev_board", "espressif__esp_wifi_remote" ],

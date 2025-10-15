@@ -50,8 +50,8 @@
 
 // API Configuration (TODO: Make configurable)
 #if API_ENABLED
-#define API_SERVER_HOST "192.168.1.100"  // Change to your Laravel server IP/hostname
-#define API_SERVER_PORT 80               // Change if using different port
+#define API_SERVER_HOST "attend.test"  // Herd local server
+#define API_SERVER_PORT 80               // HTTP port
 #define API_DEVICE_NAME "ESP32-P4-NFC-Clock-01"
 #endif
 
@@ -332,11 +332,37 @@ void app_main(void) {
 				strncpy(scan_result.card_uid, uid_str, sizeof(scan_result.card_uid) - 1);
 				strncpy(scan_result.card_type, type_name, sizeof(scan_result.card_type) - 1);
 
-				// TODO: Lookup employee info from API
+				// Initialize default values
 				strncpy(scan_result.employee.name, "Unknown Employee", sizeof(scan_result.employee.name) - 1);
 				strncpy(scan_result.employee.employee_id, "---", sizeof(scan_result.employee.employee_id) - 1);
 				strncpy(scan_result.employee.department, "Not Enrolled", sizeof(scan_result.employee.department) - 1);
 				scan_result.employee.is_authorized = false;
+				scan_result.employee.today_hours = 0.0f;
+				scan_result.employee.week_hours = 0.0f;
+				scan_result.employee.pay_period_hours = 0.0f;
+				scan_result.employee.vacation_balance = 0.0f;
+
+#if API_ENABLED
+				// Fetch employee info and hours from API
+				api_config_t *api_cfg = api_get_config();
+				if (api_cfg->is_registered) {
+					employee_info_t emp_info = {0};
+					if (api_get_employee_info(uid_str, &emp_info) == ESP_OK) {
+						// Copy employee info to scan result
+						strncpy(scan_result.employee.name, emp_info.name, sizeof(scan_result.employee.name) - 1);
+						strncpy(scan_result.employee.employee_id, emp_info.employee_id, sizeof(scan_result.employee.employee_id) - 1);
+						strncpy(scan_result.employee.department, emp_info.department, sizeof(scan_result.employee.department) - 1);
+						scan_result.employee.is_authorized = emp_info.is_authorized;
+						scan_result.employee.today_hours = emp_info.today_hours;
+						scan_result.employee.week_hours = emp_info.week_hours;
+						scan_result.employee.pay_period_hours = emp_info.pay_period_hours;
+						scan_result.employee.vacation_balance = emp_info.vacation_balance;
+						printf("✅ Employee info retrieved from API\n\n");
+					} else {
+						printf("⚠️  Employee not found in system\n\n");
+					}
+				}
+#endif
 
 				// Format timestamp
 				time_t now = time(NULL);

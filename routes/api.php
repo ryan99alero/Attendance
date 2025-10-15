@@ -49,6 +49,10 @@ Route::prefix('v1/timeclock')->group(function () {
     Route::get('/health', [TimeClockController::class, 'health'])
         ->name('timeclock.health');
 
+    // Lightweight time synchronization endpoint
+    Route::get('/time', [TimeClockController::class, 'getTime'])
+        ->name('timeclock.time');
+
     // Device registration (no auth required for initial registration)
     Route::post('/register', [TimeClockController::class, 'register'])
         ->name('timeclock.register');
