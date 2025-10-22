@@ -1357,10 +1357,17 @@ static void network_save_and_connect_clicked(lv_event_t *e) {
             snprintf(msg, sizeof(msg), "✅ Connected\nIP: %s", ip_str);
             lv_label_set_text(network_status_label, msg);
             lv_obj_set_style_text_color(network_status_label, COLOR_SUCCESS, 0);
+
+            // Update status bar icon immediately (don't wait for monitoring task)
+            ui_update_status(NET_STATUS_WIFI_CONNECTED, NFC_STATUS_READY);
+            ui_update_network_info(ip_str, wifi_manager_get_rssi());
         } else {
             ESP_LOGW(TAG, "WiFi connection timeout");
             lv_label_set_text(network_status_label, "Connection timeout\nCheck credentials");
             lv_obj_set_style_text_color(network_status_label, COLOR_ERROR, 0);
+
+            // Update status bar to show disconnected
+            ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_READY);
         }
     } else {
         ESP_LOGE(TAG, "Failed to switch to WiFi mode");
@@ -1428,10 +1435,17 @@ static void ethernet_save_and_connect_clicked(lv_event_t *e) {
             snprintf(msg, sizeof(msg), "✅ Connected\nIP: %s", ip_str);
             lv_label_set_text(network_status_label, msg);
             lv_obj_set_style_text_color(network_status_label, COLOR_SUCCESS, 0);
+
+            // Update status bar icon immediately (don't wait for monitoring task)
+            ui_update_status(NET_STATUS_ETHERNET_CONNECTED, NFC_STATUS_READY);
+            ui_update_network_info(ip_str, 0);
         } else {
             ESP_LOGW(TAG, "Ethernet connection timeout");
             lv_label_set_text(network_status_label, "Connection timeout\nCheck cable & settings");
             lv_obj_set_style_text_color(network_status_label, COLOR_ERROR, 0);
+
+            // Update status bar to show disconnected
+            ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_READY);
         }
     } else {
         ESP_LOGE(TAG, "Failed to switch to Ethernet mode");
