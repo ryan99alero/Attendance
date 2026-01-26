@@ -181,7 +181,7 @@ int es8389_set_bias_standby(audio_codec_es8389_t *codec)
 
 int es8389_set_bias_on(audio_codec_es8389_t *codec)
 {
-    int ret = es8389_write_reg(codec, ES8389_DAC_CONTROL_REG0x4D, 0x02);
+    int ret = es8389_write_reg(codec, ES8389_DAC_CONTROL_REG0x4D, 0x00);
     ret |= es8389_update_bits(codec, ES8389_ANALOG_CONTROL_REG0x69, 0x20, 0x20);
     ret |= es8389_write_reg(codec, ES8389_ANALOG_CONTROL_REG0x61, 0xD9);
     ret |= es8389_write_reg(codec, ES8389_ANALOG_CONTROL_REG0x64, 0x8F);
@@ -520,7 +520,7 @@ static int es8389_open(const audio_codec_if_t *h, void *cfg, int cfg_size)
     ret |= es8389_write_reg(codec, ES8389_RESET_REG0x00, 0x00);
     ret |= es8389_write_reg(codec, ES8389_CLK_MANAGER_REG0x03, 0xC1);
     ret |= es8389_write_reg(codec, ES8389_RESET_REG0x00, 0x01);
-    ret |= es8389_write_reg(codec, ES8389_DAC_CONTROL_REG0x4D, 0x02);
+    ret |= es8389_write_reg(codec, ES8389_DAC_CONTROL_REG0x4D, 0x00);
 
     ret |= es8389_write_reg(codec, ES8389_ADC_SP_CONTROL_REG0x26, 191);
     ret |= es8389_write_reg(codec, ES8389_ADC_SP_CONTROL_REG0x27, 191);

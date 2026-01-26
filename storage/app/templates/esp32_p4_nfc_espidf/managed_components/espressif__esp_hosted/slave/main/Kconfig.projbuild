@@ -4,6 +4,19 @@ menu "Example Configuration"
 		bool
 		default y
 
+	config ESP_HOSTED_COPROCESSOR_APP_MAIN
+		bool "Use ESP-Hosted coprocessor app_main"
+		default y
+		help
+			Enable this to use the built-in app_main() from ESP-Hosted slave firmware.
+
+			When enabled (default for standalone slave builds), the slave firmware provides
+			its own app_main() that initializes NVS, event loop, and calls
+			esp_hosted_coprocessor_init().
+
+			Disable this when using ESP-Hosted as a component in your application where
+			you provide your own app_main() (e.g., in network_adapter, signaling_only examples).
+
 	menu "Bus Config in between Host and Co-processor"
 		choice ESP_HOST_DEV_BOARD
 			bool "Configure GPIOs based on an ESP Development Board"
@@ -21,6 +34,14 @@ menu "Example Configuration"
 			config C2_C5_MODULE_SUB_BOARD
 				bool "ESP32-P4 EV Sub-Board for C2 & C5"
 				depends on IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C5
+
+			config ESP_HOST_DEV_BOARD_P4_C5_CORE
+				bool "ESP32-P4-C5 Core Board with on-board C5"
+				depends on IDF_TARGET_ESP32C5
+
+			config ESP_HOST_DEV_BOARD_P4_C6_CORE
+				bool "ESP32-P4-C6 Core Board with on-board C6"
+				depends on IDF_TARGET_ESP32C6
 		endchoice
 
 		choice ESP_HOST_INTERFACE
@@ -111,6 +132,8 @@ menu "Example Configuration"
 					depends on SPI_HSPI
 					int "Slave GPIO pin for Host MOSI"
 					default 20 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 8 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 20 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 13 if IDF_TARGET_ESP32
 					default 11 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
 					default 7
@@ -121,6 +144,8 @@ menu "Example Configuration"
 					depends on SPI_HSPI
 					int "Slave GPIO pin for Host MISO"
 					default 21 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 7 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 21 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 12 if IDF_TARGET_ESP32
 					default 13 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
 					default 2
@@ -131,6 +156,8 @@ menu "Example Configuration"
 					depends on SPI_HSPI
 					int "Slave GPIO pin for Host CLK"
 					default 19 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 9 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 19 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 3 if IDF_TARGET_ESP32C5
 					default 0 if IDF_TARGET_ESP32C2 && C2_C5_MODULE_SUB_BOARD
 					default 14 if IDF_TARGET_ESP32
@@ -143,6 +170,8 @@ menu "Example Configuration"
 					depends on SPI_HSPI
 					int "Slave GPIO pin for Host  CS"
 					default 18 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 10 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 18 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 15 if IDF_TARGET_ESP32
 					default 10 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
 					default 8 if IDF_TARGET_ESP32C61
@@ -201,6 +230,8 @@ menu "Example Configuration"
 				config ESP_SPI_GPIO_HANDSHAKE
 					int "Slave GPIO pin for handshake"
 					default 22 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 14 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 22 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 4 if IDF_TARGET_ESP32C2 && C2_C5_MODULE_SUB_BOARD
 					default 3 if IDF_TARGET_ESP32C2 && !C2_C5_MODULE_SUB_BOARD
 					default 4 if IDF_TARGET_ESP32C5 && C2_C5_MODULE_SUB_BOARD
@@ -215,6 +246,8 @@ menu "Example Configuration"
 				config ESP_SPI_GPIO_DATA_READY
 					int "Slave GPIO pin for data ready interrupt"
 					default 23 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 13 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 23 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 1 if IDF_TARGET_ESP32C2 && C2_C5_MODULE_SUB_BOARD
 					default 4 if IDF_TARGET_ESP32C2 && !C2_C5_MODULE_SUB_BOARD
 					default 0 if IDF_TARGET_ESP32C5 && C2_C5_MODULE_SUB_BOARD
@@ -228,7 +261,7 @@ menu "Example Configuration"
 					int "Slave GPIO pin to reset itself"
 					default -1
 					help
-						Host uses this pin to reset the slave ESP. To re-use ESP 'RST' or 'EN' GPIO, set value to -1
+						Host uses this pin to reset the slave ESP. To reuse ESP 'RST' or 'EN' GPIO, set value to -1
 			endmenu
 
 			config ESP_SPI_DEASSERT_HS_ON_CS
@@ -284,7 +317,7 @@ menu "Example Configuration"
 				int "Slave GPIO pin to reset itself"
 				default -1
 				help
-					Host uses this pin to reset the slave ESP. To re-use ESP 'RST' or 'EN' GPIO, set value to -1
+					Host uses this pin to reset the slave ESP. To reuse ESP 'RST' or 'EN' GPIO, set value to -1
 
 			choice
 				prompt "SDIO Bus Speed"
@@ -453,6 +486,8 @@ menu "Example Configuration"
 				config ESP_SPI_HD_GPIO_CS
 					int "Slave GPIO pin for Host CS"
 					default 18 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 10 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 18 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 8 if IDF_TARGET_ESP32C61
 					default 10
 					help
@@ -461,6 +496,8 @@ menu "Example Configuration"
 				config ESP_SPI_HD_GPIO_CLK
 					int "Slave GPIO pin for Host CLK"
 					default 19 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 9 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 19 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 3 if IDF_TARGET_ESP32C5
 					default 0 if IDF_TARGET_ESP32C2
 					default 6
@@ -470,6 +507,8 @@ menu "Example Configuration"
 				config ESP_SPI_HD_GPIO_D0
 					int "Slave GPIO pin for Host D0"
 					default 20 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 8 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 20 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 7
 					help
 						SPI HD controller Host D0
@@ -477,6 +516,8 @@ menu "Example Configuration"
 				config ESP_SPI_HD_GPIO_D1
 					int "Slave GPIO pin for Host D1"
 					default 21 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 7 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 21 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 2
 					help
 						SPI HD controller Host D1
@@ -485,6 +526,8 @@ menu "Example Configuration"
 					depends on ESP_SPI_HD_PRIV_INTERFACE_4_DATA_LINES
 					int "Slave GPIO pin for Host D2"
 					default 22 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 14 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 22 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 4 if IDF_TARGET_ESP32C61
 					default 5
 					help
@@ -494,6 +537,8 @@ menu "Example Configuration"
 					depends on ESP_SPI_HD_PRIV_INTERFACE_4_DATA_LINES
 					int "Slave GPIO pin for Host D3"
 					default 23 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 13 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 23 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 3 if IDF_TARGET_ESP32C61
 					default 4
 					help
@@ -502,6 +547,8 @@ menu "Example Configuration"
 				config ESP_SPI_HD_GPIO_DATA_READY
 					int "Slave GPIO pin for Data Ready"
 					default 2 if ESP_HOST_DEV_BOARD_P4_FUNC_BOARD
+					default 28 if ESP_HOST_DEV_BOARD_P4_C5_CORE
+					default 9 if ESP_HOST_DEV_BOARD_P4_C6_CORE
 					default 0 if IDF_TARGET_ESP32C5
 					default 1 if IDF_TARGET_ESP32C2
 					default 23 if IDF_TARGET_ESP32C61
@@ -525,7 +572,7 @@ menu "Example Configuration"
 					int "Slave GPIO pin to reset itself"
 					default -1
 					help
-						Host uses this pin to reset the slave ESP. To re-use ESP 'RST' or 'EN' GPIO, set value to -1
+						Host uses this pin to reset the slave ESP. To reuse ESP 'RST' or 'EN' GPIO, set value to -1
 
 			endmenu
 
@@ -638,7 +685,7 @@ menu "Example Configuration"
 				int "Slave GPIO pin to reset itself"
 				default -1
 				help
-					Host uses this pin to reset the slave ESP. To re-use ESP 'RST' or 'EN' GPIO, set value to -1
+					Host uses this pin to reset the slave ESP. To reuse ESP 'RST' or 'EN' GPIO, set value to -1
 
 			config ESP_UART_TX_Q_SIZE
 				int "Tx Queue Size"
@@ -665,7 +712,6 @@ menu "Example Configuration"
 			default ESP_SDIO_GPIO_RESET if ESP_SDIO_HOST_INTERFACE
 			default ESP_SPI_HD_GPIO_RESET if ESP_SPI_HD_HOST_INTERFACE
 			default ESP_UART_GPIO_RESET if ESP_UART_HOST_INTERFACE
-
 	endmenu
 
 	# HCI UART menu for ESP32-C3/S3
@@ -840,7 +886,7 @@ menu "Example Configuration"
 
 	config ESP_HOSTED_DEFAULT_TASK_PRIORITY
 		int "ESP-Hosted task priority"
-		default 22
+		default 21
 		help
 			Default task priority of ESP-Hosted tasks
 
@@ -856,11 +902,32 @@ menu "Example Configuration"
 		help
 			Enable/disable sleeps while OTA operations
 
+	config ESP_HOSTED_WIFI_TX_RETRY_ENABLED
+		bool "Enable WiFi TX retry on failure"
+		default y
+		help
+			Enable retry mechanism for WiFi internal TX operations on STA interface.
+			When enabled, the system will retry failed TX operations up to 5 times
+			with a 1ms delay between retries. Disable this to call TX only once
+			without retry, which may be useful for debugging or specific use cases.
+
 	config ESP_WIFI_DPP_SUPPORT
 		bool "Enable Wi-Fi Easy Connect (DPP)"
 		default n
 		help
 			Enable Wi-Fi Easy Connect (DPP) support
+
+	config ESP_HOSTED_ALLOW_FULL_APP_DESC
+		bool "Return the Full App Descriptor"
+		default n
+		help
+			Returns the full app descriptor when selected.
+			By default the returned app descriptor only contains:
+			- Project Name
+			- Project Version
+			- IDF Version
+			Full app descriptor returns all information contained in esp_app_desc_t.
+			**WARNING** The full app descriptor may include sensitive build-time metadata.
 
 	menu "Hosted Debugging"
 		config ESP_RAW_THROUGHPUT_TRANSPORT
@@ -1071,8 +1138,9 @@ menu "Example Configuration"
 				default 2 if IDF_TARGET_ESP32C6 && !ESP_SPI_HD_HOST_INTERFACE
 				default 9 if IDF_TARGET_ESP32C6 && ESP_SPI_HD_HOST_INTERFACE
 				default 1 if IDF_TARGET_ESP32C3
-				default 25 if IDF_TARGET_ESP32C5
+				default 25 if IDF_TARGET_ESP32C5 && !ESP_HOST_DEV_BOARD_P4_C5_CORE
 				default 6 if IDF_TARGET_ESP32C2 && C2_C5_MODULE_SUB_BOARD
+				default 3 if ESP_HOST_DEV_BOARD_P4_C5_CORE
 				default -1
 
 			choice ESP_HOSTED_HOST_WAKEUP_GPIO_LEVEL
@@ -1099,12 +1167,22 @@ menu "Example Configuration"
 			bool "Unload low level BUS driver during host deep sleep"
 			default n
 
+		comment "Slave Light Sleep (hosted) Integration:"
+		comment "  ✓ Light sleep available - see Examples menu for auto mode"
+			depends on ESP_HOSTED_LIGHT_SLEEP_ENABLE
+		comment "  ✗ Light sleep not enabled - see Light Sleep Power Management menu"
+			depends on !ESP_HOSTED_LIGHT_SLEEP_ENABLE
+
 		config PRINT_HOST_WAKEUP_PACKET_FULL_PKT
 			bool "Print the full wakeup packet"
 			default n
 
 	endmenu
 
+	# ═══════════════════════════════════════════════════════════
+	# Include Light Sleep Configuration (separate module)
+	# ═══════════════════════════════════════════════════════════
+	rsource "Kconfig.light_sleep"
 
 	config ESP_HOSTED_CLI_ENABLED
 		bool "Enable CLI Shell"
@@ -1115,7 +1193,7 @@ menu "Example Configuration"
 
 	config ESP_HOSTED_CLI_NEW_INSTANCE
 		depends on ESP_HOSTED_CLI_ENABLED
-		bool "Create new instance & do not re-use existing session if any"
+		bool "Create new instance & do not reuse existing session if any"
 		default y
 
 	config ESP_HOSTED_USE_EXAMPLE_WIFI_PRE_PROVISION_CONFIG
@@ -1126,6 +1204,13 @@ menu "Example Configuration"
 			This can be useful for testing and development purposes where a known
 			Wi-Fi setup is required.
 
+	config ESP_HOSTED_ENABLE_GPIO_EXPANDER
+		bool "Enable GPIO Expander support (host can control slave GPIOs)"
+		default n
+		help
+			Enable RPC methods that allow the HOST MCU to configure and control
+			GPIOs on the SLAVE. Leave disabled unless you really need it.
+			Access to GPIOs used by the transport (SPI/SDIO/SPI-HD/UART) are always blocked.
 
 	menu "Wi-Fi default config (pre-provisioning)"
 		depends on ESP_HOSTED_USE_EXAMPLE_WIFI_PRE_PROVISION_CONFIG
@@ -1173,8 +1258,8 @@ menu "Example Configuration"
 			default ESP_WIFI_AUTH_WPA2_PSK
 			help
 				The weakest authmode to accept in the scan mode.
-				This value defaults to ESP_WIFI_AUTH_WPA2_PSK incase password is present and ESP_WIFI_AUTH_OPEN is used.
-				Please select ESP_WIFI_AUTH_WEP/ESP_WIFI_AUTH_WPA_PSK incase AP is operating in WEP/WPA mode.
+				This value defaults to ESP_WIFI_AUTH_WPA2_PSK in case password is present and ESP_WIFI_AUTH_OPEN is used.
+				Please select ESP_WIFI_AUTH_WEP/ESP_WIFI_AUTH_WPA_PSK in case AP is operating in WEP/WPA mode.
 
 			config ESP_WIFI_AUTH_OPEN
 				bool "OPEN"
@@ -1211,8 +1296,25 @@ menu "Example Configuration"
 		endchoice
 	endmenu
 
+	config ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+		bool "Enable peer data transfer"
+		default y
+		help
+		Enable peer data transfer to send/receive raw bytes between host and coprocessor.
+		This is enabled by default. Disable only if you don't need this feature.
+
+	config ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS
+		int "Maximum number of custom message handlers"
+		depends on ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+		range 1 32
+		default 3
+		help
+			Maximum number of concurrent custom message handlers that can be registered.
+			Each handler consumes ~12 bytes of RAM. Reduce this value to save memory
+			if you don't need many concurrent message types.
+
+
 	config ESP_HOSTED_EXTRA_EXAMPLES
-		depends on ESP_HOSTED_NETWORK_SPLIT_ENABLED
 		bool "Additional higher layer examples to run"
 		default n
 		help
@@ -1221,9 +1323,35 @@ menu "Example Configuration"
 	menu "Select Examples to run"
 		depends on ESP_HOSTED_EXTRA_EXAMPLES
 
+		# 'slave to host' OR 'host to slave' data transfer example
+		config EXAMPLE_PEER_DATA_TRANSFER
+			bool "Peer Data Transfer Example"
+			depends on ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+			default n
+			help
+			Enable peer data transfer example.
+			Registers handlers for custom message IDs and echoes received data back to host.
+			Used by the host peer_data_transfer example to demonstrate bidirectional communication.
+
+		# 'slave light sleep' activation upon 'host deep sleep'
+		config ESP_HOSTED_COPROCESSOR_EXAMPLE_LIGHT_SLEEP
+			bool "Automatic Light Sleep Example"
+			depends on ESP_HOSTED_HOST_POWER_SAVE_ENABLED
+			default n if ESP_HOSTED_LIGHT_SLEEP_ENABLE
+			help
+				Automatic light sleep triggered by host power save events.
+
+				Integrates host_power_save + slave_light_sleep components.
+				Slave sleeps when host sleeps, wakes when host wakes.
+
+				Disable to implement custom power management logic.
+				See example_light_sleep.c for integration pattern.
+
+		# 'mqtt' example on network split
 		config ESP_HOSTED_COPROCESSOR_EXAMPLE_MQTT
+			depends on ESP_HOSTED_NETWORK_SPLIT_ENABLED
 			bool "MQTT client example"
-			default y
+			default n
 
 		menu "MQTT client config"
 			depends on ESP_HOSTED_COPROCESSOR_EXAMPLE_MQTT
@@ -1250,9 +1378,11 @@ menu "Example Configuration"
 
 		endmenu
 
+		# http client example for network split
 		config ESP_HOSTED_COPROCESSOR_EXAMPLE_HTTP_CLIENT
+			depends on ESP_HOSTED_NETWORK_SPLIT_ENABLED
 			bool "HTTP client example"
-			default y
+			default n
 
 		menu "HTTP client config"
 			depends on ESP_HOSTED_COPROCESSOR_EXAMPLE_HTTP_CLIENT

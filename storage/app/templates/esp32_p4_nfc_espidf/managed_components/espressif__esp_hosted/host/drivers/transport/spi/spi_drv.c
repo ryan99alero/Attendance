@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -129,7 +129,7 @@ This ISR is called when the handshake or data_ready line goes high.
 static void FAST_RAM_ATTR gpio_hs_isr_handler(void* arg)
 {
 #if 0
-	//Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
+	//Sometimes due to interference or ringing or something, we get two irqs after each other. This is solved by
 	//looking at the time between interrupts and refusing any interrupt too close to another one.
 	static uint32_t lasthandshaketime_us;
 	uint32_t currtime_us = esp_timer_get_time();
@@ -440,7 +440,7 @@ static int check_and_execute_spi_transaction(void)
 
 			if (!txbuff) {
 				/* Even though, there is nothing to send,
-				 * valid reseted txbuff is needed for SPI driver
+				 * valid reset txbuff is needed for SPI driver
 				 */
 				txbuff = spi_buffer_alloc(MEMSET_REQUIRED);
 				assert(txbuff);
@@ -663,8 +663,18 @@ static void spi_process_rx_task(void const* pvParameters)
 
 				ret = chan_arr[buf_handle->if_type]->rx(chan_arr[buf_handle->if_type]->api_chan,
 						copy_payload, copy_payload, buf_handle->payload_len);
+				// only free memory when using older versions of wifi-remote
+#ifndef ESP_WIFI_REMOTE_VERSION // not defined in older versions of wifi-remote
+ 				if (unlikely(ret))
+ 					HOSTED_FREE(copy_payload);
+#else
+#if ESP_WIFI_REMOTE_VERSION < ESP_WIFI_REMOTE_VERSION_VAL(1,3,1)
 				if (unlikely(ret))
 					HOSTED_FREE(copy_payload);
+#else
+				(void)ret; // to silence 'unused variable' warning
+#endif
+#endif
 			}
 #else
 
@@ -681,7 +691,7 @@ static void spi_process_rx_task(void const* pvParameters)
 
 			event = (struct esp_priv_event *) (buf_handle->payload);
 			if (event->event_type != ESP_PRIV_EVENT_INIT) {
-				/* User can re-use this type of transaction */
+				/* User can reuse this type of transaction */
 			}
 		} else if (buf_handle->if_type == ESP_HCI_IF) {
 			hci_rx_handler(buf_handle->payload, buf_handle->payload_len);
@@ -855,9 +865,9 @@ static esp_err_t transport_gpio_reset(void *bus_handle, gpio_pin_t reset_pin)
 	ESP_LOGI(TAG, "Resetting slave on SPI bus with pin %d", reset_pin.pin);
 	g_h.funcs->_h_config_gpio(reset_pin.port, reset_pin.pin, H_GPIO_MODE_DEF_OUTPUT);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-	g_h.funcs->_h_msleep(1);
+	g_h.funcs->_h_msleep(10);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_INACTIVE);
-	g_h.funcs->_h_msleep(1);
+	g_h.funcs->_h_msleep(10);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
 	/* Delay for a short while to allow co-processor to take control
 	 * of GPIO signals after reset. Otherwise, we may false detect on
@@ -884,7 +894,7 @@ int ensure_slave_bus_ready(void *bus_handle)
 	if (esp_hosted_woke_from_power_save()) {
 		stop_host_power_save();
 	} else {
-		ESP_LOGI(TAG, "Reseting slave");
+		ESP_LOGI(TAG, "Resetting slave");
 		transport_gpio_reset(bus_handle, reset_pin);
 	}
 

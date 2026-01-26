@@ -124,6 +124,12 @@ ctrl_cmd_t * rpc_slaveif_ota_end(ctrl_cmd_t *req)
 	RPC_DECODE_RSP_IF_NOT_ASYNC();
 }
 
+ctrl_cmd_t * rpc_slaveif_ota_activate(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_OTAActivate);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
 ctrl_cmd_t * rpc_slaveif_wifi_init(ctrl_cmd_t *req)
 {
 	RPC_SEND_REQ(RPC_ID__Req_WifiInit);
@@ -408,6 +414,12 @@ ctrl_cmd_t * rpc_slaveif_feature_control(ctrl_cmd_t *req)
 	RPC_DECODE_RSP_IF_NOT_ASYNC();
 }
 
+ctrl_cmd_t * rpc_slaveif_get_coprocessor_app_desc(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_AppGetDesc);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
 ctrl_cmd_t * rpc_slaveif_iface_mac_addr_len_get(ctrl_cmd_t *req)
 {
 	RPC_SEND_REQ(RPC_ID__Req_IfaceMacAddrLenGet);
@@ -463,6 +475,7 @@ ctrl_cmd_t * rpc_slaveif_set_slave_dhcp_dns_status(ctrl_cmd_t *req)
 	RPC_SEND_REQ(RPC_ID__Req_SetDhcpDnsStatus);
 	RPC_DECODE_RSP_IF_NOT_ASYNC();
 }
+
 
 #if H_WIFI_ENTERPRISE_SUPPORT
 ctrl_cmd_t * rpc_slaveif_wifi_sta_enterprise_enable(ctrl_cmd_t *req)
@@ -639,6 +652,65 @@ ctrl_cmd_t * rpc_slaveif_supp_dpp_start_listen(ctrl_cmd_t *req)
 ctrl_cmd_t * rpc_slaveif_supp_dpp_stop_listen(ctrl_cmd_t *req)
 {
 	RPC_SEND_REQ(RPC_ID__Req_SuppDppStopListen);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+#endif
+
+
+#ifdef H_PEER_DATA_TRANSFER
+int rpc_slaveif_register_custom_callback(uint32_t msg_id,
+		void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len))
+{
+	return rpc_evt_register_custom_callback(msg_id, callback);
+}
+
+ctrl_cmd_t * rpc_slaveif_custom_rpc(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_CustomRpc);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+ctrl_cmd_t * rpc_slaveif_gpio_config(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioConfig);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
+ctrl_cmd_t * rpc_slaveif_gpio_reset_pin(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioResetPin);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
+ctrl_cmd_t * rpc_slaveif_gpio_set_level(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioSetLevel);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
+ctrl_cmd_t * rpc_slaveif_gpio_get_level(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioGetLevel);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
+ctrl_cmd_t * rpc_slaveif_gpio_set_direction(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioSetDirection);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
+ctrl_cmd_t * rpc_slaveif_gpio_input_enable(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioInputEnable);
+	RPC_DECODE_RSP_IF_NOT_ASYNC();
+}
+
+ctrl_cmd_t * rpc_slaveif_gpio_set_pull_mode(ctrl_cmd_t *req)
+{
+	RPC_SEND_REQ(RPC_ID__Req_GpioSetPullMode);
 	RPC_DECODE_RSP_IF_NOT_ASYNC();
 }
 #endif

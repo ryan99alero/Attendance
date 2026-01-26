@@ -14,6 +14,7 @@
 #include "transport_drv.h"
 #include "rpc_slave_if.h"
 #include "port_esp_hosted_host_log.h"
+#include "port_esp_hosted_host_config.h"
 
 #ifndef BIT
 #define BIT(n) (1UL << (n))
@@ -123,7 +124,7 @@ ctrl_cmd_t * rpc_wait_and_parse_sync_resp(ctrl_cmd_t *req);
  * > req - control request from user
  *
  * Returns:
- * > CALLBACK_AVAILABLE - if a non NULL asynchrounous control response
+ * > CALLBACK_AVAILABLE - if a non NULL asynchronous control response
  *                      callback is available
  * In case of failures -
  * > MSG_ID_OUT_OF_ORDER - if request msg id is unsupported
@@ -136,4 +137,10 @@ int is_event_callback_registered(int event);
 int rpc_parse_evt(Rpc *rpc_msg, ctrl_cmd_t *app_ntfy);
 
 int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp);
+
+#if H_PEER_DATA_TRANSFER
+int rpc_evt_register_custom_callback(uint32_t msg_id,
+		void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len));
+#endif
+
 #endif /* __RPC_CORE_H */

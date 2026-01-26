@@ -13,6 +13,7 @@
 #else
 #include "driver/i2s.h"
 #endif
+#include "esp_private/rtc_clk.h"
 #include "esp_codec_dev.h"
 #include "esp_codec_dev_defaults.h"
 #include "test_board.h"
@@ -114,7 +115,7 @@ static void ut_clr_i2s_mode(void)
 }
 #endif
 
-static int ut_i2s_init(uint8_t port, codec_i2s_pin_t *i2s_pin)
+static int ut_i2s_init(uint8_t port, codec_i2s_pin_t *i2s_pin, i2s_clock_src_t clk_src)
 {
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     if (port >= I2S_MAX_KEEP) {
@@ -132,6 +133,7 @@ static int ut_i2s_init(uint8_t port, codec_i2s_pin_t *i2s_pin)
             .din = i2s_pin ? i2s_pin->din : TEST_BOARD_I2S_DATA_IN_PIN,
         },
     };
+    std_cfg.clk_cfg.clk_src = clk_src;
     if (i2s_keep[port] == NULL) {
         i2s_keep[port] = (i2s_keep_t *) calloc(1, sizeof(i2s_keep_t));
         if (i2s_keep[port] == NULL) {
@@ -152,6 +154,7 @@ static int ut_i2s_init(uint8_t port, codec_i2s_pin_t *i2s_pin)
         },
     };
     tdm_cfg.slot_cfg.total_slot = 4;
+    tdm_cfg.clk_cfg.clk_src = clk_src;
 #endif
 
 
@@ -245,12 +248,19 @@ static void codec_max_sample(uint8_t *data, int size, int *max_value, int *min_v
     *min_value = min;
 }
 
-TEST_CASE("esp codec dev test using S3 board", "[esp_codec_dev]")
+static void test_codec_dev_using_s3_board(bool use_xtal)
 {
+    i2s_clock_src_t clk_src = I2S_CLK_SRC_DEFAULT;
+    if (use_xtal) {
+#if SOC_I2S_SUPPORTS_XTAL
+        clk_src = I2S_CLK_SRC_XTAL;
+        rtc_clk_cpu_set_to_default_config();
+#endif
+    }
     // Need install driver (i2c and i2s) firstly
     int ret = ut_i2c_init(0, NULL);
     TEST_ESP_OK(ret);
-    ret = ut_i2s_init(0, NULL);
+    ret = ut_i2s_init(0, NULL, clk_src);
     TEST_ESP_OK(ret);
     // Do initialize of related interface: data_if, ctrl_if and gpio_if
     audio_codec_i2s_cfg_t i2s_cfg = {
@@ -259,6 +269,9 @@ TEST_CASE("esp codec dev test using S3 board", "[esp_codec_dev]")
         .tx_handle = i2s_keep[0]->tx_handle,
 #endif
     };
+    if (use_xtal) {
+        i2s_cfg.clk_src = clk_src;
+    }
     const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_cfg);
     TEST_ASSERT_NOT_NULL(data_if);
 
@@ -359,12 +372,22 @@ TEST_CASE("esp codec dev test using S3 board", "[esp_codec_dev]")
     ut_i2s_deinit(0);
 }
 
+TEST_CASE("esp codec dev test using S3 board", "[esp_codec_dev]")
+{
+    test_codec_dev_using_s3_board(false);
+}
+
+TEST_CASE("esp codec dev test using S3 board with XTAL", "[esp_codec_dev]")
+{
+    test_codec_dev_using_s3_board(true);
+}
+
 TEST_CASE("Record play overlap test", "[esp_codec_dev]")
 {
     // Need install driver (i2c and i2s) firstly
     int ret = ut_i2c_init(0, NULL);
     TEST_ESP_OK(ret);
-    ret = ut_i2s_init(0, NULL);
+    ret = ut_i2s_init(0, NULL, I2S_CLK_SRC_DEFAULT);
     TEST_ESP_OK(ret);
     // Do initialize of related interface: data_if, ctrl_if and gpio_if
     audio_codec_i2s_cfg_t i2s_cfg = {
@@ -601,7 +624,7 @@ static void multiple_es8311_run(bool reuse_data_if)
         .dout = 8,
         .din = 10,
     };
-    ret = ut_i2s_init(0, &i2s_pin);
+    ret = ut_i2s_init(0, &i2s_pin, I2S_CLK_SRC_DEFAULT);
     TEST_ESP_OK(ret);
     const audio_codec_data_if_t *data_if = NULL;
     if (reuse_data_if) {
@@ -723,7 +746,7 @@ TEST_CASE("Playing while recording use TDM mode", "[esp_codec_dev]")
     // Need install driver (i2c and i2s) firstly
     int ret = ut_i2c_init(0, NULL);
     TEST_ESP_OK(ret);
-    ret = ut_i2s_init(0, NULL);
+    ret = ut_i2s_init(0, NULL, I2S_CLK_SRC_DEFAULT);
     TEST_ESP_OK(ret);
     // Do initialize of related interface: data_if, ctrl_if and gpio_if
     audio_codec_i2s_cfg_t i2s_cfg = {

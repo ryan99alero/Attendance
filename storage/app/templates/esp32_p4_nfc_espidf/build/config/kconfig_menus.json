@@ -36279,6 +36279,16 @@
                                 "range": null,
                                 "title": "ESP32-P4-C5 Core Board with on-board C5",
                                 "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "SLAVE_IDF_TARGET_ESP32C6 && <choice ESP_HOSTED_P4_DEV_BOARD>",
+                                "help": null,
+                                "id": "ESP_HOSTED_P4_C6_CORE_BOARD",
+                                "name": "ESP_HOSTED_P4_C6_CORE_BOARD",
+                                "range": null,
+                                "title": "ESP32-P4-C6 Core Board with on-board C6",
+                                "type": "bool"
                             }
                         ],
                         "depends_on": "IDF_TARGET_ESP32P4 && ESP_HOSTED_ENABLED",
@@ -36899,7 +36909,7 @@
                                         "id": "ESP_HOSTED_SPI_GPIO_RESET_SLAVE",
                                         "name": "ESP_HOSTED_SPI_GPIO_RESET_SLAVE",
                                         "range": null,
-                                        "title": "GPIO pin for Reseting slave ESP",
+                                        "title": "GPIO pin for Resetting slave ESP",
                                         "type": "int"
                                     }
                                 ],
@@ -37468,7 +37478,7 @@
                                     54,
                                     54
                                 ],
-                                "title": "GPIO pin for Reseting slave ESP",
+                                "title": "GPIO pin for Resetting slave ESP",
                                 "type": "int"
                             },
                             {
@@ -37569,6 +37579,16 @@
                                 "name": "ESP_HOSTED_SDIO_RX_Q_SIZE",
                                 "range": null,
                                 "title": "Host SDIO Rx queue size",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "ESP_HOSTED_SDIO_HOST_INTERFACE && ESP_HOSTED_ENABLED",
+                                "help": "The co-processor needs some time to be ready after being reset by the host.\nIncrease this value if host sees SDMMC errors after resetting the co-processor.",
+                                "id": "ESP_HOSTED_SDIO_RESET_DELAY_MS",
+                                "name": "ESP_HOSTED_SDIO_RESET_DELAY_MS",
+                                "range": null,
+                                "title": "Delay (in ms) after Co-processor Reset",
                                 "type": "int"
                             },
                             {
@@ -37938,7 +37958,7 @@
                                         "id": "ESP_HOSTED_SPI_HD_GPIO_RESET_SLAVE",
                                         "name": "ESP_HOSTED_SPI_HD_GPIO_RESET_SLAVE",
                                         "range": null,
-                                        "title": "GPIO pin for Reseting slave ESP",
+                                        "title": "GPIO pin for Resetting slave ESP",
                                         "type": "int"
                                     }
                                 ],
@@ -38242,7 +38262,7 @@
                                 "id": "ESP_HOSTED_UART_GPIO_RESET_SLAVE",
                                 "name": "ESP_HOSTED_UART_GPIO_RESET_SLAVE",
                                 "range": null,
-                                "title": "GPIO pin for Reseting slave ESP",
+                                "title": "GPIO pin for Resetting slave ESP",
                                 "type": "int"
                             },
                             {
@@ -38292,7 +38312,7 @@
                                         "id": "ESP_HOSTED_SLAVE_RESET_ON_EVERY_HOST_BOOTUP",
                                         "name": "ESP_HOSTED_SLAVE_RESET_ON_EVERY_HOST_BOOTUP",
                                         "range": null,
-                                        "title": "Reset slave on every host bootup",
+                                        "title": "Reset slave on every host boot-up",
                                         "type": "bool"
                                     },
                                     {
@@ -38451,6 +38471,16 @@
                                 "range": null,
                                 "title": "Hosted default task size",
                                 "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "ESP_HOSTED_ENABLED",
+                                "help": "When enabled, Hosted tasks would be allocated\nfrom SPIRAM, instead of default internal RAM.",
+                                "id": "ESP_HOSTED_DFLT_TASK_FROM_SPIRAM",
+                                "name": "ESP_HOSTED_DFLT_TASK_FROM_SPIRAM",
+                                "range": null,
+                                "title": "Hosted task stack from SPIRAM",
+                                "type": "bool"
                             }
                         ],
                         "depends_on": "ESP_HOSTED_ENABLED",
@@ -38460,12 +38490,32 @@
                     },
                     {
                         "children": [],
+                        "depends_on": "ESP_HOSTED_ENABLED",
+                        "help": "When enabled, transport restarts the system when it encounters a failure.\nDisable to custom handle the transport failure in application.\nA transport failure will always be sent as an ESP_HOSTED_EVENT_TRANSPORT_FAILURE event, irrespective of the setting.",
+                        "id": "ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE",
+                        "name": "ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE",
+                        "range": null,
+                        "title": "Restart transport upon failure",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
                         "depends_on": "SLAVE_SOC_WIFI_HE_SUPPORT && ESP_HOSTED_ENABLED",
                         "help": "Enable Wi-Fi iTWT (individual Target Wake Time) APIs on Host. Using the API, Host\ncan instruct the co-processor to negotiate specific wake and sleep schedules with\nthe access point (AP) for lower power consumption.",
                         "id": "ESP_HOSTED_ENABLE_ITWT",
                         "name": "ESP_HOSTED_ENABLE_ITWT",
                         "range": null,
                         "title": "Enable iTWT support",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "ESP_HOSTED_ENABLED",
+                        "help": "Enable RPC methods that allow the HOST MCU to configure and control GPIOs\non the co-processor. Leave disabled unless you really need it.\nGPIO requests that target pins used by the active transport will be rejected.\nNote: ESP_HOSTED_ENABLE_GPIO_EXPANDER should also be enabled at co-processor to use this",
+                        "id": "ESP_HOSTED_ENABLE_GPIO_EXPANDER",
+                        "name": "ESP_HOSTED_ENABLE_GPIO_EXPANDER",
+                        "range": null,
+                        "title": "Enable GPIO Expander feature on host",
                         "type": "bool"
                     },
                     {
@@ -38528,7 +38578,7 @@
                                 "id": "ESP_HOSTED_CLI_NEW_INSTANCE",
                                 "name": "ESP_HOSTED_CLI_NEW_INSTANCE",
                                 "range": null,
-                                "title": "Create new instance & do not re-use existing session if any",
+                                "title": "Create new instance & do not reuse existing session if any",
                                 "type": "bool"
                             }
                         ],
@@ -38542,6 +38592,16 @@
                     },
                     {
                         "children": [
+                            {
+                                "children": [],
+                                "depends_on": "ESP_HOSTED_ENABLED",
+                                "help": "Suppress warnings when host and co-processor firmware versions do not match.\nBy default, version mismatch warnings are shown during initialization.\nEnable this option to suppress these warnings.",
+                                "id": "ESP_HOSTED_FW_VERSION_MISMATCH_WARNING_SUPPRESS",
+                                "name": "ESP_HOSTED_FW_VERSION_MISMATCH_WARNING_SUPPRESS",
+                                "range": null,
+                                "title": "Suppress firmware version mismatch warnings",
+                                "type": "bool"
+                            },
                             {
                                 "children": [
                                     {
@@ -38614,7 +38674,18 @@
                                 "type": "bool"
                             },
                             {
-                                "children": [],
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "ESP_HOSTED_PKT_STATS && ESP_HOSTED_ENABLED",
+                                        "help": null,
+                                        "id": "ESP_HOSTED_PKT_STATS_INTERVAL_SEC",
+                                        "name": "ESP_HOSTED_PKT_STATS_INTERVAL_SEC",
+                                        "range": null,
+                                        "title": "Packet stats reporting interval (sec)",
+                                        "type": "int"
+                                    }
+                                ],
                                 "depends_on": "ESP_HOSTED_ENABLED",
                                 "help": "On comparing with slave packet stats helps to understand any packet loss at hosted",
                                 "id": "ESP_HOSTED_PKT_STATS",
@@ -38622,16 +38693,6 @@
                                 "range": null,
                                 "title": "Transport level packet stats",
                                 "type": "bool"
-                            },
-                            {
-                                "children": [],
-                                "depends_on": "ESP_PKT_STATS && ESP_HOSTED_ENABLED",
-                                "help": null,
-                                "id": "ESP_PKT_STATS_INTERVAL_SEC",
-                                "name": "ESP_PKT_STATS_INTERVAL_SEC",
-                                "range": null,
-                                "title": "Packet stats reporting interval (sec)",
-                                "type": "int"
                             }
                         ],
                         "depends_on": "ESP_HOSTED_ENABLED",
@@ -38723,6 +38784,30 @@
                         "id": "component-config-esp-hosted-config-data-path-options",
                         "title": "Data path options",
                         "type": "menu"
+                    },
+                    {
+                        "children": [
+                            {
+                                "children": [],
+                                "depends_on": "ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER && ESP_HOSTED_ENABLED",
+                                "help": "Maximum number of concurrent custom message handlers that can be registered.\nEach handler consumes ~12 bytes of RAM. Reduce this value to save memory\nif you dont need many concurrent message types.",
+                                "id": "ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS",
+                                "name": "ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS",
+                                "range": [
+                                    1,
+                                    32
+                                ],
+                                "title": "Maximum number of custom message handlers",
+                                "type": "int"
+                            }
+                        ],
+                        "depends_on": "ESP_HOSTED_ENABLED",
+                        "help": "Enable peer data transfer to send/receive raw bytes between host and coprocessor.\nThis is enabled by default. Disable only if you don't need this feature.",
+                        "id": "ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER",
+                        "name": "ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER",
+                        "range": null,
+                        "title": "Enable peer data transfer (custom RPC)",
+                        "type": "bool"
                     },
                     {
                         "children": [],
@@ -41830,6 +41915,16 @@
                 "children": [
                     {
                         "children": [],
+                        "depends_on": "ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Enable unsecure mode.\nThis will disable the TLS encryption and authentication.\nThis is useful for testing purposes.",
+                        "id": "WIFI_RMT_OVER_EPPP_UNSECURE",
+                        "name": "WIFI_RMT_OVER_EPPP_UNSECURE",
+                        "range": null,
+                        "title": "Enable unsecure mode",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [],
                         "depends_on": "EPPP_LINK_DEVICE_UART && ESP_WIFI_REMOTE_LIBRARY_EPPP",
                         "help": "UART Port number.",
                         "id": "WIFI_RMT_OVER_EPPP_UART_PORT",
@@ -41926,6 +42021,76 @@
                         "name": "WIFI_RMT_OVER_EPPP_SPI_FREQ",
                         "range": null,
                         "title": "SPI frequency",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "SDIO bus width (1, 2, or 4 bits).",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_WIDTH",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_WIDTH",
+                        "range": null,
+                        "title": "SDIO bus width",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Pin number of SDIO CLK.",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_CLK_PIN",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_CLK_PIN",
+                        "range": null,
+                        "title": "CLK Pin Number",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Pin number of SDIO CMD.",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_CMD_PIN",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_CMD_PIN",
+                        "range": null,
+                        "title": "CMD Pin Number",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Pin number of SDIO D0.",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_D0_PIN",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_D0_PIN",
+                        "range": null,
+                        "title": "D0 Pin Number",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Pin number of SDIO D1.",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_D1_PIN",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_D1_PIN",
+                        "range": null,
+                        "title": "D1 Pin Number",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Pin number of SDIO D2.",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_D2_PIN",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_D2_PIN",
+                        "range": null,
+                        "title": "D2 Pin Number",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "EPPP_LINK_DEVICE_SDIO && ESP_WIFI_REMOTE_LIBRARY_EPPP",
+                        "help": "Pin number of SDIO D3.",
+                        "id": "WIFI_RMT_OVER_EPPP_SDIO_D3_PIN",
+                        "name": "WIFI_RMT_OVER_EPPP_SDIO_D3_PIN",
+                        "range": null,
+                        "title": "D3 Pin Number",
                         "type": "int"
                     },
                     {
@@ -42418,6 +42583,16 @@
                                         "children": [],
                                         "depends_on": "<choice LV_USE_OS>",
                                         "help": null,
+                                        "id": "LV_OS_SDL2",
+                                        "name": "LV_OS_SDL2",
+                                        "range": null,
+                                        "title": "7: SDL2",
+                                        "type": "bool"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "<choice LV_USE_OS>",
+                                        "help": null,
                                         "id": "LV_OS_CUSTOM",
                                         "name": "LV_OS_CUSTOM",
                                         "range": null,
@@ -42512,7 +42687,7 @@
                             },
                             {
                                 "children": [],
-                                "depends_on": "LV_USE_OS > 0",
+                                "depends_on": "!LV_OS_NONE",
                                 "help": "If FreeType or ThorVG is enabled, it is recommended to set it to 32KB or more.",
                                 "id": "LV_DRAW_THREAD_STACK_SIZE",
                                 "name": "LV_DRAW_THREAD_STACK_SIZE",
@@ -42522,14 +42697,11 @@
                             },
                             {
                                 "children": [],
-                                "depends_on": "LV_USE_OS > 0",
+                                "depends_on": "!LV_OS_NONE",
                                 "help": "Thread priority controls the relative importance of the drawing threads.\nValues correspond to lv_thread_prio_t enum in lv_os.h:\n0: LV_THREAD_PRIO_LOWEST\n1: LV_THREAD_PRIO_LOW\n2: LV_THREAD_PRIO_MID (default)\n3: LV_THREAD_PRIO_HIGH\n4: LV_THREAD_PRIO_HIGHEST\n\nHigher priority can improve rendering performance but might cause\nstarvation of lower priority tasks.",
                                 "id": "LV_DRAW_THREAD_PRIO",
                                 "name": "LV_DRAW_THREAD_PRIO",
-                                "range": [
-                                    0,
-                                    4
-                                ],
+                                "range": null,
                                 "title": "Thread priority for the drawing thread",
                                 "type": "int"
                             },
@@ -42583,6 +42755,16 @@
                                         "name": "LV_DRAW_SW_SUPPORT_ARGB8888",
                                         "range": null,
                                         "title": "Enable support for ARGB8888 color format",
+                                        "type": "bool"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_DRAW_SW",
+                                        "help": null,
+                                        "id": "LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED",
+                                        "name": "LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED",
+                                        "range": null,
+                                        "title": "Enable support for ARGB8888 premultiplied color format",
                                         "type": "bool"
                                     },
                                     {
@@ -42792,68 +42974,6 @@
                                 "children": [
                                     {
                                         "children": [],
-                                        "depends_on": "LV_USE_DRAW_VGLITE",
-                                        "help": null,
-                                        "id": "LV_USE_VGLITE_BLIT_SPLIT",
-                                        "name": "LV_USE_VGLITE_BLIT_SPLIT",
-                                        "range": null,
-                                        "title": "Enable blit quality degradation workaround recommended for screen's dimension > 352 pixels",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [
-                                            {
-                                                "children": [],
-                                                "depends_on": "LV_USE_VGLITE_DRAW_THREAD",
-                                                "help": "Queue multiple tasks and flash them once to the GPU. The task ready state will be send asynchronous to dispatcher.",
-                                                "id": "LV_USE_VGLITE_DRAW_ASYNC",
-                                                "name": "LV_USE_VGLITE_DRAW_ASYNC",
-                                                "range": null,
-                                                "title": "Enable VGLite draw async",
-                                                "type": "bool"
-                                            }
-                                        ],
-                                        "depends_on": "LV_USE_DRAW_VGLITE && LV_USE_OS > 0",
-                                        "help": null,
-                                        "id": "LV_USE_VGLITE_DRAW_THREAD",
-                                        "name": "LV_USE_VGLITE_DRAW_THREAD",
-                                        "range": null,
-                                        "title": "Use additional draw thread for VG-Lite processing",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "LV_USE_DRAW_VGLITE",
-                                        "help": null,
-                                        "id": "LV_USE_VGLITE_ASSERT",
-                                        "name": "LV_USE_VGLITE_ASSERT",
-                                        "range": null,
-                                        "title": "Enable VGLite asserts",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "LV_USE_DRAW_VGLITE",
-                                        "help": null,
-                                        "id": "LV_USE_VGLITE_CHECK_ERROR",
-                                        "name": "LV_USE_VGLITE_CHECK_ERROR",
-                                        "range": null,
-                                        "title": "Enable VGLite error checks",
-                                        "type": "bool"
-                                    }
-                                ],
-                                "depends_on": null,
-                                "help": null,
-                                "id": "LV_USE_DRAW_VGLITE",
-                                "name": "LV_USE_DRAW_VGLITE",
-                                "range": null,
-                                "title": "Use NXP's VG-Lite GPU on iMX RTxxx platforms",
-                                "type": "bool"
-                            },
-                            {
-                                "children": [
-                                    {
-                                        "children": [],
                                         "depends_on": "LV_USE_PXP",
                                         "help": null,
                                         "id": "LV_USE_DRAW_PXP",
@@ -42883,7 +43003,7 @@
                             },
                             {
                                 "children": [],
-                                "depends_on": "LV_USE_DRAW_PXP && LV_USE_OS > 0",
+                                "depends_on": "LV_USE_DRAW_PXP && !LV_OS_NONE",
                                 "help": null,
                                 "id": "LV_USE_PXP_DRAW_THREAD",
                                 "name": "LV_USE_PXP_DRAW_THREAD",
@@ -42905,41 +43025,61 @@
                                 "children": [
                                     {
                                         "children": [],
-                                        "depends_on": "LV_USE_DRAW_G2D",
+                                        "depends_on": "LV_USE_G2D",
+                                        "help": null,
+                                        "id": "LV_USE_DRAW_G2D",
+                                        "name": "LV_USE_DRAW_G2D",
+                                        "range": null,
+                                        "title": "Use G2D for drawing.",
+                                        "type": "bool"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_G2D",
+                                        "help": null,
+                                        "id": "LV_USE_ROTATE_G2D",
+                                        "name": "LV_USE_ROTATE_G2D",
+                                        "range": null,
+                                        "title": "Use G2D to rotate display.",
+                                        "type": "bool"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_G2D",
                                         "help": "Includes the frame buffers and assets.",
                                         "id": "LV_G2D_HASH_TABLE_SIZE",
                                         "name": "LV_G2D_HASH_TABLE_SIZE",
                                         "range": null,
                                         "title": "Maximum number of buffers that can be stored for G2D draw unit.",
                                         "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "LV_USE_DRAW_G2D && LV_USE_OS > 0",
-                                        "help": null,
-                                        "id": "LV_USE_G2D_DRAW_THREAD",
-                                        "name": "LV_USE_G2D_DRAW_THREAD",
-                                        "range": null,
-                                        "title": "Use additional draw thread for G2D processing",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "LV_USE_DRAW_G2D",
-                                        "help": null,
-                                        "id": "LV_USE_G2D_ASSERT",
-                                        "name": "LV_USE_G2D_ASSERT",
-                                        "range": null,
-                                        "title": "Enable G2D asserts",
-                                        "type": "bool"
                                     }
                                 ],
                                 "depends_on": null,
                                 "help": null,
-                                "id": "LV_USE_DRAW_G2D",
-                                "name": "LV_USE_DRAW_G2D",
+                                "id": "LV_USE_G2D",
+                                "name": "LV_USE_G2D",
                                 "range": null,
                                 "title": "Use NXP's G2D on MPU platforms",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "LV_USE_DRAW_G2D && !LV_OS_NONE",
+                                "help": null,
+                                "id": "LV_USE_G2D_DRAW_THREAD",
+                                "name": "LV_USE_G2D_DRAW_THREAD",
+                                "range": null,
+                                "title": "Use additional draw thread for G2D processing",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": "LV_USE_G2D",
+                                "help": null,
+                                "id": "LV_USE_G2D_ASSERT",
+                                "name": "LV_USE_G2D_ASSERT",
+                                "range": null,
+                                "title": "Enable G2D asserts",
                                 "type": "bool"
                             },
                             {
@@ -43023,6 +43163,26 @@
                                         "range": null,
                                         "title": "VG-Lite stroke maximum cache number.",
                                         "type": "int"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_DRAW_VG_LITE",
+                                        "help": null,
+                                        "id": "LV_VG_LITE_DISABLE_VLC_OP_CLOSE",
+                                        "name": "LV_VG_LITE_DISABLE_VLC_OP_CLOSE",
+                                        "range": null,
+                                        "title": "Remove VLC_OP_CLOSE path instruction (Workaround for NXP)",
+                                        "type": "bool"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_DRAW_VG_LITE",
+                                        "help": null,
+                                        "id": "LV_VG_LITE_DISABLE_LINEAR_GRADIENT_EXT",
+                                        "name": "LV_VG_LITE_DISABLE_LINEAR_GRADIENT_EXT",
+                                        "range": null,
+                                        "title": "Disable linear gradient extension for some older versions of drivers.",
+                                        "type": "bool"
                                     }
                                 ],
                                 "depends_on": null,
@@ -43082,6 +43242,58 @@
                                 "name": "LV_USE_DRAW_OPENGLES",
                                 "range": null,
                                 "title": "Draw using cached OpenGLES textures",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_PPA",
+                                        "help": null,
+                                        "id": "LV_USE_PPA_IMG",
+                                        "name": "LV_USE_PPA_IMG",
+                                        "range": null,
+                                        "title": "Use Espressif's PPA accelerator for Image draw",
+                                        "type": "bool"
+                                    }
+                                ],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_PPA",
+                                "name": "LV_USE_PPA",
+                                "range": null,
+                                "title": "Use Espressif's PPA accelerator for ESP SoCs",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_DRAW_EVE",
+                                        "help": null,
+                                        "id": "LV_DRAW_EVE_EVE_GENERATION",
+                                        "name": "LV_DRAW_EVE_EVE_GENERATION",
+                                        "range": null,
+                                        "title": "EVE_GEN value",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_DRAW_EVE",
+                                        "help": null,
+                                        "id": "LV_DRAW_EVE_WRITE_BUFFER_SIZE",
+                                        "name": "LV_DRAW_EVE_WRITE_BUFFER_SIZE",
+                                        "range": null,
+                                        "title": "Max bytes to buffer for each SPI transmission or 0 to disable buffering",
+                                        "type": "int"
+                                    }
+                                ],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_DRAW_EVE",
+                                "name": "LV_USE_DRAW_EVE",
+                                "range": null,
+                                "title": "Use EVE FT81X GPU.",
                                 "type": "bool"
                             }
                         ],
@@ -43953,26 +44165,6 @@
                                         "children": [],
                                         "depends_on": null,
                                         "help": null,
-                                        "id": "LV_FONT_SIMSUN_14_CJK",
-                                        "name": "LV_FONT_SIMSUN_14_CJK",
-                                        "range": null,
-                                        "title": "Enable Simsun 14 CJK",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": null,
-                                        "help": null,
-                                        "id": "LV_FONT_SIMSUN_16_CJK",
-                                        "name": "LV_FONT_SIMSUN_16_CJK",
-                                        "range": null,
-                                        "title": "Enable Simsun 16 CJK",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": null,
-                                        "help": null,
                                         "id": "LV_FONT_SOURCE_HAN_SANS_SC_14_CJK",
                                         "name": "LV_FONT_SOURCE_HAN_SANS_SC_14_CJK",
                                         "range": null,
@@ -44245,26 +44437,6 @@
                                         "name": "LV_FONT_DEFAULT_DEJAVU_16_PERSIAN_HEBREW",
                                         "range": null,
                                         "title": "Dejavu 16 Persian, Hebrew, Arabic letters",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "<choice LV_FONT_DEFAULT>",
-                                        "help": null,
-                                        "id": "LV_FONT_DEFAULT_SIMSUN_14_CJK",
-                                        "name": "LV_FONT_DEFAULT_SIMSUN_14_CJK",
-                                        "range": null,
-                                        "title": "Simsun 14 CJK",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "<choice LV_FONT_DEFAULT>",
-                                        "help": null,
-                                        "id": "LV_FONT_DEFAULT_SIMSUN_16_CJK",
-                                        "name": "LV_FONT_DEFAULT_SIMSUN_16_CJK",
-                                        "range": null,
-                                        "title": "Simsun 16 CJK",
                                         "type": "bool"
                                     },
                                     {
@@ -44548,6 +44720,16 @@
                                 "name": "LV_USE_ARC",
                                 "range": null,
                                 "title": "Arc",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_ARCLABEL",
+                                "name": "LV_USE_ARCLABEL",
+                                "range": null,
+                                "title": "Arc Label",
                                 "type": "bool"
                             },
                             {
@@ -45146,7 +45328,7 @@
                                         "id": "LV_FS_STDIO_LETTER",
                                         "name": "LV_FS_STDIO_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45187,7 +45369,7 @@
                                         "id": "LV_FS_POSIX_LETTER",
                                         "name": "LV_FS_POSIX_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45228,7 +45410,7 @@
                                         "id": "LV_FS_WIN32_LETTER",
                                         "name": "LV_FS_WIN32_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45269,7 +45451,7 @@
                                         "id": "LV_FS_FATFS_LETTER",
                                         "name": "LV_FS_FATFS_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45310,7 +45492,7 @@
                                         "id": "LV_FS_MEMFS_LETTER",
                                         "name": "LV_FS_MEMFS_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     }
                                 ],
@@ -45331,7 +45513,7 @@
                                         "id": "LV_FS_LITTLEFS_LETTER",
                                         "name": "LV_FS_LITTLEFS_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45362,7 +45544,7 @@
                                         "id": "LV_FS_ARDUINO_ESP_LITTLEFS_LETTER",
                                         "name": "LV_FS_ARDUINO_ESP_LITTLEFS_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45393,7 +45575,7 @@
                                         "id": "LV_FS_ARDUINO_SD_LETTER",
                                         "name": "LV_FS_ARDUINO_SD_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     },
                                     {
@@ -45424,7 +45606,7 @@
                                         "id": "LV_USE_FS_UEFI_LETTER",
                                         "name": "LV_USE_FS_UEFI_LETTER",
                                         "range": null,
-                                        "title": "Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A')",
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
                                         "type": "int"
                                     }
                                 ],
@@ -45434,6 +45616,27 @@
                                 "name": "LV_USE_FS_UEFI",
                                 "range": null,
                                 "title": "File system on top of the UEFI EFI_SIMPLE_FILE_SYSTEM_PROTOCOL",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_FS_FROGFS",
+                                        "help": null,
+                                        "id": "LV_FS_FROGFS_LETTER",
+                                        "name": "LV_FS_FROGFS_LETTER",
+                                        "range": null,
+                                        "title": "Set an upper-cased driver-identifier letter for this driver (e.g. 65 for 'A')",
+                                        "type": "int"
+                                    }
+                                ],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_FS_FROGFS",
+                                "name": "LV_USE_FS_FROGFS",
+                                "range": null,
+                                "title": "FrogFS read-only filesystem",
                                 "type": "bool"
                             },
                             {
@@ -45619,7 +45822,17 @@
                                         "name": "LV_TINY_TTF_CACHE_GLYPH_CNT",
                                         "range": null,
                                         "title": "Tiny ttf cache entries count",
-                                        "type": "bool"
+                                        "type": "int"
+                                    },
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_TINY_TTF",
+                                        "help": null,
+                                        "id": "LV_TINY_TTF_CACHE_KERNING_CNT",
+                                        "name": "LV_TINY_TTF_CACHE_KERNING_CNT",
+                                        "range": null,
+                                        "title": "Tiny ttf kerning cache entries count",
+                                        "type": "int"
                                     }
                                 ],
                                 "depends_on": null,
@@ -46037,6 +46250,16 @@
                                                 "range": null,
                                                 "title": "Enable built-in profiler by default",
                                                 "type": "bool"
+                                            },
+                                            {
+                                                "children": [],
+                                                "depends_on": "LV_USE_PROFILER_BUILTIN && LV_USE_PROFILER",
+                                                "help": null,
+                                                "id": "LV_USE_PROFILER_BUILTIN_POSIX",
+                                                "name": "LV_USE_PROFILER_BUILTIN_POSIX",
+                                                "range": null,
+                                                "title": "Enable POSIX profiler port",
+                                                "type": "bool"
                                             }
                                         ],
                                         "depends_on": "LV_USE_PROFILER",
@@ -46350,6 +46573,16 @@
                                 "name": "LV_USE_TEST",
                                 "range": null,
                                 "title": "Enable emulated input devices, time emulation, and screenshot compares.",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_TRANSLATION",
+                                "name": "LV_USE_TRANSLATION",
+                                "range": null,
+                                "title": "Enable text translation support",
                                 "type": "bool"
                             },
                             {
@@ -46678,16 +46911,6 @@
                                         "children": [],
                                         "depends_on": "LV_USE_WAYLAND",
                                         "help": null,
-                                        "id": "LV_WAYLAND_WL_SHELL",
-                                        "name": "LV_WAYLAND_WL_SHELL",
-                                        "range": null,
-                                        "title": "Support the legacy wl_shell instead of the default XDG Shell protocol",
-                                        "type": "bool"
-                                    },
-                                    {
-                                        "children": [],
-                                        "depends_on": "LV_USE_WAYLAND",
-                                        "help": null,
                                         "id": "LV_WAYLAND_BUF_COUNT",
                                         "name": "LV_WAYLAND_BUF_COUNT",
                                         "range": null,
@@ -46736,7 +46959,7 @@
                                     },
                                     {
                                         "children": [],
-                                        "depends_on": "LV_USE_WAYLAND && LV_USE_DRAW_G2D",
+                                        "depends_on": "LV_USE_WAYLAND && LV_USE_G2D",
                                         "help": null,
                                         "id": "LV_WAYLAND_USE_DMABUF",
                                         "name": "LV_WAYLAND_USE_DMABUF",
@@ -46909,7 +47132,7 @@
                                     },
                                     {
                                         "children": [],
-                                        "depends_on": "LV_USE_NUTTX && LIBUV",
+                                        "depends_on": "LV_USE_NUTTX",
                                         "help": null,
                                         "id": "LV_USE_NUTTX_LIBUV",
                                         "name": "LV_USE_NUTTX_LIBUV",
@@ -47018,6 +47241,48 @@
                                         "range": null,
                                         "title": "Use NuttX touchscreen driver",
                                         "type": "bool"
+                                    },
+                                    {
+                                        "children": [
+                                            {
+                                                "children": [],
+                                                "depends_on": "LV_USE_NUTTX_MOUSE",
+                                                "help": "Set the step size of the mouse movement in pixels.",
+                                                "id": "LV_USE_NUTTX_MOUSE_MOVE_STEP",
+                                                "name": "LV_USE_NUTTX_MOUSE_MOVE_STEP",
+                                                "range": null,
+                                                "title": "Mouse movement step (pixels)",
+                                                "type": "int"
+                                            }
+                                        ],
+                                        "depends_on": "LV_USE_NUTTX",
+                                        "help": null,
+                                        "id": "LV_USE_NUTTX_MOUSE",
+                                        "name": "LV_USE_NUTTX_MOUSE",
+                                        "range": null,
+                                        "title": "Use NuttX mouse driver",
+                                        "type": "bool"
+                                    },
+                                    {
+                                        "children": [
+                                            {
+                                                "children": [],
+                                                "depends_on": "LV_USE_NUTTX_TRACE_FILE",
+                                                "help": null,
+                                                "id": "LV_NUTTX_TRACE_FILE_PATH",
+                                                "name": "LV_NUTTX_TRACE_FILE_PATH",
+                                                "range": null,
+                                                "title": "NuttX trace file path",
+                                                "type": "string"
+                                            }
+                                        ],
+                                        "depends_on": "LV_USE_NUTTX && LV_USE_PROFILER_BUILTIN",
+                                        "help": null,
+                                        "id": "LV_USE_NUTTX_TRACE_FILE",
+                                        "name": "LV_USE_NUTTX_TRACE_FILE",
+                                        "range": null,
+                                        "title": "Use NuttX trace file",
+                                        "type": "bool"
                                     }
                                 ],
                                 "depends_on": null,
@@ -47046,6 +47311,27 @@
                                 "name": "LV_USE_TFT_ESPI",
                                 "range": null,
                                 "title": "Use TFT_eSPI driver",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "LV_USE_LOVYAN_GFX",
+                                        "help": null,
+                                        "id": "LV_LGFX_USER_INCLUDE",
+                                        "name": "LV_LGFX_USER_INCLUDE",
+                                        "range": null,
+                                        "title": "Header for LovyanGFX user configuration",
+                                        "type": "string"
+                                    }
+                                ],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_LOVYAN_GFX",
+                                "name": "LV_USE_LOVYAN_GFX",
+                                "range": null,
+                                "title": "Use LovyanGFX driver",
                                 "type": "bool"
                             },
                             {
@@ -47137,6 +47423,16 @@
                                 "name": "LV_USE_GENERIC_MIPI",
                                 "range": null,
                                 "title": "Generic MIPI driver",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": null,
+                                "id": "LV_USE_NXP_ELCDIF",
+                                "name": "LV_USE_NXP_ELCDIF",
+                                "range": null,
+                                "title": "Use NXP ELCDIF to generate display",
                                 "type": "bool"
                             },
                             {

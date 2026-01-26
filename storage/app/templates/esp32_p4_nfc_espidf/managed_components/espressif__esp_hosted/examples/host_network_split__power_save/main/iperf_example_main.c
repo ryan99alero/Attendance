@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* Wi-Fi iperf Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
@@ -73,8 +78,7 @@ void iperf_hook_show_wifi_stats(iperf_traffic_type_t type, iperf_status_t status
 void app_main(void)
 {
 #if defined(CONFIG_ESP_EXT_CONN_ENABLE) && defined(CONFIG_ESP_HOST_WIFI_ENABLED)
-    esp_extconn_config_t ext_config = ESP_EXTCONN_CONFIG_DEFAULT();
-    esp_extconn_init(&ext_config);
+#error "Disable extconn as per esp-hosted-mcu doc and try again"
 #endif
 
     esp_err_t ret = nvs_flash_init();

@@ -6,4 +6,5 @@ idf_component_register(
         esp_lvgl_port
         lvgl__lvgl
         espressif__esp32_p4_function_ev_board
+        ui
 )

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+ #include <inttypes.h>
 #include "rpc_core.h"
 #include "rpc_utils.h"
 #include "rpc_slave_if.h"
@@ -17,7 +18,7 @@
 
 DEFINE_LOG_TAG(rpc_rsp);
 
-/* RPC response is result of remote function invokation at slave from host
+/* RPC response is result of remote function invocation at slave from host
  * The response will contain the return values of the RPC procedure
  * Return values typically will be simple integer return value of rpc call
  * for simple procedures. For function call with return value as a parameter,
@@ -178,25 +179,18 @@ int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp)
 	} case RPC_ID__Resp_OTABegin : {
 		RPC_FAIL_ON_NULL(resp_ota_begin);
 		RPC_ERR_IN_RESP(resp_ota_begin);
-		if (rpc_msg->resp_ota_begin->resp) {
-			ESP_LOGE(TAG, "OTA Begin Failed");
-			goto fail_parse_rpc_msg;
-		}
 		break;
 	} case RPC_ID__Resp_OTAWrite : {
 		RPC_FAIL_ON_NULL(resp_ota_write);
 		RPC_ERR_IN_RESP(resp_ota_write);
-		if (rpc_msg->resp_ota_write->resp) {
-			ESP_LOGE(TAG, "OTA write failed");
-			goto fail_parse_rpc_msg;
-		}
 		break;
 	} case RPC_ID__Resp_OTAEnd: {
 		RPC_FAIL_ON_NULL(resp_ota_end);
-		if (rpc_msg->resp_ota_end->resp) {
-			ESP_LOGE(TAG, "OTA write failed");
-			goto fail_parse_rpc_msg;
-		}
+		RPC_ERR_IN_RESP(resp_ota_end);
+		break;
+	} case RPC_ID__Resp_OTAActivate: {
+		RPC_FAIL_ON_NULL(resp_ota_activate);
+		RPC_ERR_IN_RESP(resp_ota_activate);
 		break;
 	} case RPC_ID__Resp_WifiSetMaxTxPower: {
 		RPC_FAIL_ON_NULL(resp_set_wifi_max_tx_power);
@@ -629,10 +623,50 @@ int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp)
 		RPC_FAIL_ON_NULL(resp_feature_control);
 		RPC_ERR_IN_RESP(resp_feature_control);
 		break;
+#ifdef H_PEER_DATA_TRANSFER
+	} case RPC_ID__Resp_CustomRpc: {
+		RPC_FAIL_ON_NULL(resp_custom_rpc);
+		RPC_ERR_IN_RESP(resp_custom_rpc);
+		ESP_LOGD(TAG, "Custom RPC response received: %zu bytes", rpc_msg->resp_custom_rpc->data.len);
+		app_resp->u.custom_rpc.custom_msg_id = rpc_msg->resp_custom_rpc->custom_msg_id;
+		if (rpc_msg->resp_custom_rpc->data.data && rpc_msg->resp_custom_rpc->data.len > 0) {
+			/* Allocate memory for response data */
+			app_resp->u.custom_rpc.data = (uint8_t *)g_h.funcs->_h_malloc(rpc_msg->resp_custom_rpc->data.len);
+
+			RPC_FAIL_ON_NULL_PRINT(app_resp->u.custom_rpc.data, "Malloc Failed");
+
+			if (app_resp->u.custom_rpc.data) {
+				g_h.funcs->_h_memcpy(app_resp->u.custom_rpc.data, rpc_msg->resp_custom_rpc->data.data, rpc_msg->resp_custom_rpc->data.len);
+				app_resp->u.custom_rpc.data_len = rpc_msg->resp_custom_rpc->data.len;
+				app_resp->u.custom_rpc.free_func = g_h.funcs->_h_free; /* Default free function */
+			}
+		}
+		break;
+#endif
+	} case RPC_ID__Resp_AppGetDesc: {
+		RPC_FAIL_ON_NULL(resp_app_get_desc);
+		RPC_ERR_IN_RESP(resp_app_get_desc);
+		RPC_FAIL_ON_NULL(resp_app_get_desc->app_desc);
+		// copy over the app descriptor elements
+		esp_hosted_app_desc_t *p_a = &app_resp->u.app_desc;
+		EspAppDesc *p_c = rpc_msg->resp_app_get_desc->app_desc;
+		p_a->magic_word = p_c->magic_word;
+		p_a->secure_version = p_c->secure_version;
+		RPC_RSP_COPY_BYTES(p_a->version, p_c->version);
+		RPC_RSP_COPY_BYTES(p_a->project_name, p_c->project_name);
+		RPC_RSP_COPY_BYTES(p_a->time, p_c->time);
+		RPC_RSP_COPY_BYTES(p_a->date, p_c->date);
+		RPC_RSP_COPY_BYTES(p_a->idf_ver, p_c->idf_ver);
+		RPC_RSP_COPY_BYTES(p_a->app_elf_sha256, p_c->app_elf_sha256);
+		p_a->min_efuse_blk_rev_full = p_c->min_efuse_blk_rev_full;
+		p_a->max_efuse_blk_rev_full = p_c->max_efuse_blk_rev_full;
+		p_a->mmu_page_size = p_c->mmu_page_size;
+		break;
 	} case RPC_ID__Resp_SetDhcpDnsStatus: {
 		RPC_FAIL_ON_NULL(resp_set_dhcp_dns);
 		RPC_ERR_IN_RESP(resp_set_dhcp_dns);
 		break;
+
 #if H_WIFI_ENTERPRISE_SUPPORT
 	} case RPC_ID__Resp_WifiStaEnterpriseEnable: {
 		RPC_FAIL_ON_NULL(resp_wifi_sta_enterprise_enable);
@@ -752,6 +786,38 @@ int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp)
 	} case RPC_ID__Resp_SuppDppStopListen: {
 		RPC_FAIL_ON_NULL(resp_supp_dpp_stop_listen);
 		RPC_ERR_IN_RESP(resp_supp_dpp_stop_listen);
+		break;
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+	} case RPC_ID__Resp_GpioConfig: {
+		RPC_FAIL_ON_NULL(resp_gpio_config);
+		RPC_ERR_IN_RESP(resp_gpio_config);
+		break;
+	} case RPC_ID__Resp_GpioResetPin: {
+		RPC_FAIL_ON_NULL(resp_gpio_reset);
+		RPC_ERR_IN_RESP(resp_gpio_reset);
+		break;
+	} case RPC_ID__Resp_GpioSetLevel: {
+		RPC_FAIL_ON_NULL(resp_gpio_set_level);
+		RPC_ERR_IN_RESP(resp_gpio_set_level);
+		break;
+	} case RPC_ID__Resp_GpioGetLevel: {
+		RPC_FAIL_ON_NULL(resp_gpio_get_level);
+		RPC_ERR_IN_RESP(resp_gpio_get_level);
+		app_resp->u.gpio_get_level = rpc_msg->resp_gpio_get_level->level;
+		break;
+	} case RPC_ID__Resp_GpioSetDirection: {
+		RPC_FAIL_ON_NULL(resp_gpio_set_direction);
+		RPC_ERR_IN_RESP(resp_gpio_set_direction);
+		break;
+	} case RPC_ID__Resp_GpioInputEnable: {
+		RPC_FAIL_ON_NULL(resp_gpio_input_enable);
+		RPC_ERR_IN_RESP(resp_gpio_input_enable);
+		break;
+	} case RPC_ID__Resp_GpioSetPullMode: {
+		RPC_FAIL_ON_NULL(resp_gpio_set_pull_mode);
+		RPC_ERR_IN_RESP(resp_gpio_set_pull_mode);
 		break;
 #endif
 	} default: {

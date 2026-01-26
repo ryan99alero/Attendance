@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -100,14 +100,14 @@ static serial_ll_handle_t * get_serial_ll_handle(const uint8_t iface_num)
 
 		return interface_handle_g[iface_num];
 	}
-	ESP_LOGE(TAG, "%s Failed to get interface handle", __func__);
+	ESP_LOGD(TAG, "%s Failed to get interface handle", __func__);
 	return NULL;
 }
 
 /**
   * @brief Close serial interface
   * @param  serial_ll_hdl - handle
-  * @retval rbuffer - ready buffer read on serial inerface
+  * @retval rbuffer - ready buffer read on serial interface
   */
 static int serial_ll_close(serial_ll_handle_t * serial_ll_hdl)
 {
@@ -115,6 +115,15 @@ static int serial_ll_close(serial_ll_handle_t * serial_ll_hdl)
 
 	if (serial_ll_hdl->queue) {
 		ESP_LOGI(TAG, "Clean-up serial queue");
+
+		interface_buffer_handle_t buf_handle;
+		while (g_h.funcs->_h_dequeue_item(serial_ll_hdl->queue, &buf_handle, 0) == 0) {
+			/* Free buffer using the provided free function */
+			if (buf_handle.priv_buffer_handle && buf_handle.free_buf_handle) {
+				buf_handle.free_buf_handle(buf_handle.priv_buffer_handle);
+			}
+		}
+
 		g_h.funcs->_h_destroy_queue(serial_ll_hdl->queue);
 		serial_ll_hdl->queue = NULL;
 	}
@@ -136,7 +145,7 @@ static int serial_ll_close(serial_ll_handle_t * serial_ll_hdl)
   * @brief  Serial interface read non blocking
   * @param  serial_ll_hdl - handle
   *         rlen - output param, number of bytes read
-  * @retval rbuffer - ready buffer read on serial inerface
+  * @retval rbuffer - ready buffer read on serial interface
   */
 static uint8_t * serial_ll_read(const serial_ll_handle_t * serial_ll_hdl,
 							 uint16_t * rlen)
@@ -161,7 +170,7 @@ static uint8_t * serial_ll_read(const serial_ll_handle_t * serial_ll_hdl,
 	 * To make it non blocking:
 	 *   As an another design option, serial_rx_callback can also be
 	 *   thought of incoming data indication, i.e. asynchronous rx
-	 *   indication, which can be used by higher layer in seperate
+	 *   indication, which can be used by higher layer in separate
 	 *   dedicated rx task to receive and process rx data.
 	 *
 	 * In our example, first approach of blocking read is used.
@@ -292,8 +301,8 @@ int serial_ll_rx_handler(interface_buffer_handle_t * buf_handle)
 
 	/* Is serial interface up */
 	if ((! serial_ll_hdl) || (serial_ll_hdl->state != ACTIVE)) {
-		ESP_LOGE(TAG, "Serial interface not registered yet");
-		goto serial_buff_cleanup;
+		ESP_LOGD(TAG, "Serial interface not active (possibly shutting down), discarding packet");
+		goto serial_buff_cleanup_silent;
 	}
 
 
@@ -356,8 +365,10 @@ int serial_ll_rx_handler(interface_buffer_handle_t * buf_handle)
 	return 0;
 
 serial_buff_cleanup:
+	ESP_LOGE(TAG, "Err occurred, discard current buffer");
 
-	ESP_LOGE(TAG, "Err occured, discard current buffer");
+serial_buff_cleanup_silent:
+	/* Common cleanup path - used for both errors and expected shutdown */
 	H_FREE_PTR_WITH_FUNC(buf_handle->free_buf_handle, buf_handle->priv_buffer_handle);
 
 	r.len = 0;

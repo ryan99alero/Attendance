@@ -193,7 +193,7 @@ sequenceDiagram
 
 -   `slave/main/host_power_save.h`: slave enums and APIs
 -   `slave/main/host_power_save.c`: wake-up management
--   `slave/main/lwip_filter.c`: packet inspection (for wake-up)
+-   `slave/main/nw_split_router.c`: packet inspection (for wake-up)
 
 ### Functions
 
@@ -293,7 +293,7 @@ static const char* TAG = "HOST_APP";
 
 void app_main(void)
 {
-    /* First, check the reason of host bootup. is it deep sleep? */
+    /* First, check the reason of host boot-up. is it deep sleep? */
     if (esp_hosted_woke_from_power_save()) {
         ESP_LOGI(TAG, "Host woke up from power save mode.");
     }

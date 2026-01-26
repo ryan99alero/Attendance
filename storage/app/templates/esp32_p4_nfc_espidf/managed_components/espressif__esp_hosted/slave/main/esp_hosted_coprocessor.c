@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021-2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -23,6 +23,7 @@
 #include "esp_hosted_coprocessor.h"
 #include "driver/gpio.h"
 
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #if defined(CONFIG_BT_ENABLED) && defined(CONFIG_SOC_BT_SUPPORTED)
@@ -43,14 +44,20 @@
 #include "esp_hosted_coprocessor_fw_ver.h"
 #include "esp_hosted_cli.h"
 #include "host_power_save.h"
+#ifdef CONFIG_EXAMPLE_PEER_DATA_TRANSFER
+#include "example_peer_data_transfer.h"
+#endif
+#ifdef CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_LIGHT_SLEEP
+#include "example_light_sleep.h"
+#endif
 
 #if CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
+    #include "nw_split_router.h"
 	#include "esp_hosted_rpc.pb-c.h"
 	volatile uint8_t station_got_ip = 0;
 	#define H_SLAVE_LWIP_DHCP_AT_SLAVE       1
 #endif
 
-#include "lwip_filter.h"
 
 static const char *TAG = "co-pro-main";
 
@@ -62,7 +69,6 @@ static const char *TAG = "co-pro-main";
 
 #define ETH_DATA_LEN                     1500
 #define MAX_WIFI_STA_TX_RETRY            2
-
 
 volatile uint8_t datapath = 0;
 volatile uint8_t station_connected = 0;
@@ -142,7 +148,7 @@ static uint8_t get_capabilities(void)
 	cap |= ESP_CHECKSUM_ENABLED;
 #endif
 
-#ifdef CONFIG_BT_ENABLED
+#if defined(CONFIG_SOC_BT_SUPPORTED) && defined(CONFIG_BT_ENABLED)
 	cap |= get_bluetooth_capabilities();
 #endif
 	ESP_LOGI(TAG, "capabilities: 0x%x", cap);
@@ -176,7 +182,7 @@ static uint32_t get_capabilities_ext(void)
 	ext_cap |= ESP_WLAN_UART_SUPPORT;
 #endif
 
-#ifdef CONFIG_BT_ENABLED
+#if defined(CONFIG_SOC_BT_SUPPORTED) && defined(CONFIG_BT_ENABLED)
 	ext_cap |= get_bluetooth_ext_capabilities();
 #endif
 	ESP_LOGI(TAG, "extended capabilities: 0x%"PRIx32, ext_cap);
@@ -209,7 +215,6 @@ static inline esp_err_t populate_buff_handle(interface_buffer_handle_t *buf_hand
 #define populate_wifi_buffer_handle(Buf_hdL, TypE, BuF, LeN) \
 	populate_buff_handle(Buf_hdL, TypE, BuF, LeN, esp_wifi_internal_free_rx_buffer, eb, 0, 0, 0);
 
-
 esp_err_t wlan_ap_rx_callback(void *buffer, uint16_t len, void *eb)
 {
 	interface_buffer_handle_t buf_handle = {0};
@@ -223,7 +228,7 @@ esp_err_t wlan_ap_rx_callback(void *buffer, uint16_t len, void *eb)
 	ESP_HEXLOGV("AP_Get", buffer, len, 32);
 
 #if 0
-	/* Only enable this is you want to avoid multi and bradcast
+	/* Only enable this is you want to avoid multi and broadcast
 	 * traffic to be reduced from stations to softap
 	 */
 	uint8_t * ap_buf = buffer;
@@ -272,7 +277,7 @@ esp_err_t wlan_sta_rx_callback(void *buffer, uint16_t len, void *eb)
 	hosted_l2_bridge bridge_to_use = HOST_LWIP_BRIDGE;
 
 	/* Filtering based on destination port */
-	bridge_to_use = filter_and_route_packet(buffer, len);
+	bridge_to_use = nw_split_filter_and_route_packet(buffer, len);
 
 
 	switch (bridge_to_use) {
@@ -451,7 +456,7 @@ static void host_reset_task(void* pvParameters)
 		/* send capabilities to host */
 		ESP_LOGI(TAG,"host reconfig event");
 		generate_startup_event(capa, ext_capa);
-		//send_event_to_host(RPC_ID__Event_ESPInit);
+		send_event_to_host(RPC_ID__Event_ESPInit);
 	}
 }
 
@@ -521,7 +526,6 @@ static void process_serial_rx_pkt(uint8_t *buf)
 		parse_protobuf_req();
 	}
 }
-
 
 static int host_to_slave_reconfig(uint8_t *evt_buf, uint16_t len)
 {
@@ -610,10 +614,6 @@ static int host_to_slave_reconfig(uint8_t *evt_buf, uint16_t len)
 		pos += (tag_len+2);
 		len_left -= (tag_len+2);
 	}
-#if CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
-	/* Host should be in position to get DHCP/DNS info */
-	//send_dhcp_dns_info_to_host(1, 0);
-#endif
 	return ESP_OK;
 }
 
@@ -647,7 +647,11 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 	uint8_t *payload = NULL;
 	uint16_t payload_len = 0;
 	int ret = 0;
+#ifdef CONFIG_ESP_HOSTED_WIFI_TX_RETRY_ENABLED
 	int retry_wifi_tx = MAX_WIFI_STA_TX_RETRY;
+#endif
+
+	(void)ret;
 
 	header = (struct esp_payload_header *) buf_handle->payload;
 	payload = buf_handle->payload + le16toh(header->offset);
@@ -655,9 +659,10 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 
 	ESP_HEXLOGD("bus_RX", buf_handle->payload, buf_handle->payload_len, 32);
 
-
 	if (buf_handle->if_type == ESP_STA_IF && station_connected) {
+
 		/* Forward data to wlan driver */
+#ifdef CONFIG_ESP_HOSTED_WIFI_TX_RETRY_ENABLED
 		do {
 			ret = esp_wifi_internal_tx(WIFI_IF_STA, payload, payload_len);
 			if (ret) {
@@ -666,6 +671,9 @@ static void process_rx_pkt(interface_buffer_handle_t *buf_handle)
 
 			retry_wifi_tx--;
 		} while (ret && retry_wifi_tx);
+#else
+		ret = esp_wifi_internal_tx(WIFI_IF_STA, payload, payload_len);
+#endif
 
 		ESP_HEXLOGV("STA_Put", payload, payload_len, 32);
 #if ESP_PKT_STATS
@@ -823,7 +831,6 @@ static void power_save_alert_task(void *pvParameters)
     host_power_save_alert(event);
 	/* The task deletes itself after running. */
 	if (event == ESP_POWER_SAVE_OFF) {
-		sleep(2);
 		if (host_reset_sem) {
 			xSemaphoreGive(host_reset_sem);
 		}
@@ -866,12 +873,8 @@ int event_handler(uint8_t val)
 			break;
 
 		case ESP_POWER_SAVE_OFF:
-			//if (if_handle && if_handle->state >= DEACTIVE) {
-				datapath = 1;
-				if_handle->state = ACTIVE;
-			/*} else {
-				ESP_EARLY_LOGI(TAG, "Failed to set state to ACTIVE");
-			}*/
+			datapath = 1;
+			if_handle->state = ACTIVE;
 			xTaskCreate(power_save_alert_task, "ps_alert_task", 3072, (void *)ESP_POWER_SAVE_OFF, tskIDLE_PRIORITY + 5, NULL);
 			break;
 	}
@@ -992,7 +995,6 @@ void create_slave_sta_netif(uint8_t dhcp_at_slave)
   #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
-
 static int fallback_to_sdkconfig_wifi_config(void)
 {
 	wifi_config_t wifi_config = {
@@ -1092,15 +1094,6 @@ static int connect_sta(void)
 }
 #endif
 
-
-
-static void host_wakeup_callback(void)
-{
-#if H_HOST_PS_ALLOWED
-	/* Interrupt context */
-#endif
-}
-
 esp_err_t esp_hosted_coprocessor_init(void)
 {
 	static bool esp_hosted_rcp_init_done = false;
@@ -1138,7 +1131,16 @@ esp_err_t esp_hosted_coprocessor_init(void)
 #if CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
 	ESP_ERROR_CHECK(esp_netif_init());
 #endif
-	ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+	esp_err_t ret = esp_event_loop_create_default();
+	if (ret != ESP_OK) {
+		if (ret == ESP_ERR_INVALID_STATE) {
+			ESP_LOGW(TAG, "Default event loop already created");
+		} else {
+			ESP_LOGE(TAG, "Failed to create default event loop: %s", esp_err_to_name(ret));
+			return ret;
+		}
+	}
 
 #if defined(CONFIG_ESP_GPIO_SLAVE_RESET) && (CONFIG_ESP_GPIO_SLAVE_RESET != -1)
 	register_reset_pin(CONFIG_ESP_GPIO_SLAVE_RESET);
@@ -1146,7 +1148,7 @@ esp_err_t esp_hosted_coprocessor_init(void)
 
 #if defined(CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED) && defined(CONFIG_ESP_HOSTED_HOST_RESERVED_PORTS_CONFIGURED)
 	ESP_LOGI(TAG, "Configuring host static port forwarding rules from slave kconfig");
-	configure_host_static_port_forwarding_rules(CONFIG_ESP_HOSTED_HOST_RESERVED_TCP_SRC_PORTS,
+	nw_split_config_host_static_port_fwd_rules(CONFIG_ESP_HOSTED_HOST_RESERVED_TCP_SRC_PORTS,
 												CONFIG_ESP_HOSTED_HOST_RESERVED_TCP_DEST_PORTS,
 												CONFIG_ESP_HOSTED_HOST_RESERVED_UDP_SRC_PORTS,
 												CONFIG_ESP_HOSTED_HOST_RESERVED_UDP_DEST_PORTS);
@@ -1161,14 +1163,14 @@ esp_err_t esp_hosted_coprocessor_init(void)
 	/* Endpoint for control command responses */
 	if (protocomm_add_endpoint(pc_pserial, RPC_EP_NAME_RSP,
 				data_transfer_handler, NULL) != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to add enpoint");
+		ESP_LOGE(TAG, "Failed to add endpoint");
 		return ESP_FAIL;
 	}
 
 	/* Endpoint for control notifications for events subscribed by user */
 	if (protocomm_add_endpoint(pc_pserial, RPC_EP_NAME_EVT,
 				rpc_evt_handler, NULL) != ESP_OK) {
-		ESP_LOGE(TAG, "Failed to add enpoint");
+		ESP_LOGE(TAG, "Failed to add endpoint");
 		return ESP_FAIL;
 	}
 
@@ -1212,9 +1214,7 @@ esp_err_t esp_hosted_coprocessor_init(void)
 	connect_sta();
 #endif
 
-	ESP_LOGI(TAG, "Mandate host wakeup");
 	wakeup_host_mandate(100);
-	host_power_save_init(host_wakeup_callback);
 
 	assert(xTaskCreate(host_reset_task, "host_reset_task" ,
 			CONFIG_ESP_HOSTED_DEFAULT_TASK_STACK_SIZE, NULL ,
@@ -1223,6 +1223,7 @@ esp_err_t esp_hosted_coprocessor_init(void)
 	return ESP_OK;
 }
 
+#ifdef CONFIG_ESP_HOSTED_COPROCESSOR_APP_MAIN
 void app_main(void)
 {
 	/* Initialize NVS */
@@ -1244,4 +1245,12 @@ void app_main(void)
 #endif
 #endif
 
+#ifdef CONFIG_EXAMPLE_PEER_DATA_TRANSFER
+	example_peer_data_transfer_init();
+#endif
+
+#ifdef CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_LIGHT_SLEEP
+	example_light_sleep_init();
+#endif
 }
+#endif

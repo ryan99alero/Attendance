@@ -67,6 +67,7 @@ typedef struct {
     uint8_t port;      /*!< I2S port, this port need pre-installed by other modules */
     void   *rx_handle; /*!< I2S rx handle, need provide on IDF 5.x */
     void   *tx_handle; /*!< I2S tx handle, need provide on IDF 5.x */
+    int     clk_src;   /*!< I2S clock source, need converted from `i2s_clock_src_t`. If set to 0 will use default clock source */
 } audio_codec_i2s_cfg_t;
 
 /**

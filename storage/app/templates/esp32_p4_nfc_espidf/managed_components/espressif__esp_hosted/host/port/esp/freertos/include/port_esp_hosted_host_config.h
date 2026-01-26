@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -10,12 +10,19 @@
 #include "sdkconfig.h"
 #include "esp_task.h"
 
+#include "esp_wifi_remote.h"
+
 #ifdef CONFIG_ESP_HOSTED_ENABLED
   #define H_ESP_HOSTED_HOST 1
 #endif
 
 #ifdef CONFIG_ESP_HOSTED_DFLT_TASK_STACK
   #define H_ESP_HOSTED_DFLT_TASK_STACK CONFIG_ESP_HOSTED_DFLT_TASK_STACK
+#endif
+#ifdef CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM
+    #define H_DFLT_TASK_FROM_SPIRAM (1)
+#else
+    #define H_DFLT_TASK_FROM_SPIRAM (0)
 #endif
 
 // to allow external code to override Hosted Functions if required
@@ -369,6 +376,12 @@ enum {
 
 /* --------------------- Common slave reset strategy ------------------- */
 
+#if defined(CONFIG_ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE)
+  #define H_TRANSPORT_RESTART_ON_FAILURE 1
+#else
+  #define H_TRANSPORT_RESTART_ON_FAILURE 0
+#endif
+
 #if defined(CONFIG_ESP_HOSTED_SLAVE_RESET_ON_EVERY_HOST_BOOTUP)
   /* Always reset the slave when host boots up
    * This ensures a clean transport state and prevents any inconsistent states,
@@ -423,7 +436,7 @@ enum {
 #endif
 
 #if H_SLAVE_RESET_ON_EVERY_HOST_BOOTUP && H_SLAVE_RESET_ONLY_IF_NECESSARY
-  #error "Invalid combination. Reset on every bootup and reset only if necessary cannot be enabled at the same time"
+  #error "Invalid combination. Reset on every boot-up and reset only if necessary cannot be enabled at the same time"
 #endif
 
 #if H_SLAVE_RESET_ON_EVERY_HOST_BOOTUP && H_HOST_RESTART_NO_COMMUNICATION_WITH_SLAVE
@@ -446,8 +459,6 @@ enum {
   #define H_WIFI_TX_DATA_THROTTLE_LOW_THRESHOLD        0
   #define H_WIFI_TX_DATA_THROTTLE_HIGH_THRESHOLD       0
 #endif
-
-#define H_PKT_STATS                                  CONFIG_ESP_HOSTED_PKT_STATS
 
 /* Raw Throughput Testing */
 #define H_TEST_RAW_TP     CONFIG_ESP_HOSTED_RAW_THROUGHPUT_TRANSPORT
@@ -472,9 +483,10 @@ enum {
 #endif
 
 /* ----------------------- Enable packet stats ------------------------------- */
-#ifdef CONFIG_ESP_PKT_STATS
+
+#ifdef CONFIG_ESP_HOSTED_PKT_STATS
   #define ESP_PKT_STATS 1
-  #define ESP_PKT_STATS_REPORT_INTERVAL  CONFIG_ESP_PKT_STATS_INTERVAL_SEC
+  #define ESP_PKT_STATS_REPORT_INTERVAL  CONFIG_ESP_HOSTED_PKT_STATS_INTERVAL_SEC
 #endif
 
 /* ----------------- Host to slave Wi-Fi flow control ------------------------ */
@@ -510,6 +522,14 @@ enum {
   #define H_HOST_WAKEUP_GPIO_LEVEL 1 /* High */
 #endif
 
+// adjust this value if co-processor needs more time to be ready
+// after reset from host
+#if CONFIG_ESP_HOSTED_SDIO_RESET_DELAY_MS
+  #define H_HOST_SDIO_RESET_DELAY_MS CONFIG_ESP_HOSTED_SDIO_RESET_DELAY_MS
+#else
+  #define H_HOST_SDIO_RESET_DELAY_MS 1500
+#endif
+
 /* Conflict checks for host power save configuration */
 #if (H_HOST_PS_ALLOWED == 1)
   #if (H_HOST_WAKEUP_GPIO == -1)
@@ -536,6 +556,17 @@ enum {
 #endif
 
 /*  ---------------------- ESP-IDF Specific Config end ----------------------  */
+
+/* --------------------- Custom RPC ----------------------------------------- */
+#ifdef CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+  #define H_PEER_DATA_TRANSFER 1
+
+  #ifdef CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS
+    #define H_MAX_CUSTOM_MSG_HANDLERS CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS
+  #endif
+#else
+  #define H_PEER_DATA_TRANSFER 0
+#endif
 
 /* --------------------- Network Split -------------------------------------- */
 #ifdef CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
@@ -569,5 +600,11 @@ enum {
 
 esp_err_t esp_hosted_set_default_config(void);
 bool esp_hosted_is_config_valid(void);
+
+#if CONFIG_ESP_HOSTED_ENABLE_GPIO_EXPANDER
+  #define H_GPIO_EXPANDER_SUPPORT 1
+#else
+  #define H_GPIO_EXPANDER_SUPPORT 0
+#endif
 
 #endif /*__ESP_HOSTED_CONFIG_H__*/

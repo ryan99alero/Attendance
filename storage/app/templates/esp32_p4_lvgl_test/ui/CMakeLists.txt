@@ -1,10 +1,18 @@
-# SquareLine Studio UI Component
+SET(SOURCES ui_comp_backgroundcontainer.c
+    ui_comp.c
+    ui_screen_mainscreen.c
+    ui_screen_adminlogin.c
+    ui_screen_setupconfigurations.c
+    ui_screen_wifisetup.c
+    ui_screen_wiredsetup.c
+    ui_screen_deviceinformation.c
+    ui_screen_timeinformation.c
+    ui.c
+    ui_comp_hook.c
+    ui_helpers.c
+    ui_events.c
+    ui_img_baseline_wifi_black_36dp_png.c
+    fonts/ui_font_Icon2.c
+    fonts/ui_font_Icons.c)
 
-# Collect all .c files in the ui directory
-file(GLOB_RECURSE UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.c)
-
-idf_component_register(
-    SRCS ${UI_SOURCES}
-    INCLUDE_DIRS "."
-    REQUIRES lvgl__lvgl
-)
+add_library(ui ${SOURCES})

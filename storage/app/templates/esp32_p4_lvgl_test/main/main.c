@@ -11,11 +11,9 @@
 #include "bsp/esp32_p4_function_ev_board.h"
 #include "bsp/display.h"
 #include "lvgl.h"
+#include "ui.h"
 
 static const char *TAG = "LVGL_TEST";
-
-// SquareLine Studio UI initialization (will be provided by ui/ui.h)
-extern void ui_init(void);
 
 void app_main(void)
 {
@@ -23,7 +21,11 @@ void app_main(void)
 
     // Initialize BSP (display, touch, etc.)
     ESP_LOGI(TAG, "Initializing BSP...");
-    ESP_ERROR_CHECK(bsp_display_start());
+    lv_display_t *disp = bsp_display_start();
+    if (disp == NULL) {
+        ESP_LOGE(TAG, "Failed to initialize BSP display");
+        return;
+    }
     ESP_LOGI(TAG, "BSP initialized");
 
     // Turn on display backlight

@@ -46,7 +46,7 @@ DEFINE_LOG_TAG(rpc_req);
     InIt_FuN(MsG_StRuCt);                                                     \
 }
 
-/* RPC request is simple remote function invokation at slave from host
+/* RPC request is simple remote function invocation at slave from host
  *
  * For new RPC request, add up switch case for your message
  * If the RPC function to be invoked does not carry any arguments, just add
@@ -70,6 +70,7 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 	case RPC_ID__Req_WifiGetPs:
 	case RPC_ID__Req_OTABegin:
 	case RPC_ID__Req_OTAEnd:
+	case RPC_ID__Req_OTAActivate:
 	case RPC_ID__Req_WifiDeinit:
 	case RPC_ID__Req_WifiStart:
 	case RPC_ID__Req_WifiStop:
@@ -91,6 +92,7 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 	case RPC_ID__Req_WifiStaGetAid:
 	case RPC_ID__Req_WifiGetBand:
 	case RPC_ID__Req_WifiGetBandMode:
+	case RPC_ID__Req_AppGetDesc:
 #if H_WIFI_ENTERPRISE_SUPPORT
 	case RPC_ID__Req_WifiStaEnterpriseEnable:
 	case RPC_ID__Req_WifiStaEnterpriseDisable:
@@ -170,11 +172,11 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 		req_payload->enable = app_req->u.e_heartbeat.enable;
 		req_payload->duration = app_req->u.e_heartbeat.duration;
 		if (req_payload->enable) {
-			ESP_LOGW(TAG, "Enable heartbeat with duration %ld\n", (long int)req_payload->duration);
+			ESP_LOGD(TAG, "Enable heartbeat with duration %ld", (long int)req_payload->duration);
 			if (CALLBACK_AVAILABLE != is_event_callback_registered(RPC_ID__Event_Heartbeat))
-				ESP_LOGW(TAG, "Note: ** Subscribe heartbeat event to get notification **\n");
+				ESP_LOGD(TAG, "Note: ** Subscribe heartbeat event to get notification **");
 		} else {
-			ESP_LOGI(TAG, "Disable Heartbeat\n");
+			ESP_LOGD(TAG, "Disable Heartbeat");
 		}
 		break;
 	} case RPC_ID__Req_WifiInit: {
@@ -689,6 +691,7 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 		RPC_REQ_COPY_STR(p_c->dhcp_gw, p_a->dhcp_gw, 64);
 		RPC_REQ_COPY_STR(p_c->dns_ip, p_a->dns_ip, 64);
 		break;
+
 #if H_WIFI_ENTERPRISE_SUPPORT
 	} case RPC_ID__Req_EapSetIdentity: {
 		RPC_ALLOC_ASSIGN(RpcReqEapSetIdentity, req_eap_set_identity,
@@ -816,6 +819,71 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 			str_len = strlen(p_a->info);
 			RPC_REQ_COPY_BYTES(p_c->info, (uint8_t *)p_a->info, str_len + 1);
 		}
+		break;
+#endif
+
+#ifdef H_PEER_DATA_TRANSFER
+	} case RPC_ID__Req_CustomRpc: {
+		RPC_ALLOC_ASSIGN(RpcReqCustomRpc, req_custom_rpc,
+				rpc__req__custom_rpc__init);
+		esp_hosted_rpc_data_t *custom_data = &app_req->u.custom_rpc;
+		req_payload->custom_msg_id = custom_data->custom_msg_id;
+		if (custom_data->data && custom_data->data_len > 0) {
+			req_payload->data.data = custom_data->data;
+			req_payload->data.len = custom_data->data_len;
+		}
+		break;
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+	} case RPC_ID__Req_GpioConfig: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioConfig, req_gpio_config,
+				rpc__req__gpio_config__init);
+		RPC_ALLOC_ELEMENT(RpcGpioConfig, req_payload->config, rpc__gpio_config__init);
+
+		req_payload->config->pin_bit_mask = app_req->u.gpio_config.pin_bit_mask;
+		req_payload->config->intr_type = app_req->u.gpio_config.intr_type;
+		req_payload->config->mode = app_req->u.gpio_config.mode;
+		req_payload->config->pull_up_en = app_req->u.gpio_config.pull_up_en;
+		req_payload->config->pull_down_en = app_req->u.gpio_config.pull_down_en;
+		break;
+	} case RPC_ID__Req_GpioResetPin: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioResetPin, req_gpio_reset_pin,
+				rpc__req__gpio_reset_pin__init);
+		req_payload->gpio_num = app_req->u.gpio_num;
+		break;
+	} case RPC_ID__Req_GpioSetLevel: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioSetLevel, req_gpio_set_level,
+				rpc__req__gpio_set_level__init);
+
+		req_payload->gpio_num = app_req->u.gpio_set_level.gpio_num;
+		req_payload->level = app_req->u.gpio_set_level.level;
+		break;
+	} case RPC_ID__Req_GpioGetLevel: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioGetLevel, req_gpio_get_level,
+				rpc__req__gpio_get_level__init);
+
+		req_payload->gpio_num = app_req->u.gpio_num;
+		break;
+	} case RPC_ID__Req_GpioSetDirection: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioSetDirection, req_gpio_set_direction,
+				rpc__req__gpio_set_direction__init);
+
+		req_payload->gpio_num = app_req->u.gpio_set_direction.gpio_num;
+		req_payload->mode = app_req->u.gpio_set_direction.mode;
+		break;
+	} case RPC_ID__Req_GpioInputEnable: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioInputEnable, req_gpio_input_enable,
+				rpc__req__gpio_input_enable__init);
+
+		req_payload->gpio_num = app_req->u.gpio_num;
+		break;
+	} case RPC_ID__Req_GpioSetPullMode: {
+		RPC_ALLOC_ASSIGN(RpcReqGpioSetPullMode, req_gpio_set_pull_mode,
+				rpc__req__gpio_set_pull_mode__init);
+
+		req_payload->gpio_num = app_req->u.gpio_set_pull_mode.gpio_num;
+		req_payload->pull = app_req->u.gpio_set_pull_mode.pull_mode;
 		break;
 #endif
 	} default: {

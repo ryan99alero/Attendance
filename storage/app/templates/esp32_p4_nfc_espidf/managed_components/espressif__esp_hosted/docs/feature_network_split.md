@@ -88,7 +88,7 @@ It is especially useful when the host sleeps — the ESP continues handling sele
 
 ## Packet Routing Decisions
 
-All incoming network packets arriving at the slave device are evaluated by the logic in `lwip_filter.c`. For each packet received from the WiFi router, the slave determines whether it should be processed locally, forwarded to the host, or handled by both network stacks, according to defined routing rules.
+All incoming network packets arriving at the slave device are evaluated by the logic in `nw_split_router.c`. For each packet received from the WiFi router, the slave determines whether it should be processed locally, forwarded to the host, or handled by both network stacks, according to defined routing rules.
 
 | Packet Type                            | Destination Port Condition                 | Routed To                          |
 |--------------------------------------- |--------------------------------------------|------------------------------------|
@@ -105,7 +105,7 @@ All incoming network packets arriving at the slave device are evaluated by the l
 
 > [!TIP]
 >
-> The packet routing logic is fully customizable within the `lwip_filter.c` file, allowing users to adapt the network management behavior to their specific requirements.
+> The packet routing logic is fully customizable within the `nw_split_router.c` file, allowing users to adapt the network management behavior to their specific requirements.
 
 The following diagrams illustrate the decision-making process for packet routing in the Network Split feature.
 
@@ -168,8 +168,8 @@ flowchart TD
 ### Core Routing API
 
 ```c
-// lwip_filter.c
-hosted_l2_bridge filter_and_route_packet(void *frame_data, uint16_t frame_length);
+// nw_split_router.c
+hosted_l2_bridge nw_split_filter_and_route_packet(void *frame_data, uint16_t frame_length);
 
 typedef enum {
     SLAVE_LWIP_BRIDGE = 0,
@@ -193,7 +193,7 @@ static bool host_mqtt_wakeup_triggered(const void *payload, uint16_t length) {
 
 ### Use Same Port on Both Sides?
 
-Yes — port 5001 (iperf) is a working example. Others can be added similarly in `lwip_filter.c`.
+Yes — port 5001 (iperf) is a working example. Others can be added similarly in `nw_split_router.c`.
 
 ---
 
@@ -201,7 +201,7 @@ Yes — port 5001 (iperf) is a working example. Others can be added similarly in
 
 | Purpose          | File                                   |
 | ---------------- | -------------------------------------- |
-| Routing logic    | `slave/main/lwip_filter.c`             |
+| Routing logic    | `slave/main/nw_split_router.c`             |
 | Host-side config | `host/api/include/esp_hosted_config.h` |
 | Slave control    | `slave/main/interface.h`               |
 | API entry point  | `esp_hosted_init()`                    |
@@ -212,16 +212,16 @@ Yes — port 5001 (iperf) is a working example. Others can be added similarly in
 ### Checklist
 
 - Port ranges must not overlap
-- Logs from `lwip_filter.c` help debug routing
+- Logs from `nw_split_router.c` help debug routing
 - Static forwarding can override port ranges
 - Only supported on ESP32-C5/C6/S2/S3
 
 ### Debug Logging
 
-Enable verbose logs in `lwip_filter.c`:
+Enable verbose logs in `nw_split_router.c`:
 
 ```c
-esp_log_level_set("lwip_filter", ESP_LOG_VERBOSE);
+esp_log_level_set("nw_split_router", ESP_LOG_VERBOSE);
 ```
 
 Wi-Fi sniffer to inspect raw traffic (if really needed)

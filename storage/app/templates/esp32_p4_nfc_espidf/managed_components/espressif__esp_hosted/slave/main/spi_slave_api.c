@@ -1,5 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0 */
-/* Copyright 2015-2025 Espressif Systems (Shanghai) PTE LTD */
+/*
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include "sdkconfig.h"
 #include <stdlib.h>
@@ -12,6 +15,7 @@
 #include "driver/spi_slave.h"
 #include "driver/gpio.h"
 #include "endian.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "mempool.h"
 #include "stats.h"
@@ -142,7 +146,7 @@ static inline void spi_mempool_create(void)
 {
 	buf_mp_tx_g = hosted_mempool_create(NULL, 0,
 			SPI_MEMPOOL_NUM_BLOCKS, SPI_BUFFER_SIZE);
-	/* re-use the mempool, as same size, can be seperate, if needed */
+	/* reuse the mempool, as same size, can be separate, if needed */
 	buf_mp_rx_g = buf_mp_tx_g;
 	trans_mp_g = hosted_mempool_create(NULL, 0,
 			SPI_MEMPOOL_NUM_BLOCKS, sizeof(spi_slave_transaction_t));
@@ -806,7 +810,7 @@ static int32_t esp_spi_write(interface_handle_t *handle, interface_buffer_handle
 
 	total_len = buf_handle->payload_len + sizeof (struct esp_payload_header);
 
-	/* make the adresses dma aligned */
+	/* make the addresses dma aligned */
 	if (!IS_SPI_DMA_ALIGNED(total_len)) {
 		MAKE_SPI_DMA_ALIGNED(total_len);
 	}

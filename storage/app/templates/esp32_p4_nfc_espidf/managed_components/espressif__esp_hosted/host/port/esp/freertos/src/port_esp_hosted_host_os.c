@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -53,6 +53,8 @@ wifi_osi_funcs_t g_wifi_osi_funcs;
 
 ESP_EVENT_DECLARE_BASE(WIFI_EVENT);
 struct hosted_config_t g_h = HOSTED_CONFIG_INIT_DEFAULT();
+
+ESP_EVENT_DEFINE_BASE(ESP_HOSTED_EVENT);
 
 struct timer_handle_t {
 	esp_timer_handle_t timer_id;
@@ -160,7 +162,31 @@ void *hosted_thread_create(const char *tname, uint32_t tprio, uint32_t tstack_si
 		return NULL;
 	}
 
+#if H_DFLT_TASK_FROM_SPIRAM
+	StaticTask_t *task_buffer = heap_caps_calloc(1, sizeof(StaticTask_t), MALLOC_CAP_INTERNAL);
+	if (!task_buffer) {
+		ESP_LOGE(TAG, "Failed to allocate task buffer");
+		HOSTED_FREE(thread_handle);
+		return NULL;
+	}
+	StackType_t *thread_stack = heap_caps_malloc(tstack_size, MALLOC_CAP_SPIRAM);
+	if (!thread_stack) {
+		ESP_LOGE(TAG, "Failed to allocate thread stack");
+		heap_caps_free(task_buffer);
+		HOSTED_FREE(thread_handle);
+		return NULL;
+	}
+
+	task_created = pdTRUE;
+	*thread_handle = xTaskCreateStatic((void (*)(void *))start_routine, tname, tstack_size, sr_arg, tprio, thread_stack, task_buffer);
+	if (!*thread_handle) {
+		heap_caps_free(thread_stack);
+		heap_caps_free(task_buffer);
+		task_created = pdFALSE;
+	}
+#else
 	task_created = xTaskCreate((void (*)(void *))start_routine, tname, tstack_size, sr_arg, tprio, thread_handle);
+#endif
 	if (!(*thread_handle)) {
 		ESP_LOGE(TAG, "Failed to create thread: %s\n", tname);
 		HOSTED_FREE(thread_handle);
@@ -590,6 +616,12 @@ void hosted_unlock_mempool(void *lock_handle)
 	assert(lock_handle);
 	portEXIT_CRITICAL((spinlock_handle_t *)lock_handle);
 }
+
+void hosted_destroy_lock_mempool(void *lock_handle)
+{
+	assert(lock_handle);
+	HOSTED_FREE(lock_handle);
+}
 #endif
 /* -------- Timers  ---------- */
 int hosted_timer_stop(void *timer_handle)
@@ -682,6 +714,11 @@ void *hosted_timer_start(const char *name, int duration_ms, int type,
 	}
 
 	return timer_handle;
+}
+
+uint64_t hosted_get_time_ms(void)
+{
+	return esp_timer_get_time() / 1000;  // Convert microseconds to milliseconds
 }
 
 
@@ -790,13 +827,21 @@ int hosted_wifi_event_post(int32_t event_id,
 	return esp_event_post(WIFI_EVENT, event_id, event_data, event_data_size, ticks_to_wait);
 }
 
+int hosted_event_post(esp_event_base_t event_base, int32_t event_id,
+		void* event_data, size_t event_data_size, uint32_t ticks_to_wait)
+{
+	ESP_LOGV(TAG, "base %s, event %ld recvd --> event_data:%p event_data_size: %u",event_base,event_id, event_data, event_data_size);
+	return esp_event_post(event_base, event_id, event_data, event_data_size, ticks_to_wait);
+}
+
 void hosted_log_write(int  level,
 					const char *tag,
 					const char *format, ...)
 {
 	va_list list;
 	va_start(list, format);
-	printf(format, list);
+	/* Use ESP-IDF logging system with proper level and tag */
+	esp_log_writev((esp_log_level_t)level, tag, format, list);
 	va_end(list);
 }
 
@@ -899,18 +944,20 @@ hosted_osi_funcs_t g_hosted_osi_funcs = {
 	._h_destroy_semaphore        =  hosted_destroy_semaphore       ,
 	._h_timer_stop               =  hosted_timer_stop              ,
 	._h_timer_start              =  hosted_timer_start             ,
+	._h_get_time_ms              =  hosted_get_time_ms             ,
 #ifdef H_USE_MEMPOOL
 	._h_create_lock_mempool      =  hosted_create_lock_mempool     ,
 	._h_lock_mempool             =  hosted_lock_mempool            ,
 	._h_unlock_mempool           =  hosted_unlock_mempool          ,
+	._h_destroy_lock_mempool     =  hosted_destroy_lock_mempool    ,
 #endif
 	._h_config_gpio              =  hosted_config_gpio             ,
 	._h_config_gpio_as_interrupt =  hosted_setup_gpio_interrupt,
-	._h_teardown_gpio_interrupt  = hosted_teardown_gpio_interrupt,
-	._h_hold_gpio                = hosted_hold_gpio,
+	._h_teardown_gpio_interrupt  =  hosted_teardown_gpio_interrupt,
+	._h_hold_gpio                =  hosted_hold_gpio,
 	._h_read_gpio                =  hosted_read_gpio               ,
 	._h_write_gpio               =  hosted_write_gpio              ,
-	._h_pull_gpio                = hosted_pull_gpio,
+	._h_pull_gpio                =  hosted_pull_gpio,
 
 	._h_get_host_wakeup_or_reboot_reason = hosted_get_host_wakeup_or_reboot_reason,
 
@@ -926,6 +973,7 @@ hosted_osi_funcs_t g_hosted_osi_funcs = {
 	._h_bus_init                 =  hosted_sdio_init               ,
 	._h_bus_deinit               =  hosted_sdio_deinit             ,
 	._h_sdio_card_init           =  hosted_sdio_card_init          ,
+	._h_sdio_card_deinit         =  hosted_sdio_card_deinit        ,
 	._h_sdio_read_reg            =  hosted_sdio_read_reg           ,
 	._h_sdio_write_reg           =  hosted_sdio_write_reg          ,
 	._h_sdio_read_block          =  hosted_sdio_read_block         ,
@@ -933,23 +981,25 @@ hosted_osi_funcs_t g_hosted_osi_funcs = {
 	._h_sdio_wait_slave_intr     =  hosted_sdio_wait_slave_intr    ,
 #endif
 #if H_TRANSPORT_IN_USE == H_TRANSPORT_SPI_HD
-	._h_bus_init                 =  hosted_spi_hd_init               ,
-	._h_bus_deinit               =  hosted_spi_hd_deinit             ,
-	._h_spi_hd_read_reg          =  hosted_spi_hd_read_reg           ,
-	._h_spi_hd_write_reg         =  hosted_spi_hd_write_reg          ,
-	._h_spi_hd_read_dma          =  hosted_spi_hd_read_dma           ,
-	._h_spi_hd_write_dma         =  hosted_spi_hd_write_dma          ,
-	._h_spi_hd_set_data_lines    =  hosted_spi_hd_set_data_lines     ,
-	._h_spi_hd_send_cmd9         =  hosted_spi_hd_send_cmd9          ,
+	._h_bus_init                 =  hosted_spi_hd_init             ,
+	._h_bus_deinit               =  hosted_spi_hd_deinit           ,
+	._h_spi_hd_read_reg          =  hosted_spi_hd_read_reg         ,
+	._h_spi_hd_write_reg         =  hosted_spi_hd_write_reg        ,
+	._h_spi_hd_read_dma          =  hosted_spi_hd_read_dma         ,
+	._h_spi_hd_write_dma         =  hosted_spi_hd_write_dma        ,
+	._h_spi_hd_set_data_lines    =  hosted_spi_hd_set_data_lines   ,
+	._h_spi_hd_send_cmd9         =  hosted_spi_hd_send_cmd9        ,
 #endif
 #if H_TRANSPORT_IN_USE == H_TRANSPORT_UART
-	._h_bus_init                 = hosted_uart_init                ,
-	._h_bus_deinit               = hosted_uart_deinit              ,
-	._h_uart_read                = hosted_uart_read                ,
-	._h_uart_write               = hosted_uart_write               ,
+	._h_bus_init                 =  hosted_uart_init               ,
+	._h_bus_deinit               =  hosted_uart_deinit             ,
+	._h_uart_read                =  hosted_uart_read               ,
+	._h_uart_write               =  hosted_uart_write              ,
+	._h_uart_flush_input         =  hosted_uart_flush_input        ,
 #endif
-	._h_restart_host             = hosted_restart_host             ,
+	._h_restart_host             =  hosted_restart_host            ,
 
 	._h_config_host_power_save_hal_impl = hosted_config_host_power_save,
 	._h_start_host_power_save_hal_impl = hosted_start_host_power_save,
+	._h_event_post               =  hosted_event_post              ,
 };

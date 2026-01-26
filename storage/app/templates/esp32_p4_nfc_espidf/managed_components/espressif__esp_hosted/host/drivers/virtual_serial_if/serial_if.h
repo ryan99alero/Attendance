@@ -1,5 +1,8 @@
-// Copyright 2015-2022 Espressif Systems (Shanghai) PTE LTD
-/* SPDX-License-Identifier: GPL-2.0-only OR Apache-2.0 */
+/*
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /** prevent recursive inclusion **/
 #ifndef __SERIAL_IF_H
@@ -25,7 +28,7 @@
 uint16_t compose_tlv(uint8_t* buf, uint8_t* data, uint16_t data_length);
 
 /* Parse the protobuf encoded data in format of tag, length and value
- * Thi will help application to decode protobuf payload and payload length
+ * This will help application to decode protobuf payload and payload length
  **/
 uint8_t parse_tlv(uint8_t* data, uint32_t* pro_len);
 

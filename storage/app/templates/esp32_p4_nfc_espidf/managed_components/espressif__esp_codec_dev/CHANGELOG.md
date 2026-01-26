@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.5.4
+
+### Feature
+
+- Added support for I2S clock source configuration, primarily for low-power applications
+
+### Bug Fixed
+
+- Fixed header dependency issue for compatibility with ESP-IDF v6.0
+
+## v1.5.3
+
+### Bug Fixed
+
+- Fixed the ES8389 no-sound playback issue.
+
+## v1.5.2
+
+### Bug Fixed
+
+- Fixed race condition when duplex I2S used by multiple data interface and run open in parallel.
+
 ## v1.5.1
 
 ### Bug Fixed

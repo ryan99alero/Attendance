@@ -15,9 +15,10 @@ extern "C" {
 /** Includes **/
 #include "esp_wifi.h"
 #include "port_esp_hosted_host_wifi_config.h"
+#include "port_esp_hosted_host_config.h"
 #include "esp_mac.h"
 #include "esp_hosted_api_types.h"
-#include "esp_hosted_ota.h"
+#include "esp_hosted_misc.h"
 
 #if H_WIFI_ENTERPRISE_SUPPORT
 #include "esp_eap_client.h"
@@ -25,7 +26,9 @@ extern "C" {
 #if H_DPP_SUPPORT
 #include "esp_dpp.h"
 #endif
-
+#if H_GPIO_EXPANDER_SUPPORT
+#include "esp_hosted_cp_gpio.h"
+#endif
 /** Exported variables **/
 
 /** Inline functions **/
@@ -93,9 +96,13 @@ esp_err_t rpc_bt_controller_disable(void);
 esp_err_t rpc_iface_mac_addr_set_get(bool set, uint8_t *mac, size_t mac_len, esp_mac_type_t type);
 esp_err_t rpc_iface_mac_addr_len_get(size_t *len, esp_mac_type_t type);
 
+esp_err_t rpc_iface_get_coprocessor_app_desc(esp_hosted_app_desc_t *app_desc);
+esp_err_t rpc_iface_configure_heartbeat(bool enable, int duration_sec);
+
 esp_err_t rpc_ota_begin(void);
 esp_err_t rpc_ota_write(uint8_t* ota_data, uint32_t ota_data_len);
 esp_err_t rpc_ota_end(void);
+esp_err_t rpc_ota_activate(void);
 
 #if H_WIFI_HE_SUPPORT
 esp_err_t rpc_wifi_sta_twt_config(wifi_twt_config_t *config);

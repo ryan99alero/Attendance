@@ -2,7 +2,10 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Set the components to search for dependencies
-set(EXTRA_COMPONENT_DIRS $ENV{IDF_PATH}/examples/common_components/protocol_examples_common)
+set(EXTRA_COMPONENT_DIRS
+    $ENV{IDF_PATH}/examples/common_components/protocol_examples_common
+    ui
+)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(esp32_p4_nfc_reader)

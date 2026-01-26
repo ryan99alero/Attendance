@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -13,6 +13,8 @@
 #include "esp_wifi.h"
 #include "esp_mac.h"
 #include "esp_wifi_types.h"
+#include "esp_hosted_misc.h"
+#include "port_esp_hosted_host_config.h"
 #include "port_esp_hosted_host_wifi_config.h"
 
 #if H_WIFI_ENTERPRISE_SUPPORT
@@ -267,6 +269,10 @@ typedef struct {
 #endif
 
 typedef struct {
+	uint32_t cp_reset_reason;
+} event_init_t;
+
+typedef struct {
 	/* event */
 	uint32_t hb_num;
 	/* Req */
@@ -277,6 +283,7 @@ typedef struct {
 typedef struct {
 	int32_t wifi_event_id;
 } event_wifi_simple_t;
+
 
 #if H_WIFI_ENTERPRISE_SUPPORT
 typedef struct {
@@ -333,6 +340,43 @@ typedef struct {
 typedef struct {
 	const char *domain_name;
 } rpc_eap_domain_name_t;
+#endif
+
+#ifdef H_PEER_DATA_TRANSFER
+typedef struct {
+	uint32_t custom_msg_id;     /* Not used - kept for struct compatibility */
+	uint8_t *data;              /* Pointer to raw data */
+	size_t data_len;            /* Length of data */
+	void (*free_func)(void *);  /* Optional: function to free data after use */
+} esp_hosted_rpc_data_t;
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+typedef struct {
+	uint64_t pin_bit_mask;   /*!< GPIO pin: set with bit mask, each bit maps to a GPIO */
+	uint32_t mode;           /*!< GPIO mode: set input/output mode                     */
+	uint32_t pull_up_en;     /*!< GPIO pull-up                                         */
+	uint32_t pull_down_en;   /*!< GPIO pull-down                                       */
+	uint32_t intr_type;      /*!< GPIO interrupt type                                  */
+	//#if SOC_GPIO_SUPPORT_PIN_HYS_FILTER
+	//    uint32_t hys_ctrl_mode;       /*!< GPIO hysteresis: hysteresis filter on slope input    */
+	//#endif
+} rpc_gpio_config_t;
+
+typedef struct {
+	uint32_t gpio_num;
+	uint32_t level;
+} rpc_gpio_set_level_t;
+
+typedef struct {
+	uint32_t gpio_num;
+	uint32_t mode;
+} rpc_gpio_set_direction_t;
+
+typedef struct {
+	uint32_t gpio_num;
+	uint32_t pull_mode;
+} rpc_gpio_set_pull_mode_t;
 #endif
 
 typedef struct Ctrl_cmd_t {
@@ -405,7 +449,11 @@ typedef struct Ctrl_cmd_t {
 		bool                        bt_mem_release;
 
 		rcp_feature_control_t       feature_control;
+#ifdef H_PEER_DATA_TRANSFER
+		esp_hosted_rpc_data_t       custom_rpc;
+#endif
 
+		esp_hosted_app_desc_t       app_desc;
 #if H_WIFI_HE_SUPPORT
 		wifi_twt_config_t           wifi_twt_config;
 
@@ -444,6 +492,7 @@ typedef struct Ctrl_cmd_t {
 		rpc_supp_dpp_bootstrap_gen_t dpp_bootstrap_gen;
 #endif
 
+		event_init_t                e_init;
 
 		event_heartbeat_t           e_heartbeat;
 
@@ -505,6 +554,20 @@ typedef struct Ctrl_cmd_t {
 		supp_wifi_event_dpp_config_received_t e_dpp_config_received;
 
 		supp_wifi_event_dpp_failed_t   e_dpp_failed;
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+		rpc_gpio_config_t           gpio_config;
+
+		uint32_t                    gpio_num;
+
+		rpc_gpio_set_level_t        gpio_set_level;
+
+		int                         gpio_get_level;
+
+		rpc_gpio_set_direction_t    gpio_set_direction;
+
+		rpc_gpio_set_pull_mode_t    gpio_set_pull_mode;
 #endif
 	}u;
 
@@ -639,7 +702,7 @@ ctrl_cmd_t * rpc_slaveif_wifi_set_mode(ctrl_cmd_t *req);
 /* Sets maximum WiFi transmitting power at ESP32 */
 ctrl_cmd_t * rpc_slaveif_wifi_set_max_tx_power(ctrl_cmd_t *req);
 
-/* Gets maximum WiFi transmiting power at ESP32 */
+/* Gets maximum WiFi transmitting power at ESP32 */
 ctrl_cmd_t * rpc_slaveif_wifi_get_max_tx_power(ctrl_cmd_t *req);
 
 /* Configure heartbeat event. Be default heartbeat is not enabled.
@@ -662,6 +725,10 @@ ctrl_cmd_t * rpc_slaveif_ota_write(ctrl_cmd_t *req);
  * sets newly written OTA partition as boot partition for next boot,
  * Creates timer which reset ESP32 after 5 sec */
 ctrl_cmd_t * rpc_slaveif_ota_end(ctrl_cmd_t *req);
+
+/* Performs an OTA activate operation for ESP32, It reboots the ESP32
+ * to activate the newly written OTA partition */
+ctrl_cmd_t * rpc_slaveif_ota_activate(ctrl_cmd_t *req);
 
 /* Gets the co-processor FW Version */
 ctrl_cmd_t * rpc_slaveif_get_coprocessor_fwversion(ctrl_cmd_t *req);
@@ -714,9 +781,10 @@ ctrl_cmd_t * rpc_slaveif_wifi_get_band_mode(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_set_slave_dhcp_dns_status(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_iface_mac_addr_set_get(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_feature_control(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_get_coprocessor_app_desc(ctrl_cmd_t *req);
 
 ctrl_cmd_t * rpc_slaveif_iface_mac_addr_set_get(ctrl_cmd_t *req);
-ctrl_cmd_t * rpc_slave_feature_command(ctrl_cmd_t *req);;
+ctrl_cmd_t * rpc_slave_feature_command(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_iface_mac_addr_len_get(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_wifi_set_inactive_time(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_wifi_get_inactive_time(ctrl_cmd_t *req);
@@ -727,6 +795,7 @@ ctrl_cmd_t * rpc_slaveif_wifi_sta_itwt_suspend(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_wifi_sta_itwt_get_flow_id_status(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_wifi_sta_itwt_send_probe_req(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_wifi_sta_itwt_set_target_wake_time_offset(ctrl_cmd_t *req);
+
 #if H_WIFI_ENTERPRISE_SUPPORT
 ctrl_cmd_t * rpc_slaveif_wifi_sta_enterprise_enable(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_wifi_sta_enterprise_disable(ctrl_cmd_t *req);
@@ -759,6 +828,22 @@ ctrl_cmd_t * rpc_slaveif_supp_dpp_deinit(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_supp_dpp_bootstrap_gen(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_supp_dpp_start_listen(ctrl_cmd_t *req);
 ctrl_cmd_t * rpc_slaveif_supp_dpp_stop_listen(ctrl_cmd_t *req);
+#endif
+
+#ifdef H_PEER_DATA_TRANSFER
+ctrl_cmd_t * rpc_slaveif_custom_rpc(ctrl_cmd_t *req);
+int rpc_slaveif_register_custom_callback(uint32_t msg_id,
+		void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len));
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+ctrl_cmd_t * rpc_slaveif_gpio_config(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_gpio_reset_pin(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_gpio_set_level(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_gpio_get_level(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_gpio_set_direction(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_gpio_input_enable(ctrl_cmd_t *req);
+ctrl_cmd_t * rpc_slaveif_gpio_set_pull_mode(ctrl_cmd_t *req);
 #endif
 #ifdef __cplusplus
 }

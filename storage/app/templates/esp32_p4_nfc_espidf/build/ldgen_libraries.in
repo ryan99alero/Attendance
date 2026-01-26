@@ -193,3 +193,4 @@ $<TARGET_FILE:idf::main>
 $<TARGET_FILE:__idf_json>
 $<TARGET_FILE:__idf_espressif__esp32_p4_function_ev_board>
 $<TARGET_FILE:idf::protocol_examples_common>
+$<TARGET_FILE:idf::ui>

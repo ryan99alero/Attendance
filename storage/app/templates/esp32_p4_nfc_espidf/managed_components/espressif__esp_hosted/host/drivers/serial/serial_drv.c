@@ -1,16 +1,8 @@
-// Copyright 2015-2023 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include "serial_if.h"
 #include "serial_ll_if.h"
@@ -29,28 +21,33 @@ static void * readSemaphore;
 
 static void rpc_rx_indication(void);
 
+/* Global serial handle - shared by RPC RX and TX threads */
+static struct serial_drv_handle_t* g_serial_drv_handle = NULL;
+
 /* -------- Serial Drv ---------- */
 struct serial_drv_handle_t* serial_drv_open(const char *transport)
 {
-	struct serial_drv_handle_t* serial_drv_handle = NULL;
 	if (!transport) {
 		ESP_LOGE(TAG, "Invalid parameter in open");
 		return NULL;
 	}
 
-	if(serial_drv_handle) {
-		ESP_LOGE(TAG, "return orig hndl\n");
-		return serial_drv_handle;
+	/* Return existing handle if already opened */
+	if(g_serial_drv_handle) {
+		ESP_LOGD(TAG, "Serial already open, returning existing handle");
+		return g_serial_drv_handle;
 	}
 
-	serial_drv_handle = (struct serial_drv_handle_t*) g_h.funcs->_h_calloc
+	/* Allocate new handle */
+	g_serial_drv_handle = (struct serial_drv_handle_t*) g_h.funcs->_h_calloc
 		(1,sizeof(struct serial_drv_handle_t));
-	if (!serial_drv_handle) {
+	if (!g_serial_drv_handle) {
 		ESP_LOGE(TAG, "Failed to allocate memory \n");
 		return NULL;
 	}
 
-	return serial_drv_handle;
+	ESP_LOGD(TAG, "Serial handle allocated");
+	return g_serial_drv_handle;
 }
 
 int serial_drv_write (struct serial_drv_handle_t* serial_drv_handle,
@@ -205,11 +202,14 @@ int serial_drv_close(struct serial_drv_handle_t** serial_drv_handle)
 {
 	if (!serial_drv_handle || !(*serial_drv_handle)) {
 		ESP_LOGE(TAG,"Invalid parameter in close \n\r");
-		if (serial_drv_handle)
-			HOSTED_FREE(serial_drv_handle);
 		return RET_INVALID;
 	}
+
+	ESP_LOGD(TAG, "Freeing serial handle");
 	HOSTED_FREE(*serial_drv_handle);
+	*serial_drv_handle = NULL;
+	g_serial_drv_handle = NULL;  /* Clear global so next open allocates fresh */
+
 	return RET_OK;
 }
 
@@ -239,10 +239,20 @@ int rpc_platform_init(void)
 /* TODO: Why this is not called in transport_pserial_close() */
 int rpc_platform_deinit(void)
 {
-	if (RET_OK != serial_ll_if_g->fops->close(serial_ll_if_g)) {
-		ESP_LOGE(TAG,"Serial interface close failed\n\r");
-		return RET_FAIL;
+	if (serial_ll_if_g) {
+		if (RET_OK != serial_ll_if_g->fops->close(serial_ll_if_g)) {
+			ESP_LOGE(TAG,"Serial interface close failed\n\r");
+			return RET_FAIL;
+		}
+		/* serial_ll_close frees the handle, NULL our pointer */
+		serial_ll_if_g = NULL;
 	}
+
+	if (readSemaphore) {
+		g_h.funcs->_h_destroy_semaphore(readSemaphore);
+		readSemaphore = NULL;
+	}
+
 	return RET_OK;
 }
 

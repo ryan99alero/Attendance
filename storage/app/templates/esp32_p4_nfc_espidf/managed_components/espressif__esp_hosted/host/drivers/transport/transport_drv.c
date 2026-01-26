@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -27,6 +27,7 @@
 
 #include "esp_hosted_cli.h"
 #include "rpc_wrap.h"
+#include "esp_private/wifi.h"
 
 /**
  * @brief  Slave capabilities are parsed
@@ -54,7 +55,7 @@ static void *init_timeout_timer = NULL;
 
 static void init_timeout_cb(void *arg)
 {
-	ESP_LOGE(TAG, "Init event not received within timeout, Reseting myself");
+	ESP_LOGE(TAG, "Init event not received within timeout, Resetting myself");
 	g_h.funcs->_h_restart_host();
 }
 #endif
@@ -124,6 +125,11 @@ esp_err_t teardown_transport(void)
 	}
 	#endif
 
+	/* Stop CLI before tearing down transport */
+#ifdef H_ESP_HOSTED_CLI_ENABLED
+	esp_hosted_cli_stop();
+#endif
+
 	if (bus_handle) {
 		bus_deinit_internal(bus_handle);
 	}
@@ -175,7 +181,10 @@ esp_err_t transport_drv_reconfigure(void)
 	/* This would come into picture, only if the host has
 	 * reset pin connected to slave's 'EN' or 'RST' GPIO */
 	if (!is_transport_tx_ready()) {
-		ensure_slave_bus_ready(bus_handle);
+		if (ESP_OK != ensure_slave_bus_ready(bus_handle)) {
+			ESP_LOGE(TAG, "ensure_slave_bus_ready failed");
+			return ESP_FAIL;
+		}
 		transport_state = TRANSPORT_RX_ACTIVE;
 		ESP_LOGI(TAG, "Waiting for esp_hosted slave to be ready");
 		while (!is_transport_tx_ready()) {
@@ -183,7 +192,10 @@ esp_err_t transport_drv_reconfigure(void)
 				retry_slave_connection++;
 				if (retry_slave_connection%50==0) {
 					ESP_LOGI(TAG, "Not able to connect with ESP-Hosted slave device");
-					ensure_slave_bus_ready(bus_handle);
+					if (ESP_OK != ensure_slave_bus_ready(bus_handle)) {
+						ESP_LOGE(TAG, "ensure_slave_bus_ready failed");
+						return ESP_FAIL;
+					}
 				}
 			} else {
 				ESP_LOGW(TAG, "Failed to get ESP_Hosted slave transport up");
@@ -207,8 +219,8 @@ esp_err_t transport_drv_remove_channel(transport_channel_t *channel)
 	switch (channel->if_type) {
 	case ESP_AP_IF:
 	case ESP_STA_IF:
-		//Should we additionally do:
-		//esp_wifi_internal_reg_rxcb(channel->if_type, NULL);
+		/* Unregister RX callback to prevent memory leak */
+		esp_wifi_internal_reg_rxcb(channel->if_type, NULL);
 		break;
 	case ESP_SERIAL_IF:
 		/* TODO */
@@ -248,6 +260,16 @@ static esp_err_t transport_drv_sta_tx(void *h, void *buffer, size_t len)
 	if (!buffer || !len)
 		return ESP_OK;
 
+	/* Transport state check */
+	if (!is_transport_tx_ready() || !chan_arr[ESP_STA_IF]) {
+		ESP_LOGE(TAG, "Transport TX not ready or STA channel is not available, drop pkt");
+#if defined(ESP_ERR_ESP_NETIF_TX_FAILED)
+		return ESP_ERR_ESP_NETIF_TX_FAILED;
+#else
+		return ESP_ERR_ESP_NETIF_NO_MEM;
+#endif
+	}
+
 	if (unlikely(wifi_tx_throttling)) {
 	#if ESP_PKT_STATS
 		pkt_stats.sta_tx_flowctrl_drop++;
@@ -278,6 +300,17 @@ static esp_err_t transport_drv_ap_tx(void *h, void *buffer, size_t len)
 	if (!buffer || !len)
 		return ESP_OK;
 
+	/* Transport state check */
+	if (!is_transport_tx_ready() || !chan_arr[ESP_AP_IF]) {
+		ESP_LOGE(TAG, "Transport TX not ready or AP channel is not available, drop pkt");
+
+#if defined(ESP_ERR_ESP_NETIF_TX_FAILED)
+		return ESP_ERR_ESP_NETIF_TX_FAILED;
+#else
+		return ESP_ERR_ESP_NETIF_NO_MEM;
+#endif
+	}
+
 	assert(h && h==chan_arr[ESP_AP_IF]->api_chan);
 
 	/*  Prepare transport buffer directly consumable */
@@ -291,6 +324,17 @@ static esp_err_t transport_drv_ap_tx(void *h, void *buffer, size_t len)
 esp_err_t transport_drv_serial_tx(void *h, void *buffer, size_t len)
 {
 	/* TODO */
+	/* Transport state check */
+	if (!is_transport_tx_ready() || !chan_arr[ESP_SERIAL_IF]) {
+
+		ESP_LOGE(TAG, "Transport TX not ready or serial channel is not available, drop pkt");
+
+#if defined(ESP_ERR_ESP_NETIF_TX_FAILED)
+		return ESP_ERR_ESP_NETIF_TX_FAILED;
+#else
+		return ESP_ERR_ESP_NETIF_NO_MEM;
+#endif
+	}
 	assert(h && h==chan_arr[ESP_SERIAL_IF]->api_chan);
 	return esp_hosted_tx(ESP_SERIAL_IF, 0, buffer, len, H_BUFF_NO_ZEROCOPY, buffer, transport_serial_free_cb, 0);
 }
@@ -311,9 +355,13 @@ transport_channel_t *transport_drv_add_channel(void *api_chan,
 	}
 
 	if (chan_arr[if_type]) {
-		/* Channel config already existed */
-		ESP_LOGW(TAG, "Channel [%u] already created, replace with new callbacks", if_type);
+		ESP_LOGW(TAG, "Channel [%u] already created, replacing with new callbacks", if_type);
+
+		if (chan_arr[if_type]->memp) {
+			mempool_destroy(chan_arr[if_type]->memp);
+		}
 		HOSTED_FREE(chan_arr[if_type]);
+		chan_arr[if_type] = NULL;
 	}
 
 
@@ -337,7 +385,7 @@ transport_channel_t *transport_drv_add_channel(void *api_chan,
 
 	default:
 		//*tx = transport_drv_tx;
-		ESP_LOGW(TAG, "Not yet suppported ESP_Hosted interface for if_type[%u]", if_type);
+		ESP_LOGW(TAG, "Not yet supported ESP_Hosted interface for if_type[%u]", if_type);
 		return NULL;
 	}
 
@@ -353,7 +401,7 @@ transport_channel_t *transport_drv_add_channel(void *api_chan,
 	assert(channel->memp);
 #endif
 
-	ESP_LOGI(TAG, "Add ESP-Hosted channel IF[%u]: S[%u] Tx[%p] Rx[%p]",
+	ESP_LOGD(TAG, "Add ESP-Hosted channel IF[%u]: S[%u] Tx[%p] Rx[%p]",
 			if_type, secure, *tx, rx);
 
 	return channel;
@@ -563,18 +611,17 @@ static int compare_fw_version(uint32_t slave_version)
 		return 0;
 	} else if (host_version > slave_version) {
 	    // host version > slave version
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
-		printf("Version on Host is NEWER than version on co-processor\n");
-		printf("RPC requests sent by host may encounter timeout errors\n");
-		printf("or may not be supported by co-processor\n");
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
+#ifndef CONFIG_ESP_HOSTED_FW_VERSION_MISMATCH_WARNING_SUPPRESS
+		ESP_LOGW(TAG, "Version mismatch: Host [%u.%u.%u] > Co-proc [%u.%u.%u] ==> Upgrade co-proc to avoid RPC timeouts",
+			ESP_HOSTED_VERSION_PRINTF_ARGS(host_version), ESP_HOSTED_VERSION_PRINTF_ARGS(slave_version));
+#endif
 		return -1;
 	} else {
 	    // host version < slave version
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
-		printf("Version on Host is OLDER than version on co-processor\n");
-		printf("Host may not be compatible with co-processor\n");
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
+#ifndef CONFIG_ESP_HOSTED_FW_VERSION_MISMATCH_WARNING_SUPPRESS
+		ESP_LOGW(TAG, "Version mismatch: Host [%u.%u.%u] < Co-proc [%u.%u.%u] ==> Upgrade host to avoid compatibility issues",
+			ESP_HOSTED_VERSION_PRINTF_ARGS(host_version), ESP_HOSTED_VERSION_PRINTF_ARGS(slave_version));
+#endif
 		return 1;
 	}
 }

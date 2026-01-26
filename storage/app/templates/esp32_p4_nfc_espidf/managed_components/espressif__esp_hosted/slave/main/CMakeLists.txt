@@ -10,13 +10,18 @@ set(COMPONENT_SRCS
 	"${common_dir}/utils/esp_hosted_cli.c"
 	"protocomm_pserial.c"
 	"esp_hosted_coprocessor.c"
-	"slave_bt.c"
 	"mempool.c"
 	"stats.c"
 	"mempool_ll.c"
 	"host_power_save.c"
-	"lwip_filter.c"
+	"slave_light_sleep.c"
+	"nw_split_router.c"
+	"transport_gpio_pin_guard.c"
 )
+
+if(CONFIG_SOC_BT_SUPPORTED)
+	list(APPEND COMPONENT_SRCS "slave_bt.c")
+endif()
 
 set(COMPONENT_ADD_INCLUDEDIRS
 	"."
@@ -27,37 +32,46 @@ set(COMPONENT_ADD_INCLUDEDIRS
 	"${common_dir}/transport"
 )
 
+if(CONFIG_SOC_BT_SUPPORTED)
 # Select BT UART code based on IDF Target
 if(CONFIG_IDF_TARGET_ESP32)
-    list(APPEND COMPONENT_SRCS slave_bt_uart_esp32.c)
+	list(APPEND COMPONENT_SRCS slave_bt_uart_esp32.c)
 elseif(CONFIG_IDF_TARGET_ESP32C3 OR CONFIG_IDF_TARGET_ESP32S3)
-    list(APPEND COMPONENT_SRCS slave_bt_uart_esp32c3_s3.c)
+	list(APPEND COMPONENT_SRCS slave_bt_uart_esp32c3_s3.c)
 else()
-    list(APPEND COMPONENT_SRCS slave_bt_uart_esp32xx.c)
+	list(APPEND COMPONENT_SRCS slave_bt_uart_esp32xx.c)
+endif()
 endif()
 
 if(CONFIG_ESP_SDIO_HOST_INTERFACE)
-    list(APPEND COMPONENT_SRCS sdio_slave_api.c)
+	list(APPEND COMPONENT_SRCS sdio_slave_api.c)
 elseif(CONFIG_ESP_SPI_HOST_INTERFACE)
-    list(APPEND COMPONENT_SRCS spi_slave_api.c)
+	list(APPEND COMPONENT_SRCS spi_slave_api.c)
 elseif(CONFIG_ESP_SPI_HD_MODE)
-    list(APPEND COMPONENT_SRCS spi_hd_slave_api.c)
+	list(APPEND COMPONENT_SRCS spi_hd_slave_api.c)
 else(CONFIG_ESP_UART_HOST_INTERFACE)
-    list(APPEND COMPONENT_SRCS uart_slave_api.c)
+	list(APPEND COMPONENT_SRCS uart_slave_api.c)
+endif()
+
+if(CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER)
+	list(APPEND COMPONENT_SRCS example_peer_data_transfer.c)
+endif()
+
+if(CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_LIGHT_SLEEP)
+	list(APPEND COMPONENT_SRCS example_light_sleep.c)
 endif()
 
 if(CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_MQTT)
-    list(APPEND COMPONENT_SRCS mqtt_example.c)
+	list(APPEND COMPONENT_SRCS example_mqtt_client.c)
 endif()
 
 if(CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_HTTP_CLIENT)
-    list(APPEND COMPONENT_SRCS http_req.c)
+	list(APPEND COMPONENT_SRCS example_http_client.c)
 endif()
 
 # cli
 list(APPEND COMPONENT_ADD_INCLUDEDIRS "${common_dir}/utils")
 list(APPEND COMPONENT_SRCS "${common_dir}/utils/esp_hosted_cli.c")
-
 
 register_component()
 

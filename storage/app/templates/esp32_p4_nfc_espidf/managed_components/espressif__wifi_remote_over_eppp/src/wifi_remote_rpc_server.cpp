@@ -27,10 +27,12 @@ namespace eppp_rpc {
 namespace server {
 const char *TAG = "rpc_server";
 
+#ifndef CONFIG_WIFI_RMT_OVER_EPPP_UNSECURE
 const unsigned char ca_crt[] = "-----BEGIN CERTIFICATE-----\n" CONFIG_WIFI_RMT_OVER_EPPP_CLIENT_CA "\n-----END CERTIFICATE-----";
 const unsigned char crt[] = "-----BEGIN CERTIFICATE-----\n" CONFIG_WIFI_RMT_OVER_EPPP_SERVER_CRT "\n-----END CERTIFICATE-----";
 const unsigned char key[] = "-----BEGIN PRIVATE KEY-----\n" CONFIG_WIFI_RMT_OVER_EPPP_SERVER_KEY "\n-----END PRIVATE KEY-----";
 // TODO: Add option to supply keys and certs via a global symbol (file)
+#endif
 
 #ifdef CONFIG_WIFI_RMT_OVER_EPPP_HOST_SIDE_NETIF
 RpcInstance* get_instance();
@@ -192,7 +194,7 @@ private:
     {
         ESP_LOGI(TAG, "Received IP event %" PRIi32, id);
         Events ev{api_id::IP_EVENT, id, nullptr};
-        if (ip_data->esp_netif) {
+        if (id == IP_EVENT_STA_GOT_IP && ip_data->esp_netif) {
             ESP_RETURN_ON_ERROR(ev.create_ip_data(), TAG, "Failed to allocate event data");
             ev.ip_data->id = id;
             ESP_RETURN_ON_ERROR(esp_netif_get_dns_info(ip_data->esp_netif, ESP_NETIF_DNS_MAIN, &ev.ip_data->dns), TAG, "Failed to get DNS info");
@@ -405,6 +407,12 @@ RpcInstance* get_instance()
 
 RpcInstance *RpcEngine::init_server()
 {
+#ifdef CONFIG_WIFI_RMT_OVER_EPPP_UNSECURE
+    // In unsecure mode, use the socket directly without TLS
+    tls_ = nullptr;
+    plain_sock_ = server::instance.sock;
+    return &server::instance;
+#else
     esp_tls_cfg_server_t cfg = {};
     cfg.cacert_buf = server::ca_crt;
     cfg.cacert_bytes = sizeof(server::ca_crt);
@@ -416,6 +424,7 @@ RpcInstance *RpcEngine::init_server()
     ESP_RETURN_ON_FALSE(tls_ = esp_tls_init(), nullptr, TAG, "Failed to create ESP-TLS instance");
     ESP_RETURN_ON_FALSE(esp_tls_server_session_create(&cfg, server::instance.sock, tls_) == ESP_OK, nullptr, TAG, "Failed to create TLS session");
     return &server::instance;
+#endif
 }
 
 }   // namespace eppp_rpc

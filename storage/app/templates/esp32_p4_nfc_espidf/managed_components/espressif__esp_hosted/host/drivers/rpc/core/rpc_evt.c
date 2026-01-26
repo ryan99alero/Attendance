@@ -4,16 +4,101 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <inttypes.h>
 #include "rpc_core.h"
 #include "rpc_utils.h"
 #include "rpc_slave_if.h"
 #include "esp_hosted_transport.h"
 #include "port_esp_hosted_host_log.h"
 #include "port_esp_hosted_host_config.h"
+#include "port_esp_hosted_host_os.h"
 #include "esp_hosted_bitmasks.h"
 #include "esp_hosted_os_abstraction.h"
 
 DEFINE_LOG_TAG(rpc_evt);
+
+#ifdef H_PEER_DATA_TRANSFER
+#define MAX_CUSTOM_CALLBACKS H_MAX_CUSTOM_MSG_HANDLERS
+/* Callback slots (empty slot has callback = NULL, msg_id = -1 is invalid sentinel) */
+static struct {
+	uint32_t msg_id;
+	void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len);
+} custom_callbacks[MAX_CUSTOM_CALLBACKS] = {
+	[0 ... (MAX_CUSTOM_CALLBACKS - 1)] = {
+		.msg_id = (uint32_t)-1,
+		.callback = NULL
+	}
+};
+
+static void* custom_callbacks_mutex = NULL;
+
+
+/* Register callback for specific message ID */
+int rpc_evt_register_custom_callback(uint32_t msg_id,
+		void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len))
+{
+	/* Validate message ID (-1/0xFFFFFFFF is invalid) */
+	if (msg_id == (uint32_t)-1) {
+		ESP_LOGE(TAG, "Invalid message ID 0xFFFFFFFF");
+		return FAILURE;
+	}
+
+	/* Initialize mutex on first use */
+	if (!custom_callbacks_mutex) {
+		custom_callbacks_mutex = g_h.funcs->_h_create_mutex();
+		if (!custom_callbacks_mutex) {
+			ESP_LOGE(TAG, "Failed to create mutex");
+			return FAILURE;
+		}
+	}
+
+	g_h.funcs->_h_lock_mutex(custom_callbacks_mutex, HOSTED_BLOCK_MAX);
+
+	/* First, check if this msg_id is already registered */
+	for (int i = 0; i < MAX_CUSTOM_CALLBACKS; i++) {
+		if (custom_callbacks[i].msg_id == msg_id) {
+			/* Found existing registration */
+			if (callback == NULL) {
+				/* Deregister: clean up this entry */
+				custom_callbacks[i].msg_id = (uint32_t)-1;  /* Mark as invalid */
+				custom_callbacks[i].callback = NULL;
+				ESP_LOGD(TAG, "Deregistered callback for msg_id %" PRIu32, msg_id);
+				g_h.funcs->_h_unlock_mutex(custom_callbacks_mutex);
+				return SUCCESS;
+			} else {
+				/* Update existing callback */
+				custom_callbacks[i].callback = callback;
+				ESP_LOGD(TAG, "Updated callback for msg_id %" PRIu32, msg_id);
+				g_h.funcs->_h_unlock_mutex(custom_callbacks_mutex);
+				return SUCCESS;
+			}
+		}
+	}
+
+	/* msg_id not found - need to register new */
+	if (callback == NULL) {
+		/* Cannot deregister what doesn't exist */
+		ESP_LOGD(TAG, "Cannot deregister msg_id %" PRIu32 " - not registered", msg_id);
+		g_h.funcs->_h_unlock_mutex(custom_callbacks_mutex);
+		return FAILURE;
+	}
+
+	/* Find empty slot for new registration */
+	for (int i = 0; i < MAX_CUSTOM_CALLBACKS; i++) {
+		if (custom_callbacks[i].callback == NULL) {
+			custom_callbacks[i].msg_id = msg_id;
+			custom_callbacks[i].callback = callback;
+			ESP_LOGD(TAG, "Registered callback for msg_id %" PRIu32, msg_id);
+			g_h.funcs->_h_unlock_mutex(custom_callbacks_mutex);
+			return SUCCESS;
+		}
+	}
+
+	ESP_LOGW(TAG, "No space for callback (max %d)", MAX_CUSTOM_CALLBACKS);
+	g_h.funcs->_h_unlock_mutex(custom_callbacks_mutex);
+	return FAILURE;
+}
+#endif
 
 /* For new RPC event (from ESP to host), add up switch case for your message
  * In general, it is better to subscribe all events or notifications
@@ -45,6 +130,8 @@ int rpc_parse_evt(Rpc *rpc_msg, ctrl_cmd_t *app_ntfy)
 
 	case RPC_ID__Event_ESPInit: {
 		ESP_LOGI(TAG, "EVENT: ESP INIT\n");
+		RPC_FAIL_ON_NULL(event_esp_init);
+		app_ntfy->u.e_init.cp_reset_reason = rpc_msg->event_esp_init->cp_reset_reason;
 		break;
 	} case RPC_ID__Event_Heartbeat: {
 		ESP_LOGD(TAG, "EVENT: Heartbeat\n");
@@ -333,6 +420,43 @@ int rpc_parse_evt(Rpc *rpc_msg, ctrl_cmd_t *app_ntfy)
 		p_a->failure_reason = p_c->reason;
 		break;
 #endif // H_WIFI_DPP_SUPPORT
+#ifdef H_PEER_DATA_TRANSFER
+	} case RPC_ID__Event_CustomRpc: {
+		RpcEventCustomRpc *p_c = rpc_msg->event_custom_rpc;
+		RPC_FAIL_ON_NULL(event_custom_rpc);
+		app_ntfy->resp_event_status = p_c->resp;
+
+		/* Get message ID from protobuf field (not from data payload) */
+		uint32_t msg_id = p_c->custom_event_id;
+
+		/* Route to callback with pure user data */
+		const uint8_t *payload = p_c->data.data;
+		size_t payload_len = p_c->data.len;
+
+		bool callback_found = false;
+		void (*cb)(uint32_t, const uint8_t *, size_t) = NULL;
+
+		/* Find callback under mutex protection */
+		if (custom_callbacks_mutex) {
+			g_h.funcs->_h_lock_mutex(custom_callbacks_mutex, HOSTED_BLOCK_MAX);
+			for (int i = 0; i < MAX_CUSTOM_CALLBACKS; i++) {
+				if (custom_callbacks[i].msg_id == msg_id && custom_callbacks[i].callback) {
+					cb = custom_callbacks[i].callback;
+					callback_found = true;
+					break;
+				}
+			}
+			g_h.funcs->_h_unlock_mutex(custom_callbacks_mutex);
+		}
+
+		/* Invoke callback outside mutex to avoid deadlock */
+		if (callback_found && cb) {
+			cb(msg_id, payload, payload_len);
+		} else {
+			ESP_LOGI(TAG, "No callback registered for message ID %" PRIu32 ", ignore", msg_id);
+		}
+		break;
+#endif
 	} default: {
 		ESP_LOGE(TAG, "Invalid/unsupported event[%u] received\n",rpc_msg->msg_id);
 		goto fail_parse_rpc_msg;

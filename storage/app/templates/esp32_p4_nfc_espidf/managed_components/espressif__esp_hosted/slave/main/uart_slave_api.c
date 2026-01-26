@@ -1,17 +1,8 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2024 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include "sdkconfig.h"
 
@@ -28,6 +19,7 @@
 #include "interface.h"
 #include "mempool.h"
 #include "stats.h"
+#include "esp_idf_version.h"
 #include "esp_hosted_interface.h"
 #include "esp_hosted_transport.h"
 #include "esp_hosted_transport_init.h"
@@ -46,6 +38,20 @@
 #define HOSTED_UART_CHECKSUM       CONFIG_ESP_UART_CHECKSUM
 
 #define BUFFER_SIZE                MAX_TRANSPORT_BUF_SIZE
+
+#if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)) && (ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0))
+/**
+ * For ESP-IDF v5.5, Building ESP32 with UART Transport can fail due to
+ * lack of IRAM space.
+ * To reduce IRAM usage, `CONFIG_RINGBUF_PLACE_FUNCTIONS_INTO_FLASH=y`
+ * should be enabled
+ */
+#if CONFIG_IDF_TARGET_ESP32 && !CONFIG_RINGBUF_PLACE_FUNCTIONS_INTO_FLASH
+#error Building for UART transport can fail due to lack of IRAM space
+#error To free up IRAM, enable Component config --> ESP Ringbuf ---> Place non-ISR ringbuf functions into flash
+#error or uncomment CONFIG_RINGBUF_PLACE_FUNCTIONS_INTO_FLASH=y in sdkconfig.defaults.esp32 and regenerate sdkconfig
+#endif
+#endif
 
 static const char TAG[] = "UART_DRIVER";
 
@@ -260,8 +266,31 @@ static void uart_rx_task(void* pvParameters)
 			continue;
 		}
 
-		flags = header->flags;
+		len = le16toh(header->len);
+		offset = le16toh(header->offset);
+		if (offset != sizeof(struct esp_payload_header)) {
+			ESP_LOGE(TAG, "invalid offset in header");
+			continue;
+		}
+		total_len = len + sizeof(struct esp_payload_header);
+		if (total_len > BUFFER_SIZE) {
+			ESP_LOGE(TAG, "incoming data too big: %d", total_len);
+			continue;
+		}
 
+		// get the data, if any
+		if (len) {
+			bytes_read = uart_read_bytes(HOSTED_UART, &uart_scratch_buf[offset],
+					len, portMAX_DELAY);
+			ESP_LOGD(TAG, "Read %d bytes (payload)", bytes_read);
+			if (bytes_read < len) {
+				ESP_LOGE(TAG, "Failed to read payload");
+				continue;
+			}
+		}
+
+		// process flags
+		flags = header->flags;
 		if (flags & FLAG_POWER_SAVE_STARTED) {
 			ESP_LOGI(TAG, "Host informed starting to power sleep");
 			if (context.event_handler) {
@@ -272,21 +301,6 @@ static void uart_rx_task(void* pvParameters)
 			if (context.event_handler) {
 				context.event_handler(ESP_POWER_SAVE_OFF);
 			}
-		}
-		len = le16toh(header->len);
-		offset = le16toh(header->offset);
-		total_len = len + sizeof(struct esp_payload_header);
-		if (total_len > BUFFER_SIZE) {
-			ESP_LOGE(TAG, "incoming data too big: %d", total_len);
-			continue;
-		}
-		// get the data
-		bytes_read = uart_read_bytes(HOSTED_UART, &uart_scratch_buf[offset],
-				len, portMAX_DELAY);
-		ESP_LOGD(TAG, "Read %d bytes (payload)", bytes_read);
-		if (bytes_read < len) {
-			ESP_LOGE(TAG, "Failed to read payload");
-			continue;
 		}
 
 #if HOSTED_UART_CHECKSUM

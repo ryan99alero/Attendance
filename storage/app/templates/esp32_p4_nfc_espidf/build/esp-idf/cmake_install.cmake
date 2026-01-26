@@ -637,3 +637,8 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/protocol_examples_common/cmake_install.cmake")
 endif()
 
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/build/esp-idf/ui/cmake_install.cmake")
+endif()
+

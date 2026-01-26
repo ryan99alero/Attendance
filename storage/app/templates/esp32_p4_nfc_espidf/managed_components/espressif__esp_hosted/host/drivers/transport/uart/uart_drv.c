@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -262,8 +262,17 @@ static void h_uart_process_rx_task(void const* pvParameters)
 
 				ret = chan_arr[buf_handle->if_type]->rx(chan_arr[buf_handle->if_type]->api_chan,
 						copy_payload, copy_payload, buf_handle->payload_len);
+#ifndef ESP_WIFI_REMOTE_VERSION // not defined in older versions of wifi-remote
 				if (unlikely(ret))
 					HOSTED_FREE(copy_payload);
+#else
+#if ESP_WIFI_REMOTE_VERSION < ESP_WIFI_REMOTE_VERSION_VAL(1,3,1)
+				if (unlikely(ret))
+					HOSTED_FREE(copy_payload);
+#else
+				(void)ret; // to silence 'unused variable' warning
+#endif
+#endif
 			}
 #else
 			if (chan_arr[buf_handle->if_type] && chan_arr[buf_handle->if_type]->rx) {
@@ -280,7 +289,7 @@ static void h_uart_process_rx_task(void const* pvParameters)
 
 			event = (struct esp_priv_event *) (buf_handle->payload);
 			if (event->event_type != ESP_PRIV_EVENT_INIT) {
-				/* User can re-use this type of transaction */
+				/* User can reuse this type of transaction */
 			}
 		} else if (buf_handle->if_type == ESP_HCI_IF) {
 			hci_rx_handler(buf_handle->payload, buf_handle->payload_len);
@@ -435,18 +444,24 @@ static void h_uart_read_task(void const* pvParameters)
 
 		len = le16toh(header->len);
 		offset = le16toh(header->offset);
+		if (offset != sizeof(struct esp_payload_header)) {
+			ESP_LOGE(TAG, "invalid offset in header");
+			continue;
+		}
 		total_len = len + sizeof(struct esp_payload_header);
 		if (total_len > MAX_UART_BUFFER_SIZE) {
 			ESP_LOGE(TAG, "incoming data too big: %d", total_len);
 			continue;
 		}
 
-		// get the data
-		bytes_read = g_h.funcs->_h_uart_read(uart_handle, &uart_scratch_buf[offset], len);
-		ESP_LOGD(TAG, "Read %d bytes (payload)", bytes_read);
-		if (bytes_read < len) {
-			ESP_LOGE(TAG, "Failed to read payload");
-			continue;
+		// get the data, if any
+		if (len) {
+			bytes_read = g_h.funcs->_h_uart_read(uart_handle, &uart_scratch_buf[offset], len);
+			ESP_LOGD(TAG, "Read %d bytes (payload)", bytes_read);
+			if (bytes_read < len) {
+				ESP_LOGE(TAG, "Failed to read payload");
+				continue;
+			}
 		}
 
 		rxbuff = h_uart_buffer_alloc(MEMSET_REQUIRED);
@@ -661,10 +676,16 @@ int ensure_slave_bus_ready(void *bus_handle)
 		ESP_LOGI(TAG, "Resetting slave on UART bus with pin %d", reset_pin.pin);
 		g_h.funcs->_h_config_gpio(reset_pin.port, reset_pin.pin, H_GPIO_MODE_DEF_OUTPUT);
 		g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-		g_h.funcs->_h_msleep(1);
+		g_h.funcs->_h_msleep(10);
 		g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_INACTIVE);
-		g_h.funcs->_h_msleep(1);
+		g_h.funcs->_h_msleep(10);
 		g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
+		// flush input
+		if (uart_handle) {
+			g_h.funcs->_h_uart_flush_input(uart_handle);
+		} else {
+			ESP_LOGW(TAG, "uart handle is NULL: cannot flush");
+		}
 		g_h.funcs->_h_msleep(1500);
 	} else {
 		stop_host_power_save();

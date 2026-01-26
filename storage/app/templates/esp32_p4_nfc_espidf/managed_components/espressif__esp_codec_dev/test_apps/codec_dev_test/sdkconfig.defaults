@@ -1,6 +1,3 @@
-# Enable SPIRAM
-CONFIG_SPIRAM=y
-
 # Enable FreeRTOS trace
 CONFIG_FREERTOS_HZ=1000
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,7 +9,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "esp_log.h"
+#include "esp_app_desc.h"
 #include "esp_private/wifi.h"
+
 #include "slave_control.h"
 #include "esp_hosted_rpc.pb-c.h"
 #include "esp_ota_ops.h"
@@ -18,9 +20,11 @@
 #include "esp_hosted_transport.h"
 #include "esp_hosted_bitmasks.h"
 #include "slave_wifi_config.h"
+#include "slave_config.h"
 #include "esp_hosted_log.h"
 #include "slave_bt.h"
 #include "esp_hosted_coprocessor_fw_ver.h"
+#include "slave_gpio_extender.h"
 
 #if H_DPP_SUPPORT
 #include "esp_dpp.h"
@@ -41,7 +45,9 @@
 #include "esp_check.h"
 #include "lwip/inet.h"
 #include "host_power_save.h"
-#include "mqtt_example.h"
+
+#include "example_mqtt_client.h"
+#include "example_http_client.h"
 #endif
 
 #define MAC_STR_LEN                 17
@@ -58,16 +64,27 @@
 
 #define TIMEOUT_IN_MIN              (60*TIMEOUT_IN_SEC)
 #define TIMEOUT_IN_HOUR             (60*TIMEOUT_IN_MIN)
-#define RESTART_TIMEOUT             (5*TIMEOUT_IN_SEC)
+#define RESTART_TIMEOUT             (2*TIMEOUT_IN_SEC)
 
-#define MIN_HEARTBEAT_INTERVAL      (10)
-#define MAX_HEARTBEAT_INTERVAL      (60*60)
+#define MIN_HEARTBEAT_INTERVAL      (1)
+#define MAX_HEARTBEAT_INTERVAL      (24*60*60)
 
 
 
 static wifi_config_t new_wifi_config = {0};
 static bool new_config_recvd = false;
+static bool suppress_disconnect = false; // true when we want to suppress the disconnect event
 static wifi_event_sta_connected_t lkg_sta_connected_event = {0};
+
+enum {
+	OTA_NOT_STARTED,
+	OTA_IN_PROGRESS,
+	OTA_FAILED,
+	OTA_COMPLETED,
+	OTA_ACTIVATED,
+};
+
+uint8_t ota_status = OTA_NOT_STARTED;
 
 #if H_WIFI_ENTERPRISE_SUPPORT
 #define CLEAR_CERT(ptr, len) \
@@ -93,9 +110,10 @@ static TimerHandle_t handle_heartbeat_task;
 static uint32_t hb_num;
 
 /* FreeRTOS event group to signal when we are connected*/
-static esp_event_handler_instance_t instance_any_id;
+static esp_event_handler_instance_t instance_any_id = NULL;
 #ifdef CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
-static esp_event_handler_instance_t instance_ip;
+static esp_event_handler_instance_t instance_ip_got = NULL;
+static esp_event_handler_instance_t instance_ip_lost = NULL;
 extern volatile uint8_t station_got_ip;
 static rpc_dhcp_dns_status_t s2h_dhcp_dns = {0};
 
@@ -123,6 +141,22 @@ extern volatile uint8_t station_connected;
 extern volatile uint8_t softap_started;
 static volatile bool station_connecting = false;
 static volatile bool wifi_initialized = false;
+
+#ifdef CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+/* Array of callback slots (empty slot has callback = NULL, msg_id = -1 is invalid sentinel) */
+static struct {
+	uint32_t msg_id;
+	void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len);
+} custom_msg_callbacks[CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS] = {
+	[0 ... (CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS - 1)] = {
+		.msg_id = (uint32_t)-1,
+		.callback = NULL
+	}
+};
+
+static SemaphoreHandle_t custom_callbacks_mutex = NULL;
+
+#endif
 
 static void send_wifi_event_data_to_host(int event, void *event_data, int event_size)
 {
@@ -399,6 +433,7 @@ static esp_err_t req_ota_begin_handler (Rpc *req,
 		ESP_LOGE(TAG, "OTA begin failed[%d]", ret);
 		goto err;
 	}
+	ota_status = OTA_IN_PROGRESS;
 
 	ota_msg = 1;
 
@@ -453,7 +488,6 @@ static esp_err_t req_ota_end_handler (Rpc *req,
 {
 	esp_err_t ret = ESP_OK;
 	RpcRespOTAEnd *resp_payload = NULL;
-	TimerHandle_t xTimer = NULL;
 
 	if (!req || !resp) {
 		ESP_LOGE(TAG, "Invalid parameters");
@@ -476,7 +510,61 @@ static esp_err_t req_ota_end_handler (Rpc *req,
 		} else {
 			ESP_LOGE(TAG, "OTA update failed in end (%s)!", esp_err_to_name(ret));
 		}
+		ota_status = OTA_FAILED;
 		goto err;
+	}
+
+	ESP_LOGI(TAG, "**** OTA updated successful, ready for activation ****");
+	ota_status = OTA_COMPLETED;
+	resp_payload->resp = SUCCESS;
+	return ESP_OK;
+err:
+	resp_payload->resp = ret;
+	return ESP_OK;
+}
+
+/* Function OTA activate */
+static esp_err_t req_ota_activate_handler (Rpc *req,
+		Rpc *resp, void *priv_data)
+{
+	esp_err_t ret = ESP_OK;
+	RpcRespOTAActivate *resp_payload = NULL;
+	TimerHandle_t xTimer = NULL;
+
+	if (!req || !resp) {
+		ESP_LOGE(TAG, "Invalid parameters");
+		return ESP_FAIL;
+	}
+
+	resp_payload = (RpcRespOTAActivate *)calloc(1,sizeof(RpcRespOTAActivate));
+	if (!resp_payload) {
+		ESP_LOGE(TAG,"Failed to allocate memory");
+		return ESP_ERR_NO_MEM;
+	}
+	rpc__resp__otaactivate__init(resp_payload);
+	resp->payload_case = RPC__PAYLOAD_RESP_OTA_ACTIVATE;
+	resp->resp_ota_activate = resp_payload;
+
+	ret = ESP_OK;
+	switch (ota_status) {
+		case OTA_COMPLETED:
+			break;
+		case OTA_IN_PROGRESS:
+			ESP_LOGW(TAG, "OTA in progress");
+			goto err;
+			break;
+		case OTA_NOT_STARTED:
+			ESP_LOGW(TAG, "OTA not started");
+			goto err;
+			break;
+		case OTA_FAILED:
+			ESP_LOGW(TAG, "OTA failed");
+			goto err;
+			break;
+		default:
+			ESP_LOGW(TAG, "OTA status unknown");
+			goto err;
+			break;
 	}
 
 	/* set OTA partition for next boot */
@@ -485,7 +573,9 @@ static esp_err_t req_ota_end_handler (Rpc *req,
 		ESP_LOGE(TAG, "esp_ota_set_boot_partition failed (%s)!", esp_err_to_name(ret));
 		goto err;
 	}
-	xTimer = xTimerCreate("Timer", RESTART_TIMEOUT , pdFALSE, 0, vTimerCallback);
+	ota_status = OTA_ACTIVATED;
+	/* Create timer to reboot system and activate OTA */
+	xTimer = xTimerCreate("OTAActivateTimer", RESTART_TIMEOUT , pdFALSE, 0, vTimerCallback);
 	if (xTimer == NULL) {
 		ESP_LOGE(TAG, "Failed to create timer to restart system");
 		ret = -1;
@@ -497,7 +587,7 @@ static esp_err_t req_ota_end_handler (Rpc *req,
 		ret = -2;
 		goto err;
 	}
-	ESP_LOGE(TAG, "**** OTA updated successful, ESP32 will reboot in 5 sec ****");
+	ESP_LOGE(TAG, "**** OTA activation initiated, ESP32 will reboot in 2 sec ****");
 	resp_payload->resp = SUCCESS;
 	return ESP_OK;
 err:
@@ -554,7 +644,6 @@ static esp_err_t req_set_softap_vender_specific_ie_handler (Rpc *req,
 		}
 	}
 
-
 	resp_payload = (RpcRespSetSoftAPVendorSpecificIE *)
 		calloc(1,sizeof(RpcRespSetSoftAPVendorSpecificIE));
 	if (!resp_payload) {
@@ -567,7 +656,6 @@ static esp_err_t req_set_softap_vender_specific_ie_handler (Rpc *req,
 	rpc__resp__set_soft_apvendor_specific_ie__init(resp_payload);
 	resp->payload_case = RPC__PAYLOAD_RESP_SET_SOFTAP_VENDOR_SPECIFIC_IE;
 	resp->resp_set_softap_vendor_specific_ie = resp_payload;
-
 
 	ret = esp_wifi_set_vendor_ie(p_vsi->enable,
 			p_vsi->type,
@@ -657,15 +745,14 @@ static esp_err_t configure_heartbeat(bool enable, int hb_duration)
 	int duration = hb_duration ;
 
 	if (!enable) {
-		ESP_LOGI(TAG, "Stop Heatbeat");
+		ESP_LOGI(TAG, "Stop Heartbeat");
 		stop_heartbeat();
 
 	} else {
-		if (duration < MIN_HEARTBEAT_INTERVAL)
-			duration = MIN_HEARTBEAT_INTERVAL;
-		if (duration > MAX_HEARTBEAT_INTERVAL)
-			duration = MAX_HEARTBEAT_INTERVAL;
-
+		if ((duration < MIN_HEARTBEAT_INTERVAL) ||
+				(duration > MAX_HEARTBEAT_INTERVAL)) {
+			return ESP_ERR_INVALID_ARG;
+		}
 		stop_heartbeat();
 
 		ret = start_heartbeat(duration);
@@ -734,12 +821,14 @@ static void event_handler_ip(void* arg, esp_event_base_t event_base,
 			//send_dhcp_dns_info_to_host(1, 0);
 			station_got_ip = 1;
 #ifdef CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_MQTT
-			example_mqtt_resume();
+			example_mqtt_client_resume();
+			example_http_client_resume();
 #endif
 			break;
 		} case IP_EVENT_STA_LOST_IP: {
 #ifdef CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_MQTT
-			example_mqtt_pause();
+			example_mqtt_client_pause();
+			example_http_client_pause();
 #endif
 			ESP_LOGI(TAG, "Lost IP address");
 			station_got_ip = 0;
@@ -805,10 +894,10 @@ static void event_handler_wifi(void* arg, esp_event_base_t event_base,
 				int ret = esp_wifi_set_config(WIFI_IF_STA, &new_wifi_config);
 				if (ret) {
 					ESP_LOGE(TAG, "Error[0x%x] while setting the wifi config", ret);
-				} else {
-					new_config_recvd = 0;
 				}
 				esp_wifi_disconnect();
+				// suppress the disconnect event since we force disconnect here
+				suppress_disconnect = true;
 				return;
 			}
 			station_connecting = false;
@@ -818,7 +907,7 @@ static void event_handler_wifi(void* arg, esp_event_base_t event_base,
 			esp_wifi_internal_reg_rxcb(WIFI_IF_STA, (wifi_rxcb_t) wlan_sta_rx_callback);
 			station_connected = true;
 		} else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
-			station_connected = false;
+			ESP_LOGI(TAG, "Sta mode disconnect");
 			if (new_config_recvd) {
 				ESP_LOGI(TAG, "New wifi config still unapplied, applying it");
 				/* Still not applied new config, so apply it */
@@ -826,14 +915,23 @@ static void event_handler_wifi(void* arg, esp_event_base_t event_base,
 				if (ret) {
 					ESP_LOGE(TAG, "Error[0x%x] while setting the wifi config", ret);
 				} else {
-					new_config_recvd = 0;
+					new_config_recvd = false;
 				}
+				station_connecting = true;
+				esp_wifi_connect();
 			}
+			station_connected = false;
 			esp_wifi_internal_reg_rxcb(WIFI_IF_STA, NULL);
-			ESP_LOGI(TAG, "Sta mode disconnect");
 			station_connecting = false;
-			send_event_data_to_host(RPC_ID__Event_StaDisconnected,
-				event_data, sizeof(wifi_event_sta_disconnected_t));
+			if (!suppress_disconnect) {
+				send_event_data_to_host(RPC_ID__Event_StaDisconnected,
+					event_data, sizeof(wifi_event_sta_disconnected_t));
+				wifi_event_sta_disconnected_t *ptr = (wifi_event_sta_disconnected_t *)event_data;
+				ESP_LOGI(TAG, "disconnect due to reason: %d", ptr->reason);
+			} else {
+				ESP_LOGI(TAG, "suppressing disconnect event due to new config");
+				suppress_disconnect = false;
+			}
 #if CONFIG_SOC_WIFI_HE_SUPPORT
 		} else if (event_id == WIFI_EVENT_ITWT_SETUP) {
 			ESP_LOGI(TAG, "Itwt Setup");
@@ -1036,7 +1134,10 @@ esp_err_t esp_hosted_register_wifi_event_handlers(void)
 {
 	int ret1;
 
-	esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &instance_any_id);
+	if (instance_any_id) {
+		esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id);
+		instance_any_id = NULL;
+	}
 
 	ret1 = esp_event_handler_instance_register(WIFI_EVENT,
 				ESP_EVENT_ANY_ID,
@@ -1050,18 +1151,25 @@ esp_err_t esp_hosted_register_wifi_event_handlers(void)
 #ifdef CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
 	int ret2, ret3;
 
-	esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &instance_any_id);
+	if (instance_ip_got) {
+		esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_ip_got);
+		instance_ip_got = NULL;
+	}
 	ret2 = esp_event_handler_instance_register(IP_EVENT,
 				IP_EVENT_STA_GOT_IP,
 				&event_handler_ip,
 				NULL,
-				&instance_ip);
-	esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_LOST_IP, &instance_any_id);
+				&instance_ip_got);
+
+	if (instance_ip_lost) {
+		esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_LOST_IP, instance_ip_lost);
+		instance_ip_lost = NULL;
+	}
 	ret3 = esp_event_handler_instance_register(IP_EVENT,
 				IP_EVENT_STA_LOST_IP,
 				&event_handler_ip,
 				NULL,
-				&instance_ip);
+				&instance_ip_lost);
 
 	if (ret2 || ret3) {
 		ESP_LOGW(TAG, "Failed to register IP events");
@@ -1226,7 +1334,6 @@ static bool wifi_init_config_changed(const wifi_init_config_t *new_cfg, const wi
 esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t *config)
 {
 	esp_err_t ret;
-	bool should_reinit = false;
 	ESP_LOGI(TAG, "=== __wrap_esp_wifi_init called ===");
 
 	if (wifi_initialized) {
@@ -1236,7 +1343,6 @@ esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t *config)
 			esp_wifi_stop();
 			esp_wifi_deinit();
 			wifi_initialized = false;
-			should_reinit = true;
 		} else {
 			ESP_LOGW(TAG, "WiFi already initialized with same parameters");
 			return ESP_OK;
@@ -1256,7 +1362,7 @@ esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t *config)
 	ret = __real_esp_wifi_init(config);
 	ESP_LOGI(TAG, "__real_esp_wifi_init returned: %d", ret);
 
-	if (ret == ESP_OK && !should_reinit) {
+	if (ret == ESP_OK) {
 		wifi_initialized = true;
 	}
 
@@ -1331,11 +1437,11 @@ static esp_err_t req_wifi_deinit(Rpc *req, Rpc *resp, void *priv_data)
 	free_g_ca_cert();
 	free_all_g_eap_cert_and_key();
 #endif
+	wifi_initialized = false;
 	RPC_RET_FAIL_IF(esp_wifi_deinit());
 
 	return ESP_OK;
 }
-
 
 static esp_err_t req_wifi_start(Rpc *req, Rpc *resp, void *priv_data)
 {
@@ -1408,7 +1514,7 @@ static esp_err_t req_wifi_connect(Rpc *req, Rpc *resp, void *priv_data)
 
 	if (new_config_recvd || !station_connected) {
 		ESP_LOGI(TAG, "************ connect ****************");
-		//station_connecting = true;
+		station_connecting = true;
 		ret = esp_wifi_connect();
 		if (ret != ESP_OK) {
 			ESP_LOGE(TAG, "Failed to connect to WiFi: %d", ret);
@@ -1417,13 +1523,8 @@ static esp_err_t req_wifi_connect(Rpc *req, Rpc *resp, void *priv_data)
 	} else {
 		ESP_LOGI(TAG, "connect recvd, ack with connected event");
 
-
-#if CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED
-		//send_dhcp_dns_info_to_host(1, 0);
-#endif
-
 		send_wifi_event_data_to_host(RPC_ID__Event_StaConnected,
-				&lkg_sta_connected_event, sizeof(wifi_event_sta_connected_t));
+			&lkg_sta_connected_event, sizeof(wifi_event_sta_connected_t));
 	}
 
 	if (ret != ESP_ERR_WIFI_CONN)
@@ -1461,7 +1562,7 @@ static bool wifi_is_provisioned(wifi_config_t *wifi_cfg)
 		ESP_LOGI(TAG, "Wifi provisioned");
 		return true;
 	}
-	ESP_LOGI(TAG, "Wifi not provisioned, Fallback to example config");
+	ESP_LOGI(TAG, "Wifi not provisioned");
 
 	return false;
 }
@@ -1508,7 +1609,6 @@ static bool is_wifi_config_equal(const wifi_config_t *cfg1, const wifi_config_t 
 	return true;
 }
 
-
 /* Function to handle WiFi configuration */
 esp_err_t esp_hosted_set_sta_config(wifi_interface_t iface, wifi_config_t *cfg)
 {
@@ -1518,16 +1618,26 @@ esp_err_t esp_hosted_set_sta_config(wifi_interface_t iface, wifi_config_t *cfg)
 			ESP_LOGW(TAG, "not provisioned and failed to set wifi config");
 		} else {
 			ESP_LOGI(TAG, "Provisioned new Wi-Fi config");
-			new_config_recvd = true;
-			station_connecting = false;
+			new_config_recvd = false;
+			return ESP_OK;
 		}
 	}
 
 	if (!is_wifi_config_equal(cfg, &current_config)) {
-		new_config_recvd = true;
-		station_connecting = false;
-		ESP_LOGI(TAG, "Setting new WiFi config SSID: %s", cfg->sta.ssid);
-		memcpy(&new_wifi_config, cfg, sizeof(wifi_config_t));
+		if (station_connecting) {
+			ESP_LOGI(TAG, "Caching new WiFi config SSID: %s", cfg->sta.ssid);
+			memcpy(&new_wifi_config, cfg, sizeof(wifi_config_t));
+			new_config_recvd = true;
+		} else {
+			if (esp_wifi_set_config(WIFI_IF_STA, cfg) != ESP_OK) {
+				ESP_LOGW(TAG, "already provisioned but failed to set wifi config: copying to cache instead");
+				memcpy(&new_wifi_config, cfg, sizeof(wifi_config_t));
+				new_config_recvd = true;
+			} else {
+				ESP_LOGI(TAG, "Setting new WiFi config SSID: %s", cfg->sta.ssid);
+				new_config_recvd = false;
+			}
+		}
 	} else {
 		ESP_LOGI(TAG, "WiFi config unchanged, keeping current connection");
 		new_config_recvd = false;
@@ -1625,12 +1735,6 @@ static esp_err_t req_wifi_set_config(Rpc *req, Rpc *resp, void *priv_data)
 		p_a_sta->he_reserved = WIFI_STA_CONFIG_2_GET_RESERVED_VAL(p_c_sta->he_bitmask);
 #endif
 #endif
-
-		/* Avoid using fast scan, which leads to faster SSID selection,
-		 * but faces data throughput issues when same SSID broadcasted by weaker AP
-		 */
-		p_a_sta->scan_method = WIFI_ALL_CHANNEL_SCAN;
-		p_a_sta->sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
 
 		RPC_REQ_COPY_STR(p_a_sta->sae_h2e_identifier, p_c_sta->sae_h2e_identifier, SAE_H2E_IDENTIFIER_LEN);
 		RPC_RET_FAIL_IF(esp_hosted_set_sta_config(req_payload->iface, &cfg));
@@ -1962,8 +2066,6 @@ static esp_err_t req_wifi_scan_start(Rpc *req, Rpc *resp, void *priv_data)
 	return ESP_OK;
 }
 
-
-
 static esp_err_t req_wifi_set_protocol(Rpc *req, Rpc *resp, void *priv_data)
 {
 	RPC_TEMPLATE(RpcRespWifiSetProtocol, resp_wifi_set_protocol,
@@ -1982,8 +2084,12 @@ static esp_err_t req_wifi_get_protocol(Rpc *req, Rpc *resp, void *priv_data)
 			RpcReqWifiGetProtocol, req_wifi_get_protocol,
 			rpc__resp__wifi_get_protocol__init);
 
-	uint8_t protocol_bitmap = 0;
-	RPC_RET_FAIL_IF(esp_wifi_get_protocol(req_payload->ifx, &protocol_bitmap));
+	/** due to a bug in some ESP-IDF releases, esp_wifi_get_protocol() treats
+	 * the incoming pointer as a uint16_t *, corrupting the next byte
+	 * see https://github.com/espressif/esp-idf/issues/17502
+	 */
+	uint32_t protocol_bitmap = 0; // for safety
+	RPC_RET_FAIL_IF(esp_wifi_get_protocol(req_payload->ifx, (uint8_t *)&protocol_bitmap));
 
 	resp_payload->protocol_bitmap = protocol_bitmap;
 	return ESP_OK;
@@ -2251,7 +2357,6 @@ static esp_err_t req_wifi_sta_get_ap_info(Rpc *req, Rpc *resp, void *priv_data)
 			RpcReqWifiStaGetApInfo, req_wifi_sta_get_ap_info,
 			rpc__resp__wifi_sta_get_ap_info__init);
 
-
 	RPC_RET_FAIL_IF(esp_wifi_sta_get_ap_info(&p_a_ap_info));
 	RPC_ALLOC_ELEMENT(WifiApRecord, resp_payload->ap_record, wifi_ap_record__init);
 	RPC_ALLOC_ELEMENT(WifiCountry, resp_payload->ap_record->country, wifi_country__init);
@@ -2265,7 +2370,6 @@ static esp_err_t req_wifi_sta_get_ap_info(Rpc *req, Rpc *resp, void *priv_data)
 err:
 	return ESP_OK;
 }
-
 
 static esp_err_t req_wifi_deauth_sta(Rpc *req, Rpc *resp, void *priv_data)
 {
@@ -3279,6 +3383,8 @@ static esp_err_t req_feature_control(Rpc *req, Rpc *resp, void *priv_data)
 	resp_payload->command = req_payload->command;
 	resp_payload->option  = req_payload->option;
 
+	// redo once additional features are supported
+#ifdef CONFIG_SOC_BT_SUPPORTED // only valid if SOC supports bluetooth
 	if (req_payload->feature == RPC_FEATURE__Feature_Bluetooth) {
 		// decode the requested Bluetooth control
 		switch (req_payload->command) {
@@ -3309,8 +3415,216 @@ static esp_err_t req_feature_control(Rpc *req, Rpc *resp, void *priv_data)
 		ESP_LOGE(TAG, "error: invalid Feature Control");
 		resp_payload->resp = ESP_ERR_INVALID_ARG;
 	}
+#else
+	ESP_LOGE(TAG, "error: invalid Feature Control");
+	resp_payload->resp = ESP_ERR_INVALID_ARG;
+#endif
 	return ESP_OK;
 }
+
+static esp_err_t req_app_get_desc(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE_SIMPLE(RpcRespAppGetDesc, resp_app_get_desc,
+			RpcReqAppGetDesc, req_app_get_desc,
+			rpc__resp__app_get_desc__init);
+
+	RPC_ALLOC_ELEMENT(EspAppDesc, resp_payload->app_desc, esp_app_desc__init);
+	EspAppDesc * p_c = resp_payload->app_desc;
+
+	const esp_app_desc_t *app_desc = esp_app_get_description();
+	if (app_desc) {
+		// copy basic info: project name, version, IDF version
+		RPC_RESP_COPY_STR(p_c->project_name, app_desc->project_name, sizeof(app_desc->project_name));
+		RPC_RESP_COPY_STR(p_c->version, app_desc->version, sizeof(app_desc->version));
+		RPC_RESP_COPY_STR(p_c->idf_ver, app_desc->idf_ver, sizeof(app_desc->idf_ver));
+#if H_ALLOW_FULL_APP_DESC
+		// copy full info
+		p_c->magic_word     = app_desc->magic_word;
+		p_c->secure_version = app_desc->secure_version;
+
+		RPC_RESP_COPY_STR(p_c->time, app_desc->time, sizeof(app_desc->time));
+		RPC_RESP_COPY_STR(p_c->date, app_desc->date, sizeof(app_desc->date));
+		RPC_RESP_COPY_BYTES(p_c->app_elf_sha256, app_desc->app_elf_sha256, sizeof(app_desc->app_elf_sha256));
+
+#if H_GOT_EFUSE_BLK_REV_FULL_APP_DESC
+		p_c->min_efuse_blk_rev_full = app_desc->min_efuse_blk_rev_full;
+		p_c->max_efuse_blk_rev_full = app_desc->max_efuse_blk_rev_full;
+#endif
+#if H_GOT_MMU_PAGE_SIZE_FULL_APP_DESC
+		p_c->mmu_page_size          = app_desc->mmu_page_size;
+#endif
+#endif
+	} else {
+		resp_payload->resp = ESP_FAIL;
+	}
+err:
+	return ESP_OK;
+}
+#ifdef CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+/* Internal RPC bridge - delegates to registered handler */
+static esp_err_t handle_custom_rpc_request(uint32_t msg_id, uint8_t *req_data, uint32_t req_len)
+{
+	/* --------- Caution ----------
+	 *  Keep this function as simple, small and fast as possible
+	 *  This function is as callback in the Rx thread.
+	 *  Do not use any blocking calls here
+	 * ----------------------------
+	 */
+
+	if (msg_id == (uint32_t)-1) {
+		ESP_LOGE(TAG, "Invalid message ID 0xFFFFFFFF received");
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	/* Find callback under mutex protection */
+	void (*cb)(uint32_t, const uint8_t *, size_t) = NULL;
+	if (custom_callbacks_mutex && xSemaphoreTake(custom_callbacks_mutex, portMAX_DELAY) == pdTRUE) {
+		for (int i = 0; i < CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS; i++) {
+			if (custom_msg_callbacks[i].msg_id == msg_id && custom_msg_callbacks[i].callback) {
+				cb = custom_msg_callbacks[i].callback;
+				break;
+			}
+		}
+		xSemaphoreGive(custom_callbacks_mutex);
+	}
+
+	/* Invoke callback outside mutex to avoid deadlock */
+	if (cb) {
+		cb(msg_id, req_data, req_len);
+		return ESP_OK;
+	}
+
+	/* No handler registered for this message ID */
+	ESP_LOGW(TAG, "No custom handler registered for message ID %" PRIu32, msg_id);
+	return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t esp_hosted_send_custom_data(uint32_t msg_id, const uint8_t *data, size_t data_len)
+{
+	if ((!data && data_len != 0) || (data && data_len == 0)) {
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	/* Validate payload size */
+	if (data_len > 8166) {
+		/* Why 8166?
+		 * pserial r.data has max 8192 bytes size.
+		 * We want to get rid of this static buffer later.
+		 * to restrict the data size, 8192 - (serial header + esp hosted header + headroom)
+		 * we keep it 8166, as part of r.data[8192] removal, this code would be changed.
+		 */
+		return ESP_ERR_INVALID_SIZE;
+	}
+
+	/* Allocate buffer for [msg_id (4 bytes)][data...] */
+	size_t total_len = sizeof(msg_id) + data_len;
+	uint8_t *buf = malloc(total_len);
+	if (!buf) {
+		ESP_LOGE(TAG, "Failed to allocate %zu bytes", total_len);
+		return ESP_ERR_NO_MEM;
+	}
+
+	/* Pack msg_id as little-endian uint32_t */
+	memcpy(buf, &msg_id, sizeof(msg_id));
+
+	/* Copy user data after msg_id */
+	if (data_len > 0) {
+		memcpy(buf + sizeof(msg_id), data, data_len);
+	}
+
+	/* Send to RPC layer - rpc_evt_custom_rpc will unpack and wrap in protobuf */
+	send_event_data_to_host(RPC_ID__Event_CustomRpc, buf, (int)total_len);
+
+	free(buf);
+	return ESP_OK;
+}
+
+esp_err_t esp_hosted_register_custom_callback(uint32_t msg_id,
+    void (*callback)(uint32_t msg_id, const uint8_t *data, size_t data_len))
+{
+	/* Validate message ID (-1/0xFFFFFFFF is invalid) */
+	if (msg_id == (uint32_t)-1) {
+		ESP_LOGE(TAG, "Invalid message ID 0xFFFFFFFF");
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	/* Initialize mutex on first use */
+	if (!custom_callbacks_mutex) {
+		custom_callbacks_mutex = xSemaphoreCreateMutex();
+		if (!custom_callbacks_mutex) {
+			ESP_LOGE(TAG, "Failed to create mutex");
+			return ESP_ERR_NO_MEM;
+		}
+	}
+
+	if (xSemaphoreTake(custom_callbacks_mutex, portMAX_DELAY) != pdTRUE) {
+		ESP_LOGE(TAG, "Failed to lock mutex");
+		return ESP_FAIL;
+	}
+
+	/* Search for existing registration */
+	for (int i = 0; i < CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS; i++) {
+		if (custom_msg_callbacks[i].msg_id == msg_id) {
+			/* Found existing registration */
+			if (callback == NULL) {
+				/* Deregister: clean up entry */
+				custom_msg_callbacks[i].msg_id = (uint32_t)-1;  /* Mark as invalid */
+				custom_msg_callbacks[i].callback = NULL;
+				ESP_LOGI(TAG, "Deregistered callback for message ID %" PRIu32, msg_id);
+			} else {
+				/* Update existing callback */
+				custom_msg_callbacks[i].callback = callback;
+				ESP_LOGI(TAG, "Updated callback for message ID %" PRIu32, msg_id);
+			}
+			xSemaphoreGive(custom_callbacks_mutex);
+			return ESP_OK;
+		}
+	}
+
+	/* msg_id not found */
+	if (callback == NULL) {
+		/* Cannot deregister what doesn't exist */
+		ESP_LOGW(TAG, "Cannot deregister message ID %" PRIu32 " - not registered", msg_id);
+		xSemaphoreGive(custom_callbacks_mutex);
+		return ESP_ERR_NOT_FOUND;
+	}
+
+	/* Find empty slot for new registration */
+	for (int i = 0; i < CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS; i++) {
+		if (custom_msg_callbacks[i].callback == NULL) {
+			custom_msg_callbacks[i].msg_id = msg_id;
+			custom_msg_callbacks[i].callback = callback;
+			ESP_LOGI(TAG, "Registered callback for message ID %" PRIu32, msg_id);
+			xSemaphoreGive(custom_callbacks_mutex);
+			return ESP_OK;
+		}
+	}
+
+	ESP_LOGW(TAG, "No space for callback (max %d)", CONFIG_ESP_HOSTED_MAX_CUSTOM_MSG_HANDLERS);
+	xSemaphoreGive(custom_callbacks_mutex);
+	return ESP_ERR_NO_MEM;
+}
+
+static esp_err_t req_custom_rpc_handler(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespCustomRpc, resp_custom_rpc,
+			RpcReqCustomRpc, req_custom_rpc,
+			rpc__resp__custom_rpc__init);
+
+	/* Call the internal handler with message ID */
+	esp_err_t ret = handle_custom_rpc_request(
+		req_payload->custom_msg_id,
+		req_payload->data.data,
+		req_payload->data.len
+	);
+
+	/* Fill response with just status */
+	resp_payload->custom_msg_id = 0; /* Not used */
+	resp_payload->resp = ret;
+
+	return ESP_OK;
+}
+#endif /* CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER */
 
 #if CONFIG_SOC_WIFI_HE_SUPPORT
 #if H_WIFI_HE_GREATER_THAN_ESP_IDF_5_3
@@ -3532,6 +3846,174 @@ static esp_err_t req_supp_dpp_stop_listen(Rpc *req, Rpc *resp, void *priv_data)
 }
 #endif
 
+#if H_GPIO_EXPANDER_SUPPORT
+static esp_err_t req_gpio_config(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioConfig, resp_gpio_config,
+			RpcReqGpioConfig, req_gpio_config,
+			rpc__resp__gpio_config__init);
+
+	gpio_config_t config = {0};
+
+	config.mode = req_payload->config->mode;
+	config.pull_up_en = req_payload->config->pull_up_en;
+	config.pull_down_en = req_payload->config->pull_down_en;
+	config.intr_type = req_payload->config->intr_type;
+	config.pin_bit_mask = req_payload->config->pin_bit_mask;
+
+	if (config.intr_type != GPIO_INTR_DISABLE) {
+		ESP_LOGE(TAG, "ISR is not supported from slave yet. please contact through github issues, if needed.");
+		resp_payload->resp = ESP_ERR_NOT_SUPPORTED;
+		return ESP_OK;
+	}
+
+	for (int pin = 0; pin < GPIO_NUM_MAX; ++pin) {
+		if (config.pin_bit_mask & (1ULL << pin)) {
+			if (!transport_gpio_pin_guard_is_eligible((gpio_num_t)pin)) {
+				ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", pin);
+				resp_payload->resp = ESP_ERR_INVALID_ARG;
+				return ESP_OK;
+			}
+		}
+	}
+
+	RPC_RET_FAIL_IF(gpio_config(&config));
+
+	return ESP_OK;
+}
+
+static esp_err_t req_gpio_reset(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioResetPin, resp_gpio_reset,
+			RpcReqGpioResetPin, req_gpio_reset_pin,
+			rpc__resp__gpio_reset_pin__init);
+
+	gpio_num_t gpio_num;
+	gpio_num = req_payload->gpio_num;
+
+	if (!transport_gpio_pin_guard_is_eligible(gpio_num)) {
+		ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", gpio_num);
+		resp_payload->resp = ESP_ERR_INVALID_ARG;
+		return ESP_OK;
+	}
+
+	RPC_RET_FAIL_IF(gpio_reset_pin(gpio_num));
+
+	return ESP_OK;
+}
+
+static esp_err_t req_gpio_set_level(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioSetLevel, resp_gpio_set_level,
+			RpcReqGpioSetLevel, req_gpio_set_level,
+			rpc__resp__gpio_set_level__init);
+
+	gpio_num_t gpio_num;
+	gpio_num = req_payload->gpio_num;
+
+	uint32_t level;
+	level = req_payload->level;
+
+	if (!transport_gpio_pin_guard_is_eligible(gpio_num)) {
+		ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", gpio_num);
+		resp_payload->resp = ESP_ERR_INVALID_ARG;
+		return ESP_OK;
+	}
+
+	RPC_RET_FAIL_IF(gpio_set_level(gpio_num, level));
+
+	return ESP_OK;
+}
+
+static esp_err_t req_gpio_get_level(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioGetLevel, resp_gpio_get_level,
+			RpcReqGpioGetLevel, req_gpio_get_level,
+			rpc__resp__gpio_get_level__init);
+
+	gpio_num_t gpio_num;
+	gpio_num = req_payload->gpio_num;
+
+	if (!transport_gpio_pin_guard_is_eligible(gpio_num)) {
+		ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", gpio_num);
+		resp_payload->resp = ESP_ERR_INVALID_ARG;
+		return ESP_OK;
+	}
+
+	int level = gpio_get_level(gpio_num);
+
+	resp_payload->level = level;
+
+	return ESP_OK;
+}
+
+static esp_err_t req_gpio_set_direction(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioSetDirection, resp_gpio_set_direction,
+			RpcReqGpioSetDirection, req_gpio_set_direction,
+			rpc__resp__gpio_set_direction__init);
+
+	gpio_num_t gpio_num;
+	gpio_num = req_payload->gpio_num;
+
+	gpio_mode_t mode;
+	mode = req_payload->mode;
+
+	if (!transport_gpio_pin_guard_is_eligible(gpio_num)) {
+		ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", gpio_num);
+		resp_payload->resp = ESP_ERR_INVALID_ARG;
+		return ESP_OK;
+	}
+
+	RPC_RET_FAIL_IF(gpio_set_direction(gpio_num, mode));
+
+	return ESP_OK;
+}
+
+static esp_err_t req_gpio_input_enable(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioInputEnable, resp_gpio_input_enable,
+			RpcReqGpioInputEnable, req_gpio_input_enable,
+			rpc__resp__gpio_input_enable__init);
+
+	gpio_num_t gpio_num;
+	gpio_num = req_payload->gpio_num;
+
+	if (!transport_gpio_pin_guard_is_eligible(gpio_num)) {
+		ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", gpio_num);
+		resp_payload->resp = ESP_ERR_INVALID_ARG;
+		return ESP_OK;
+	}
+
+	RPC_RET_FAIL_IF(gpio_input_enable(gpio_num));
+
+	return ESP_OK;
+}
+
+static esp_err_t req_gpio_set_pull_mode(Rpc *req, Rpc *resp, void *priv_data)
+{
+	RPC_TEMPLATE(RpcRespGpioSetPullMode, resp_gpio_set_pull_mode,
+			RpcReqGpioSetPullMode, req_gpio_set_pull_mode,
+			rpc__resp__gpio_set_pull_mode__init);
+
+	gpio_num_t gpio_num;
+	gpio_num = req_payload->gpio_num;
+
+	gpio_pull_mode_t pull_mode;
+	pull_mode = req_payload->pull;
+
+	if (!transport_gpio_pin_guard_is_eligible(gpio_num)) {
+		ESP_LOGE(TAG, "GPIO pin %d is not allowed to be configured", gpio_num);
+		resp_payload->resp = ESP_ERR_INVALID_ARG;
+		return ESP_OK;
+	}
+
+	RPC_RET_FAIL_IF(gpio_set_pull_mode(gpio_num, pull_mode));
+
+	return ESP_OK;
+}
+#endif
+
 static esp_rpc_req_t req_table[] = {
 	{
 		.req_num = RPC_ID__Req_GetMACAddress ,
@@ -3568,6 +4050,10 @@ static esp_rpc_req_t req_table[] = {
 	{
 		.req_num = RPC_ID__Req_OTAEnd,
 		.command_handler = req_ota_end_handler
+	},
+	{
+		.req_num = RPC_ID__Req_OTAActivate,
+		.command_handler = req_ota_activate_handler
 	},
 	{
 		.req_num = RPC_ID__Req_WifiSetMaxTxPower,
@@ -3803,6 +4289,7 @@ static esp_rpc_req_t req_table[] = {
 		.command_handler = req_wifi_sta_itwt_set_target_wake_time_offset
 	},
 #endif // CONFIG_SOC_WIFI_HE_SUPPORT
+
 #if H_WIFI_ENTERPRISE_SUPPORT
 	{
 		.req_num = RPC_ID__Req_WifiStaEnterpriseEnable,
@@ -3945,8 +4432,49 @@ static esp_rpc_req_t req_table[] = {
 		.req_num = RPC_ID__Req_FeatureControl,
 		.command_handler = req_feature_control
 	},
-};
 
+	{
+		.req_num = RPC_ID__Req_AppGetDesc,
+		.command_handler = req_app_get_desc
+	},
+#ifdef CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+	{
+		.req_num = RPC_ID__Req_CustomRpc,
+		.command_handler = req_custom_rpc_handler
+	},
+#endif
+
+#if H_GPIO_EXPANDER_SUPPORT
+	{
+		.req_num = RPC_ID__Req_GpioConfig,
+		.command_handler = req_gpio_config
+	},
+	{
+		.req_num = RPC_ID__Req_GpioResetPin,
+		.command_handler = req_gpio_reset
+	},
+	{
+		.req_num = RPC_ID__Req_GpioSetLevel,
+		.command_handler = req_gpio_set_level
+	},
+	{
+		.req_num = RPC_ID__Req_GpioGetLevel,
+		.command_handler = req_gpio_get_level
+	},
+	{
+		.req_num = RPC_ID__Req_GpioSetDirection,
+		.command_handler = req_gpio_set_direction
+	},
+	{
+		.req_num = RPC_ID__Req_GpioInputEnable,
+		.command_handler = req_gpio_input_enable
+	},
+	{
+		.req_num = RPC_ID__Req_GpioSetPullMode,
+		.command_handler = req_gpio_set_pull_mode
+	},
+#endif
+};
 
 static int lookup_req_handler(int req_id)
 {
@@ -3976,7 +4504,9 @@ static esp_err_t esp_rpc_command_dispatcher(
 		goto err_not_supported;
 	}
 
-	ESP_LOGI(TAG, "Received Req [0x%x]", req->msg_id);
+	if (req->msg_id != RPC_ID__Req_OTAWrite) {
+		ESP_LOGI(TAG, "Received Req [0x%x]", req->msg_id);
+	}
 
 	req_index = lookup_req_handler(req->msg_id);
 	if (req_index < 0) {
@@ -4039,7 +4569,10 @@ esp_err_t data_transfer_handler(uint32_t session_id,const uint8_t *inbuf,
 	resp->msg_id = req->msg_id - RPC_ID__Req_Base + RPC_ID__Resp_Base;
 	resp->uid = req->uid;
 	resp->payload_case = resp->msg_id;
-	ESP_LOGI(TAG, "Resp_MSGId for req[0x%x] is [0x%x], uid %ld", req->msg_id, resp->msg_id, resp->uid);
+
+	if (resp->msg_id != RPC_ID__Resp_OTAWrite) {
+		ESP_LOGI(TAG, "Resp_MSGId for req[0x%x] is [0x%x], uid %ld", req->msg_id, resp->msg_id, resp->uid);
+	}
 	ret = esp_rpc_command_dispatcher(req,resp,NULL);
 	if (ret) {
 		ESP_LOGE(TAG, "Command dispatching not happening");
@@ -4092,13 +4625,13 @@ static esp_err_t rpc_evt_ESPInit(Rpc *ntfy)
 	ntfy->payload_case = RPC__PAYLOAD_EVENT_ESP_INIT;
 	ntfy->event_esp_init = ntfy_payload;
 
+	ntfy_payload->cp_reset_reason = esp_reset_reason();
 	return ESP_OK;
 }
 
 static esp_err_t rpc_evt_heartbeat(Rpc *ntfy)
 {
 	RpcEventHeartbeat *ntfy_payload = NULL;
-
 
 	ntfy_payload = (RpcEventHeartbeat*)
 		calloc(1,sizeof(RpcEventHeartbeat));
@@ -4558,6 +5091,32 @@ static esp_err_t rpc_evt_wifi_dpp_fail(Rpc *ntfy,
 #endif // H_WIFI_DPP_SUPPORT
 #endif // H_DPP_SUPPORT
 
+#ifdef CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+/* Custom RPC event handler - converts raw data to protobuf */
+static esp_err_t rpc_evt_custom_rpc(Rpc *ntfy, const uint8_t *data, ssize_t len)
+{
+
+	NTFY_TEMPLATE(RPC_ID__Event_CustomRpc,
+			RpcEventCustomRpc, event_custom_rpc,
+			rpc__event__custom_rpc__init);
+
+	ntfy_payload->resp = SUCCESS;
+
+	/* Extract msg_id from first 4 bytes */
+	uint32_t msg_id;
+	memcpy(&msg_id, data, sizeof(msg_id));
+	ntfy_payload->custom_event_id = msg_id;
+
+	/* Copy user data (skip msg_id at start) */
+	ssize_t user_data_len = len - sizeof(msg_id);
+	if (user_data_len > 0) {
+		NTFY_COPY_BYTES(ntfy_payload->data, data + sizeof(msg_id), user_data_len);
+	}
+
+	return ESP_OK;
+}
+#endif
+
 esp_err_t rpc_evt_handler(uint32_t session_id,const uint8_t *inbuf,
 		ssize_t inlen, uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
@@ -4644,6 +5203,11 @@ esp_err_t rpc_evt_handler(uint32_t session_id,const uint8_t *inbuf,
 			ret = rpc_evt_wifi_dpp_fail(ntfy, inbuf, inlen);
 			break;
 #endif // H_WIFI_DPP_SUPPORT
+#ifdef CONFIG_ESP_HOSTED_ENABLE_PEER_DATA_TRANSFER
+		} case RPC_ID__Event_CustomRpc: {
+			ret = rpc_evt_custom_rpc(ntfy, inbuf, inlen);
+			break;
+#endif
 		} default: {
 			ESP_LOGE(TAG, "Incorrect/unsupported Ctrl Notification[%u]\n",ntfy->msg_id);
 			goto err;

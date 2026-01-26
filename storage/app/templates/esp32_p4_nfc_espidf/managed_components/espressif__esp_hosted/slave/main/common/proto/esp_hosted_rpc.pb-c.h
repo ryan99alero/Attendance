@@ -61,6 +61,7 @@ typedef struct WifiProtocols WifiProtocols;
 typedef struct WifiBandwidths WifiBandwidths;
 typedef struct WifiItwtSetupConfig WifiItwtSetupConfig;
 typedef struct WifiTwtConfig WifiTwtConfig;
+typedef struct EspAppDesc EspAppDesc;
 typedef struct ConnectedSTAList ConnectedSTAList;
 typedef struct EapFastConfig EapFastConfig;
 typedef struct RpcReqGetMacAddress RpcReqGetMacAddress;
@@ -81,6 +82,10 @@ typedef struct RpcReqOTAWrite RpcReqOTAWrite;
 typedef struct RpcRespOTAWrite RpcRespOTAWrite;
 typedef struct RpcReqOTAEnd RpcReqOTAEnd;
 typedef struct RpcRespOTAEnd RpcRespOTAEnd;
+typedef struct RpcReqOTAActivate RpcReqOTAActivate;
+typedef struct RpcRespOTAActivate RpcRespOTAActivate;
+typedef struct RpcReqAppGetDesc RpcReqAppGetDesc;
+typedef struct RpcRespAppGetDesc RpcRespAppGetDesc;
 typedef struct RpcReqWifiSetMaxTxPower RpcReqWifiSetMaxTxPower;
 typedef struct RpcRespWifiSetMaxTxPower RpcRespWifiSetMaxTxPower;
 typedef struct RpcReqWifiGetMaxTxPower RpcReqWifiGetMaxTxPower;
@@ -219,6 +224,21 @@ typedef struct RpcEventAPStaConnected RpcEventAPStaConnected;
 typedef struct RpcEventStaScanDone RpcEventStaScanDone;
 typedef struct RpcEventStaConnected RpcEventStaConnected;
 typedef struct RpcEventStaDisconnected RpcEventStaDisconnected;
+typedef struct RpcGpioConfig RpcGpioConfig;
+typedef struct RpcReqGpioConfig RpcReqGpioConfig;
+typedef struct RpcRespGpioConfig RpcRespGpioConfig;
+typedef struct RpcReqGpioResetPin RpcReqGpioResetPin;
+typedef struct RpcRespGpioResetPin RpcRespGpioResetPin;
+typedef struct RpcReqGpioSetLevel RpcReqGpioSetLevel;
+typedef struct RpcRespGpioSetLevel RpcRespGpioSetLevel;
+typedef struct RpcReqGpioGetLevel RpcReqGpioGetLevel;
+typedef struct RpcRespGpioGetLevel RpcRespGpioGetLevel;
+typedef struct RpcReqGpioSetDirection RpcReqGpioSetDirection;
+typedef struct RpcRespGpioSetDirection RpcRespGpioSetDirection;
+typedef struct RpcReqGpioInputEnable RpcReqGpioInputEnable;
+typedef struct RpcRespGpioInputEnable RpcRespGpioInputEnable;
+typedef struct RpcReqGpioSetPullMode RpcReqGpioSetPullMode;
+typedef struct RpcRespGpioSetPullMode RpcRespGpioSetPullMode;
 typedef struct RpcEventDhcpDnsStatus RpcEventDhcpDnsStatus;
 typedef struct RpcEventStaItwtSetup RpcEventStaItwtSetup;
 typedef struct RpcEventStaItwtTeardown RpcEventStaItwtTeardown;
@@ -278,6 +298,9 @@ typedef struct RpcEventSuppDppFail RpcEventSuppDppFail;
 typedef struct RpcEventWifiDppUriReady RpcEventWifiDppUriReady;
 typedef struct RpcEventWifiDppCfgRecvd RpcEventWifiDppCfgRecvd;
 typedef struct RpcEventWifiDppFail RpcEventWifiDppFail;
+typedef struct RpcReqCustomRpc RpcReqCustomRpc;
+typedef struct RpcRespCustomRpc RpcRespCustomRpc;
+typedef struct RpcEventCustomRpc RpcEventCustomRpc;
 typedef struct Rpc Rpc;
 
 
@@ -407,6 +430,20 @@ typedef enum _RpcId {
    *0x109
    */
   RPC_ID__Req_SuppDppStopListen = 265,
+  /*
+   *Req_SetSoftAPVendorSpecificIE     = 266; //0x10a
+   *Req_StartSoftAP                   = 267; //0x10b
+   *Req_GetSoftAPConnectedSTAList     = 268; //0x10c
+   *Req_StopSoftAP                    = 269; //0x10d
+   */
+  /*
+   *0x10a
+   */
+  RPC_ID__Req_OTAActivate = 266,
+  /*
+   *0x10b
+   */
+  RPC_ID__Req_AppGetDesc = 267,
   /*
    *0x10e
    */
@@ -890,13 +927,48 @@ typedef enum _RpcId {
    */
   RPC_ID__Req_FeatureControl = 387,
   /*
-   * Add new control path command response before Req_Max
-   * and update Req_Max 
+   * Custom RPC for user-defined packed structures 
    */
   /*
    *0x184
    */
-  RPC_ID__Req_Max = 388,
+  RPC_ID__Req_CustomRpc = 388,
+  /*
+   * 0x185
+   */
+  RPC_ID__Req_GpioConfig = 389,
+  /*
+   * 0x186
+   */
+  RPC_ID__Req_GpioResetPin = 390,
+  /*
+   * 0x187
+   */
+  RPC_ID__Req_GpioSetLevel = 391,
+  /*
+   * 0x188
+   */
+  RPC_ID__Req_GpioGetLevel = 392,
+  /*
+   * 0x189
+   */
+  RPC_ID__Req_GpioSetDirection = 393,
+  /*
+   * 0x18a
+   */
+  RPC_ID__Req_GpioInputEnable = 394,
+  /*
+   * 0x18B
+   */
+  RPC_ID__Req_GpioSetPullMode = 395,
+  /*
+   * Add new control path command response before Req_Max
+   * and update Req_Max 
+   */
+  /*
+   *0x18C
+   */
+  RPC_ID__Req_Max = 396,
   /*
    ** Response Msgs *
    */
@@ -910,6 +982,14 @@ typedef enum _RpcId {
   RPC_ID__Resp_SuppDppBootstrapGen = 519,
   RPC_ID__Resp_SuppDppStartListen = 520,
   RPC_ID__Resp_SuppDppStopListen = 521,
+  /*
+   *Resp_SetSoftAPVendorSpecificIE    = 522;
+   *Resp_StartSoftAP                  = 523;
+   *Resp_GetSoftAPConnectedSTAList    = 524;
+   *Resp_StopSoftAP                   = 525;
+   */
+  RPC_ID__Resp_OTAActivate = 522,
+  RPC_ID__Resp_AppGetDesc = 523,
   RPC_ID__Resp_WifiSetPs = 526,
   RPC_ID__Resp_WifiGetPs = 527,
   RPC_ID__Resp_OTABegin = 528,
@@ -1039,11 +1119,19 @@ typedef enum _RpcId {
   RPC_ID__Resp_IfaceMacAddrSetGet = 641,
   RPC_ID__Resp_IfaceMacAddrLenGet = 642,
   RPC_ID__Resp_FeatureControl = 643,
+  RPC_ID__Resp_CustomRpc = 644,
+  RPC_ID__Resp_GpioConfig = 645,
+  RPC_ID__Resp_GpioResetPin = 646,
+  RPC_ID__Resp_GpioSetLevel = 647,
+  RPC_ID__Resp_GpioGetLevel = 648,
+  RPC_ID__Resp_GpioSetDirection = 649,
+  RPC_ID__Resp_GpioInputEnable = 650,
+  RPC_ID__Resp_GpioSetPullMode = 651,
   /*
    * Add new control path command response before Resp_Max
    * and update Resp_Max 
    */
-  RPC_ID__Resp_Max = 644,
+  RPC_ID__Resp_Max = 652,
   /*
    ** Event Msgs *
    */
@@ -1074,12 +1162,29 @@ typedef enum _RpcId {
   RPC_ID__Event_WifiDppCfgRecvd = 786,
   RPC_ID__Event_WifiDppFail = 787,
   /*
+   * Custom RPC event for user-defined packed structures 
+   */
+  RPC_ID__Event_CustomRpc = 788,
+  /*
    * Add new control path command notification before Event_Max
    * and update Event_Max 
    */
-  RPC_ID__Event_Max = 788
+  RPC_ID__Event_Max = 789
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RPC_ID)
 } RpcId;
+typedef enum _RpcGpioMode {
+  RPC__GPIO_MODE__GPIO_MODE_DISABLE = 0,
+  RPC__GPIO_MODE__GPIO_MODE_INPUT = 1,
+  RPC__GPIO_MODE__GPIO_MODE_OUTPUT = 2,
+  RPC__GPIO_MODE__GPIO_MODE_INPUT_OUTPUT = 3
+    PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RPC__GPIO_MODE)
+} RpcGpioMode;
+typedef enum _RpcGpioPullMode {
+  RPC__GPIO_PULL_MODE__GPIO_PULL_NONE = 0,
+  RPC__GPIO_PULL_MODE__GPIO_PULL_UP = 1,
+  RPC__GPIO_PULL_MODE__GPIO_PULL_DOWN = 2
+    PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RPC__GPIO_PULL_MODE)
+} RpcGpioPullMode;
 
 /* --- messages --- */
 
@@ -1426,7 +1531,7 @@ struct  WifiScanThreshold
   int32_t rssi;
   /*
    **< The weakest authmode to accept in the fast scan mode
-   *Note: Incase this value is not set and password is set as per WPA2 standards(password len >= 8),
+   *Note: In case this value is not set and password is set as per WPA2 standards(password len >= 8),
    *it will be defaulted to WPA2 and device won't connect to deprecated WEP/WPA networks.
    *Please set authmode threshold as WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK to connect to WEP/WPA networks 
    */
@@ -1445,11 +1550,11 @@ struct  WifiPmfConfig
 {
   ProtobufCMessage base;
   /*
-   **< Deprecated variable. Device will always connect in PMF mode if other device also advertizes PMF capability. 
+   **< Deprecated variable. Device will always connect in PMF mode if other device also advertises PMF capability. 
    */
   protobuf_c_boolean capable;
   /*
-   **< Advertizes that Protected Management Frame is required. Device will not associate to non-PMF capable devices. 
+   **< Advertises that Protected Management Frame is required. Device will not associate to non-PMF capable devices. 
    */
   protobuf_c_boolean required;
 };
@@ -1602,7 +1707,7 @@ struct  WifiStaConfig
    */
   WifiScanThreshold *threshold;
   /*
-   **< Configuration for Protected Management Frame. Will be advertized in RSN Capabilities in RSN IE. 
+   **< Configuration for Protected Management Frame. Will be advertised in RSN Capabilities in RSN IE. 
    */
   WifiPmfConfig *pmf_cfg;
   /*
@@ -1622,7 +1727,7 @@ struct  WifiStaConfig
   /*
    **< Number of connection retries station will do before moving to next AP.
    *scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config.
-   *Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. 
+   *Note: Enabling this may cause connection time to increase in case best AP doesn't behave properly. 
    */
   uint32_t failure_retry_cnt;
   /*
@@ -2472,6 +2577,71 @@ struct  WifiTwtConfig
     , 0, 0 }
 
 
+struct  EspAppDesc
+{
+  ProtobufCMessage base;
+  /*
+   *!< Magic word ESP_APP_DESC_MAGIC_WORD 
+   */
+  uint32_t magic_word;
+  /*
+   *!< Secure version 
+   */
+  uint32_t secure_version;
+  /*
+   *!< reserv1 
+   */
+  ProtobufCBinaryData reserv1;
+  /*
+   *!< Application version 
+   */
+  ProtobufCBinaryData version;
+  /*
+   *!< Project name 
+   */
+  ProtobufCBinaryData project_name;
+  /*
+   *!< Compile time 
+   */
+  ProtobufCBinaryData time;
+  /*
+   *!< Compile date
+   */
+  ProtobufCBinaryData date;
+  /*
+   *!< Version IDF 
+   */
+  ProtobufCBinaryData idf_ver;
+  /*
+   *!< sha256 of elf file 
+   */
+  ProtobufCBinaryData app_elf_sha256;
+  /*
+   *!< Minimal eFuse block revision supported by image, in format: major * 100 + minor 
+   */
+  uint32_t min_efuse_blk_rev_full;
+  /*
+   *!< Maximal eFuse block revision supported by image, in format: major * 100 + minor 
+   */
+  uint32_t max_efuse_blk_rev_full;
+  /*
+   *!< MMU page size in log base 2 format 
+   */
+  uint32_t mmu_page_size;
+  /*
+   *!< reserv3 
+   */
+  ProtobufCBinaryData reserv3;
+  /*
+   *!< reserv2 
+   */
+  ProtobufCBinaryData reserv2;
+};
+#define ESP_APP_DESC__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&esp_app_desc__descriptor) \
+    , 0, 0, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0, {0,NULL}, {0,NULL} }
+
+
 struct  ConnectedSTAList
 {
   ProtobufCMessage base;
@@ -2685,6 +2855,45 @@ struct  RpcRespOTAEnd
 #define RPC__RESP__OTAEND__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__otaend__descriptor) \
     , 0 }
+
+
+struct  RpcReqOTAActivate
+{
+  ProtobufCMessage base;
+};
+#define RPC__REQ__OTAACTIVATE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__otaactivate__descriptor) \
+     }
+
+
+struct  RpcRespOTAActivate
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__OTAACTIVATE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__otaactivate__descriptor) \
+    , 0 }
+
+
+struct  RpcReqAppGetDesc
+{
+  ProtobufCMessage base;
+};
+#define RPC__REQ__APP_GET_DESC__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__app_get_desc__descriptor) \
+     }
+
+
+struct  RpcRespAppGetDesc
+{
+  ProtobufCMessage base;
+  int32_t resp;
+  EspAppDesc *app_desc;
+};
+#define RPC__RESP__APP_GET_DESC__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__app_get_desc__descriptor) \
+    , 0, NULL }
 
 
 struct  RpcReqWifiSetMaxTxPower
@@ -4070,11 +4279,15 @@ struct  RpcEventWifiEventNoArgs
 struct  RpcEventESPInit
 {
   ProtobufCMessage base;
+  /*
+   * reserved
+   */
   ProtobufCBinaryData init_data;
+  uint32_t cp_reset_reason;
 };
 #define RPC__EVENT__ESPINIT__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&rpc__event__espinit__descriptor) \
-    , {0,NULL} }
+    , {0,NULL}, 0 }
 
 
 struct  RpcEventHeartbeat
@@ -4145,6 +4358,167 @@ struct  RpcEventStaDisconnected
 #define RPC__EVENT__STA_DISCONNECTED__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&rpc__event__sta_disconnected__descriptor) \
     , 0, NULL }
+
+
+struct  RpcGpioConfig
+{
+  ProtobufCMessage base;
+  uint64_t pin_bit_mask;
+  RpcGpioMode mode;
+  protobuf_c_boolean pull_up_en;
+  protobuf_c_boolean pull_down_en;
+  int32_t intr_type;
+};
+#define RPC__GPIO_CONFIG__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__gpio_config__descriptor) \
+    , 0, RPC__GPIO_MODE__GPIO_MODE_DISABLE, 0, 0, 0 }
+
+
+struct  RpcReqGpioConfig
+{
+  ProtobufCMessage base;
+  RpcGpioConfig *config;
+};
+#define RPC__REQ__GPIO_CONFIG__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_config__descriptor) \
+    , NULL }
+
+
+struct  RpcRespGpioConfig
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__GPIO_CONFIG__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_config__descriptor) \
+    , 0 }
+
+
+struct  RpcReqGpioResetPin
+{
+  ProtobufCMessage base;
+  int32_t gpio_num;
+};
+#define RPC__REQ__GPIO_RESET_PIN__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_reset_pin__descriptor) \
+    , 0 }
+
+
+struct  RpcRespGpioResetPin
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__GPIO_RESET_PIN__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_reset_pin__descriptor) \
+    , 0 }
+
+
+struct  RpcReqGpioSetLevel
+{
+  ProtobufCMessage base;
+  int32_t gpio_num;
+  /*
+   * 0 or 1
+   */
+  uint32_t level;
+};
+#define RPC__REQ__GPIO_SET_LEVEL__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_set_level__descriptor) \
+    , 0, 0 }
+
+
+struct  RpcRespGpioSetLevel
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__GPIO_SET_LEVEL__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_set_level__descriptor) \
+    , 0 }
+
+
+struct  RpcReqGpioGetLevel
+{
+  ProtobufCMessage base;
+  int32_t gpio_num;
+};
+#define RPC__REQ__GPIO_GET_LEVEL__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_get_level__descriptor) \
+    , 0 }
+
+
+struct  RpcRespGpioGetLevel
+{
+  ProtobufCMessage base;
+  int32_t resp;
+  uint32_t level;
+};
+#define RPC__RESP__GPIO_GET_LEVEL__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_get_level__descriptor) \
+    , 0, 0 }
+
+
+struct  RpcReqGpioSetDirection
+{
+  ProtobufCMessage base;
+  int32_t gpio_num;
+  RpcGpioMode mode;
+};
+#define RPC__REQ__GPIO_SET_DIRECTION__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_set_direction__descriptor) \
+    , 0, RPC__GPIO_MODE__GPIO_MODE_DISABLE }
+
+
+struct  RpcRespGpioSetDirection
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__GPIO_SET_DIRECTION__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_set_direction__descriptor) \
+    , 0 }
+
+
+struct  RpcReqGpioInputEnable
+{
+  ProtobufCMessage base;
+  int32_t gpio_num;
+};
+#define RPC__REQ__GPIO_INPUT_ENABLE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_input_enable__descriptor) \
+    , 0 }
+
+
+struct  RpcRespGpioInputEnable
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__GPIO_INPUT_ENABLE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_input_enable__descriptor) \
+    , 0 }
+
+
+struct  RpcReqGpioSetPullMode
+{
+  ProtobufCMessage base;
+  int32_t gpio_num;
+  RpcGpioPullMode pull;
+};
+#define RPC__REQ__GPIO_SET_PULL_MODE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__gpio_set_pull_mode__descriptor) \
+    , 0, RPC__GPIO_PULL_MODE__GPIO_PULL_NONE }
+
+
+struct  RpcRespGpioSetPullMode
+{
+  ProtobufCMessage base;
+  int32_t resp;
+};
+#define RPC__RESP__GPIO_SET_PULL_MODE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__gpio_set_pull_mode__descriptor) \
+    , 0 }
 
 
 struct  RpcEventDhcpDnsStatus
@@ -4782,6 +5156,68 @@ struct  RpcEventWifiDppFail
     , 0, 0 }
 
 
+/*
+ * Custom RPC messages for user-defined packed structures 
+ */
+struct  RpcReqCustomRpc
+{
+  ProtobufCMessage base;
+  /*
+   * User-defined message ID 
+   */
+  uint32_t custom_msg_id;
+  /*
+   * Raw packed data 
+   */
+  ProtobufCBinaryData data;
+};
+#define RPC__REQ__CUSTOM_RPC__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__req__custom_rpc__descriptor) \
+    , 0, {0,NULL} }
+
+
+struct  RpcRespCustomRpc
+{
+  ProtobufCMessage base;
+  /*
+   * Response status 
+   */
+  int32_t resp;
+  /*
+   * User-defined message ID (echoed from request) 
+   */
+  uint32_t custom_msg_id;
+  /*
+   * Raw packed response data 
+   */
+  ProtobufCBinaryData data;
+};
+#define RPC__RESP__CUSTOM_RPC__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__resp__custom_rpc__descriptor) \
+    , 0, 0, {0,NULL} }
+
+
+struct  RpcEventCustomRpc
+{
+  ProtobufCMessage base;
+  /*
+   * Event status 
+   */
+  int32_t resp;
+  /*
+   * User-defined event ID 
+   */
+  uint32_t custom_event_id;
+  /*
+   * Raw packed event data 
+   */
+  ProtobufCBinaryData data;
+};
+#define RPC__EVENT__CUSTOM_RPC__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rpc__event__custom_rpc__descriptor) \
+    , 0, 0, {0,NULL} }
+
+
 typedef enum {
   RPC__PAYLOAD__NOT_SET = 0,
   RPC__PAYLOAD_REQ_GET_MAC_ADDRESS = 257,
@@ -4793,6 +5229,8 @@ typedef enum {
   RPC__PAYLOAD_REQ_SUPP_DPP_BOOTSTRAP_GEN = 263,
   RPC__PAYLOAD_REQ_SUPP_DPP_START_LISTEN = 264,
   RPC__PAYLOAD_REQ_SUPP_DPP_STOP_LISTEN = 265,
+  RPC__PAYLOAD_REQ_OTA_ACTIVATE = 266,
+  RPC__PAYLOAD_REQ_APP_GET_DESC = 267,
   RPC__PAYLOAD_REQ_WIFI_SET_PS = 270,
   RPC__PAYLOAD_REQ_WIFI_GET_PS = 271,
   RPC__PAYLOAD_REQ_OTA_BEGIN = 272,
@@ -4882,6 +5320,14 @@ typedef enum {
   RPC__PAYLOAD_REQ_IFACE_MAC_ADDR_SET_GET = 385,
   RPC__PAYLOAD_REQ_IFACE_MAC_ADDR_LEN_GET = 386,
   RPC__PAYLOAD_REQ_FEATURE_CONTROL = 387,
+  RPC__PAYLOAD_REQ_CUSTOM_RPC = 388,
+  RPC__PAYLOAD_REQ_GPIO_CONFIG = 389,
+  RPC__PAYLOAD_REQ_GPIO_RESET_PIN = 390,
+  RPC__PAYLOAD_REQ_GPIO_SET_LEVEL = 391,
+  RPC__PAYLOAD_REQ_GPIO_GET_LEVEL = 392,
+  RPC__PAYLOAD_REQ_GPIO_SET_DIRECTION = 393,
+  RPC__PAYLOAD_REQ_GPIO_INPUT_ENABLE = 394,
+  RPC__PAYLOAD_REQ_GPIO_SET_PULL_MODE = 395,
   RPC__PAYLOAD_RESP_GET_MAC_ADDRESS = 513,
   RPC__PAYLOAD_RESP_SET_MAC_ADDRESS = 514,
   RPC__PAYLOAD_RESP_GET_WIFI_MODE = 515,
@@ -4891,6 +5337,8 @@ typedef enum {
   RPC__PAYLOAD_RESP_SUPP_DPP_BOOTSTRAP_GEN = 519,
   RPC__PAYLOAD_RESP_SUPP_DPP_START_LISTEN = 520,
   RPC__PAYLOAD_RESP_SUPP_DPP_STOP_LISTEN = 521,
+  RPC__PAYLOAD_RESP_OTA_ACTIVATE = 522,
+  RPC__PAYLOAD_RESP_APP_GET_DESC = 523,
   RPC__PAYLOAD_RESP_WIFI_SET_PS = 526,
   RPC__PAYLOAD_RESP_WIFI_GET_PS = 527,
   RPC__PAYLOAD_RESP_OTA_BEGIN = 528,
@@ -4980,6 +5428,14 @@ typedef enum {
   RPC__PAYLOAD_RESP_IFACE_MAC_ADDR_SET_GET = 641,
   RPC__PAYLOAD_RESP_IFACE_MAC_ADDR_LEN_GET = 642,
   RPC__PAYLOAD_RESP_FEATURE_CONTROL = 643,
+  RPC__PAYLOAD_RESP_CUSTOM_RPC = 644,
+  RPC__PAYLOAD_RESP_GPIO_CONFIG = 645,
+  RPC__PAYLOAD_RESP_GPIO_RESET = 646,
+  RPC__PAYLOAD_RESP_GPIO_SET_LEVEL = 647,
+  RPC__PAYLOAD_RESP_GPIO_GET_LEVEL = 648,
+  RPC__PAYLOAD_RESP_GPIO_SET_DIRECTION = 649,
+  RPC__PAYLOAD_RESP_GPIO_INPUT_ENABLE = 650,
+  RPC__PAYLOAD_RESP_GPIO_SET_PULL_MODE = 651,
   RPC__PAYLOAD_EVENT_ESP_INIT = 769,
   RPC__PAYLOAD_EVENT_HEARTBEAT = 770,
   RPC__PAYLOAD_EVENT_AP_STA_CONNECTED = 771,
@@ -4998,7 +5454,8 @@ typedef enum {
   RPC__PAYLOAD_EVENT_SUPP_DPP_FAIL = 784,
   RPC__PAYLOAD_EVENT_WIFI_DPP_URI_READY = 785,
   RPC__PAYLOAD_EVENT_WIFI_DPP_CFG_RECVD = 786,
-  RPC__PAYLOAD_EVENT_WIFI_DPP_FAIL = 787
+  RPC__PAYLOAD_EVENT_WIFI_DPP_FAIL = 787,
+  RPC__PAYLOAD_EVENT_CUSTOM_RPC = 788
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RPC__PAYLOAD__CASE)
 } Rpc__PayloadCase;
 
@@ -5031,6 +5488,13 @@ struct  Rpc
     RpcReqSuppDppBootstrapGen *req_supp_dpp_bootstrap_gen;
     RpcReqSuppDppStartListen *req_supp_dpp_start_listen;
     RpcReqSuppDppStopListen *req_supp_dpp_stop_listen;
+    /*
+     *Rpc_Req_StartSoftAP                 req_start_softap                  = 267;
+     *Rpc_Req_SoftAPConnectedSTA          req_softap_connected_stas_list    = 268;
+     *Rpc_Req_GetStatus                   req_stop_softap                   = 269;
+     */
+    RpcReqOTAActivate *req_ota_activate;
+    RpcReqAppGetDesc *req_app_get_desc;
     RpcReqSetPs *req_wifi_set_ps;
     RpcReqGetPs *req_wifi_get_ps;
     RpcReqOTABegin *req_ota_begin;
@@ -5120,6 +5584,14 @@ struct  Rpc
     RpcReqIfaceMacAddrSetGet *req_iface_mac_addr_set_get;
     RpcReqIfaceMacAddrLenGet *req_iface_mac_addr_len_get;
     RpcReqFeatureControl *req_feature_control;
+    RpcReqCustomRpc *req_custom_rpc;
+    RpcReqGpioConfig *req_gpio_config;
+    RpcReqGpioResetPin *req_gpio_reset_pin;
+    RpcReqGpioSetLevel *req_gpio_set_level;
+    RpcReqGpioGetLevel *req_gpio_get_level;
+    RpcReqGpioSetDirection *req_gpio_set_direction;
+    RpcReqGpioInputEnable *req_gpio_input_enable;
+    RpcReqGpioSetPullMode *req_gpio_set_pull_mode;
     /*
      ** Responses *
      */
@@ -5132,6 +5604,14 @@ struct  Rpc
     RpcRespSuppDppBootstrapGen *resp_supp_dpp_bootstrap_gen;
     RpcRespSuppDppStartListen *resp_supp_dpp_start_listen;
     RpcRespSuppDppStopListen *resp_supp_dpp_stop_listen;
+    /*
+     *Rpc_Resp_SetSoftAPVendorSpecificIE  resp_set_softap_vendor_specific_ie = 522;
+     *Rpc_Resp_StartSoftAP                resp_start_softap                  = 523;
+     *Rpc_Resp_SoftAPConnectedSTA         resp_softap_connected_stas_list    = 524;
+     *Rpc_Resp_GetStatus                  resp_stop_softap                   = 525;
+     */
+    RpcRespOTAActivate *resp_ota_activate;
+    RpcRespAppGetDesc *resp_app_get_desc;
     RpcRespSetPs *resp_wifi_set_ps;
     RpcRespGetPs *resp_wifi_get_ps;
     RpcRespOTABegin *resp_ota_begin;
@@ -5221,6 +5701,14 @@ struct  Rpc
     RpcRespIfaceMacAddrSetGet *resp_iface_mac_addr_set_get;
     RpcRespIfaceMacAddrLenGet *resp_iface_mac_addr_len_get;
     RpcRespFeatureControl *resp_feature_control;
+    RpcRespCustomRpc *resp_custom_rpc;
+    RpcRespGpioConfig *resp_gpio_config;
+    RpcRespGpioResetPin *resp_gpio_reset;
+    RpcRespGpioSetLevel *resp_gpio_set_level;
+    RpcRespGpioGetLevel *resp_gpio_get_level;
+    RpcRespGpioSetDirection *resp_gpio_set_direction;
+    RpcRespGpioInputEnable *resp_gpio_input_enable;
+    RpcRespGpioSetPullMode *resp_gpio_set_pull_mode;
     /*
      ** Notifications *
      */
@@ -5243,6 +5731,7 @@ struct  Rpc
     RpcEventWifiDppUriReady *event_wifi_dpp_uri_ready;
     RpcEventWifiDppCfgRecvd *event_wifi_dpp_cfg_recvd;
     RpcEventWifiDppFail *event_wifi_dpp_fail;
+    RpcEventCustomRpc *event_custom_rpc;
   };
 };
 #define RPC__INIT \
@@ -6124,6 +6613,25 @@ WifiTwtConfig *
 void   wifi_twt_config__free_unpacked
                      (WifiTwtConfig *message,
                       ProtobufCAllocator *allocator);
+/* EspAppDesc methods */
+void   esp_app_desc__init
+                     (EspAppDesc         *message);
+size_t esp_app_desc__get_packed_size
+                     (const EspAppDesc   *message);
+size_t esp_app_desc__pack
+                     (const EspAppDesc   *message,
+                      uint8_t             *out);
+size_t esp_app_desc__pack_to_buffer
+                     (const EspAppDesc   *message,
+                      ProtobufCBuffer     *buffer);
+EspAppDesc *
+       esp_app_desc__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   esp_app_desc__free_unpacked
+                     (EspAppDesc *message,
+                      ProtobufCAllocator *allocator);
 /* ConnectedSTAList methods */
 void   connected_stalist__init
                      (ConnectedSTAList         *message);
@@ -6503,6 +7011,82 @@ RpcRespOTAEnd *
                       const uint8_t       *data);
 void   rpc__resp__otaend__free_unpacked
                      (RpcRespOTAEnd *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqOTAActivate methods */
+void   rpc__req__otaactivate__init
+                     (RpcReqOTAActivate         *message);
+size_t rpc__req__otaactivate__get_packed_size
+                     (const RpcReqOTAActivate   *message);
+size_t rpc__req__otaactivate__pack
+                     (const RpcReqOTAActivate   *message,
+                      uint8_t             *out);
+size_t rpc__req__otaactivate__pack_to_buffer
+                     (const RpcReqOTAActivate   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqOTAActivate *
+       rpc__req__otaactivate__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__otaactivate__free_unpacked
+                     (RpcReqOTAActivate *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespOTAActivate methods */
+void   rpc__resp__otaactivate__init
+                     (RpcRespOTAActivate         *message);
+size_t rpc__resp__otaactivate__get_packed_size
+                     (const RpcRespOTAActivate   *message);
+size_t rpc__resp__otaactivate__pack
+                     (const RpcRespOTAActivate   *message,
+                      uint8_t             *out);
+size_t rpc__resp__otaactivate__pack_to_buffer
+                     (const RpcRespOTAActivate   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespOTAActivate *
+       rpc__resp__otaactivate__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__otaactivate__free_unpacked
+                     (RpcRespOTAActivate *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqAppGetDesc methods */
+void   rpc__req__app_get_desc__init
+                     (RpcReqAppGetDesc         *message);
+size_t rpc__req__app_get_desc__get_packed_size
+                     (const RpcReqAppGetDesc   *message);
+size_t rpc__req__app_get_desc__pack
+                     (const RpcReqAppGetDesc   *message,
+                      uint8_t             *out);
+size_t rpc__req__app_get_desc__pack_to_buffer
+                     (const RpcReqAppGetDesc   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqAppGetDesc *
+       rpc__req__app_get_desc__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__app_get_desc__free_unpacked
+                     (RpcReqAppGetDesc *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespAppGetDesc methods */
+void   rpc__resp__app_get_desc__init
+                     (RpcRespAppGetDesc         *message);
+size_t rpc__resp__app_get_desc__get_packed_size
+                     (const RpcRespAppGetDesc   *message);
+size_t rpc__resp__app_get_desc__pack
+                     (const RpcRespAppGetDesc   *message,
+                      uint8_t             *out);
+size_t rpc__resp__app_get_desc__pack_to_buffer
+                     (const RpcRespAppGetDesc   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespAppGetDesc *
+       rpc__resp__app_get_desc__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__app_get_desc__free_unpacked
+                     (RpcRespAppGetDesc *message,
                       ProtobufCAllocator *allocator);
 /* RpcReqWifiSetMaxTxPower methods */
 void   rpc__req__wifi_set_max_tx_power__init
@@ -9126,6 +9710,291 @@ RpcEventStaDisconnected *
 void   rpc__event__sta_disconnected__free_unpacked
                      (RpcEventStaDisconnected *message,
                       ProtobufCAllocator *allocator);
+/* RpcGpioConfig methods */
+void   rpc__gpio_config__init
+                     (RpcGpioConfig         *message);
+size_t rpc__gpio_config__get_packed_size
+                     (const RpcGpioConfig   *message);
+size_t rpc__gpio_config__pack
+                     (const RpcGpioConfig   *message,
+                      uint8_t             *out);
+size_t rpc__gpio_config__pack_to_buffer
+                     (const RpcGpioConfig   *message,
+                      ProtobufCBuffer     *buffer);
+RpcGpioConfig *
+       rpc__gpio_config__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__gpio_config__free_unpacked
+                     (RpcGpioConfig *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioConfig methods */
+void   rpc__req__gpio_config__init
+                     (RpcReqGpioConfig         *message);
+size_t rpc__req__gpio_config__get_packed_size
+                     (const RpcReqGpioConfig   *message);
+size_t rpc__req__gpio_config__pack
+                     (const RpcReqGpioConfig   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_config__pack_to_buffer
+                     (const RpcReqGpioConfig   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioConfig *
+       rpc__req__gpio_config__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_config__free_unpacked
+                     (RpcReqGpioConfig *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioConfig methods */
+void   rpc__resp__gpio_config__init
+                     (RpcRespGpioConfig         *message);
+size_t rpc__resp__gpio_config__get_packed_size
+                     (const RpcRespGpioConfig   *message);
+size_t rpc__resp__gpio_config__pack
+                     (const RpcRespGpioConfig   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_config__pack_to_buffer
+                     (const RpcRespGpioConfig   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioConfig *
+       rpc__resp__gpio_config__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_config__free_unpacked
+                     (RpcRespGpioConfig *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioResetPin methods */
+void   rpc__req__gpio_reset_pin__init
+                     (RpcReqGpioResetPin         *message);
+size_t rpc__req__gpio_reset_pin__get_packed_size
+                     (const RpcReqGpioResetPin   *message);
+size_t rpc__req__gpio_reset_pin__pack
+                     (const RpcReqGpioResetPin   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_reset_pin__pack_to_buffer
+                     (const RpcReqGpioResetPin   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioResetPin *
+       rpc__req__gpio_reset_pin__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_reset_pin__free_unpacked
+                     (RpcReqGpioResetPin *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioResetPin methods */
+void   rpc__resp__gpio_reset_pin__init
+                     (RpcRespGpioResetPin         *message);
+size_t rpc__resp__gpio_reset_pin__get_packed_size
+                     (const RpcRespGpioResetPin   *message);
+size_t rpc__resp__gpio_reset_pin__pack
+                     (const RpcRespGpioResetPin   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_reset_pin__pack_to_buffer
+                     (const RpcRespGpioResetPin   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioResetPin *
+       rpc__resp__gpio_reset_pin__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_reset_pin__free_unpacked
+                     (RpcRespGpioResetPin *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioSetLevel methods */
+void   rpc__req__gpio_set_level__init
+                     (RpcReqGpioSetLevel         *message);
+size_t rpc__req__gpio_set_level__get_packed_size
+                     (const RpcReqGpioSetLevel   *message);
+size_t rpc__req__gpio_set_level__pack
+                     (const RpcReqGpioSetLevel   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_set_level__pack_to_buffer
+                     (const RpcReqGpioSetLevel   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioSetLevel *
+       rpc__req__gpio_set_level__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_set_level__free_unpacked
+                     (RpcReqGpioSetLevel *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioSetLevel methods */
+void   rpc__resp__gpio_set_level__init
+                     (RpcRespGpioSetLevel         *message);
+size_t rpc__resp__gpio_set_level__get_packed_size
+                     (const RpcRespGpioSetLevel   *message);
+size_t rpc__resp__gpio_set_level__pack
+                     (const RpcRespGpioSetLevel   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_set_level__pack_to_buffer
+                     (const RpcRespGpioSetLevel   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioSetLevel *
+       rpc__resp__gpio_set_level__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_set_level__free_unpacked
+                     (RpcRespGpioSetLevel *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioGetLevel methods */
+void   rpc__req__gpio_get_level__init
+                     (RpcReqGpioGetLevel         *message);
+size_t rpc__req__gpio_get_level__get_packed_size
+                     (const RpcReqGpioGetLevel   *message);
+size_t rpc__req__gpio_get_level__pack
+                     (const RpcReqGpioGetLevel   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_get_level__pack_to_buffer
+                     (const RpcReqGpioGetLevel   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioGetLevel *
+       rpc__req__gpio_get_level__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_get_level__free_unpacked
+                     (RpcReqGpioGetLevel *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioGetLevel methods */
+void   rpc__resp__gpio_get_level__init
+                     (RpcRespGpioGetLevel         *message);
+size_t rpc__resp__gpio_get_level__get_packed_size
+                     (const RpcRespGpioGetLevel   *message);
+size_t rpc__resp__gpio_get_level__pack
+                     (const RpcRespGpioGetLevel   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_get_level__pack_to_buffer
+                     (const RpcRespGpioGetLevel   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioGetLevel *
+       rpc__resp__gpio_get_level__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_get_level__free_unpacked
+                     (RpcRespGpioGetLevel *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioSetDirection methods */
+void   rpc__req__gpio_set_direction__init
+                     (RpcReqGpioSetDirection         *message);
+size_t rpc__req__gpio_set_direction__get_packed_size
+                     (const RpcReqGpioSetDirection   *message);
+size_t rpc__req__gpio_set_direction__pack
+                     (const RpcReqGpioSetDirection   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_set_direction__pack_to_buffer
+                     (const RpcReqGpioSetDirection   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioSetDirection *
+       rpc__req__gpio_set_direction__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_set_direction__free_unpacked
+                     (RpcReqGpioSetDirection *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioSetDirection methods */
+void   rpc__resp__gpio_set_direction__init
+                     (RpcRespGpioSetDirection         *message);
+size_t rpc__resp__gpio_set_direction__get_packed_size
+                     (const RpcRespGpioSetDirection   *message);
+size_t rpc__resp__gpio_set_direction__pack
+                     (const RpcRespGpioSetDirection   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_set_direction__pack_to_buffer
+                     (const RpcRespGpioSetDirection   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioSetDirection *
+       rpc__resp__gpio_set_direction__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_set_direction__free_unpacked
+                     (RpcRespGpioSetDirection *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioInputEnable methods */
+void   rpc__req__gpio_input_enable__init
+                     (RpcReqGpioInputEnable         *message);
+size_t rpc__req__gpio_input_enable__get_packed_size
+                     (const RpcReqGpioInputEnable   *message);
+size_t rpc__req__gpio_input_enable__pack
+                     (const RpcReqGpioInputEnable   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_input_enable__pack_to_buffer
+                     (const RpcReqGpioInputEnable   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioInputEnable *
+       rpc__req__gpio_input_enable__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_input_enable__free_unpacked
+                     (RpcReqGpioInputEnable *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioInputEnable methods */
+void   rpc__resp__gpio_input_enable__init
+                     (RpcRespGpioInputEnable         *message);
+size_t rpc__resp__gpio_input_enable__get_packed_size
+                     (const RpcRespGpioInputEnable   *message);
+size_t rpc__resp__gpio_input_enable__pack
+                     (const RpcRespGpioInputEnable   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_input_enable__pack_to_buffer
+                     (const RpcRespGpioInputEnable   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioInputEnable *
+       rpc__resp__gpio_input_enable__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_input_enable__free_unpacked
+                     (RpcRespGpioInputEnable *message,
+                      ProtobufCAllocator *allocator);
+/* RpcReqGpioSetPullMode methods */
+void   rpc__req__gpio_set_pull_mode__init
+                     (RpcReqGpioSetPullMode         *message);
+size_t rpc__req__gpio_set_pull_mode__get_packed_size
+                     (const RpcReqGpioSetPullMode   *message);
+size_t rpc__req__gpio_set_pull_mode__pack
+                     (const RpcReqGpioSetPullMode   *message,
+                      uint8_t             *out);
+size_t rpc__req__gpio_set_pull_mode__pack_to_buffer
+                     (const RpcReqGpioSetPullMode   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqGpioSetPullMode *
+       rpc__req__gpio_set_pull_mode__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__gpio_set_pull_mode__free_unpacked
+                     (RpcReqGpioSetPullMode *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespGpioSetPullMode methods */
+void   rpc__resp__gpio_set_pull_mode__init
+                     (RpcRespGpioSetPullMode         *message);
+size_t rpc__resp__gpio_set_pull_mode__get_packed_size
+                     (const RpcRespGpioSetPullMode   *message);
+size_t rpc__resp__gpio_set_pull_mode__pack
+                     (const RpcRespGpioSetPullMode   *message,
+                      uint8_t             *out);
+size_t rpc__resp__gpio_set_pull_mode__pack_to_buffer
+                     (const RpcRespGpioSetPullMode   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespGpioSetPullMode *
+       rpc__resp__gpio_set_pull_mode__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__gpio_set_pull_mode__free_unpacked
+                     (RpcRespGpioSetPullMode *message,
+                      ProtobufCAllocator *allocator);
 /* RpcEventDhcpDnsStatus methods */
 void   rpc__event__dhcp_dns_status__init
                      (RpcEventDhcpDnsStatus         *message);
@@ -10247,6 +11116,63 @@ RpcEventWifiDppFail *
 void   rpc__event__wifi_dpp_fail__free_unpacked
                      (RpcEventWifiDppFail *message,
                       ProtobufCAllocator *allocator);
+/* RpcReqCustomRpc methods */
+void   rpc__req__custom_rpc__init
+                     (RpcReqCustomRpc         *message);
+size_t rpc__req__custom_rpc__get_packed_size
+                     (const RpcReqCustomRpc   *message);
+size_t rpc__req__custom_rpc__pack
+                     (const RpcReqCustomRpc   *message,
+                      uint8_t             *out);
+size_t rpc__req__custom_rpc__pack_to_buffer
+                     (const RpcReqCustomRpc   *message,
+                      ProtobufCBuffer     *buffer);
+RpcReqCustomRpc *
+       rpc__req__custom_rpc__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__req__custom_rpc__free_unpacked
+                     (RpcReqCustomRpc *message,
+                      ProtobufCAllocator *allocator);
+/* RpcRespCustomRpc methods */
+void   rpc__resp__custom_rpc__init
+                     (RpcRespCustomRpc         *message);
+size_t rpc__resp__custom_rpc__get_packed_size
+                     (const RpcRespCustomRpc   *message);
+size_t rpc__resp__custom_rpc__pack
+                     (const RpcRespCustomRpc   *message,
+                      uint8_t             *out);
+size_t rpc__resp__custom_rpc__pack_to_buffer
+                     (const RpcRespCustomRpc   *message,
+                      ProtobufCBuffer     *buffer);
+RpcRespCustomRpc *
+       rpc__resp__custom_rpc__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__resp__custom_rpc__free_unpacked
+                     (RpcRespCustomRpc *message,
+                      ProtobufCAllocator *allocator);
+/* RpcEventCustomRpc methods */
+void   rpc__event__custom_rpc__init
+                     (RpcEventCustomRpc         *message);
+size_t rpc__event__custom_rpc__get_packed_size
+                     (const RpcEventCustomRpc   *message);
+size_t rpc__event__custom_rpc__pack
+                     (const RpcEventCustomRpc   *message,
+                      uint8_t             *out);
+size_t rpc__event__custom_rpc__pack_to_buffer
+                     (const RpcEventCustomRpc   *message,
+                      ProtobufCBuffer     *buffer);
+RpcEventCustomRpc *
+       rpc__event__custom_rpc__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rpc__event__custom_rpc__free_unpacked
+                     (RpcEventCustomRpc *message,
+                      ProtobufCAllocator *allocator);
 /* Rpc methods */
 void   rpc__init
                      (Rpc         *message);
@@ -10406,6 +11332,9 @@ typedef void (*WifiItwtSetupConfig_Closure)
 typedef void (*WifiTwtConfig_Closure)
                  (const WifiTwtConfig *message,
                   void *closure_data);
+typedef void (*EspAppDesc_Closure)
+                 (const EspAppDesc *message,
+                  void *closure_data);
 typedef void (*ConnectedSTAList_Closure)
                  (const ConnectedSTAList *message,
                   void *closure_data);
@@ -10465,6 +11394,18 @@ typedef void (*RpcReqOTAEnd_Closure)
                   void *closure_data);
 typedef void (*RpcRespOTAEnd_Closure)
                  (const RpcRespOTAEnd *message,
+                  void *closure_data);
+typedef void (*RpcReqOTAActivate_Closure)
+                 (const RpcReqOTAActivate *message,
+                  void *closure_data);
+typedef void (*RpcRespOTAActivate_Closure)
+                 (const RpcRespOTAActivate *message,
+                  void *closure_data);
+typedef void (*RpcReqAppGetDesc_Closure)
+                 (const RpcReqAppGetDesc *message,
+                  void *closure_data);
+typedef void (*RpcRespAppGetDesc_Closure)
+                 (const RpcRespAppGetDesc *message,
                   void *closure_data);
 typedef void (*RpcReqWifiSetMaxTxPower_Closure)
                  (const RpcReqWifiSetMaxTxPower *message,
@@ -10880,6 +11821,51 @@ typedef void (*RpcEventStaConnected_Closure)
 typedef void (*RpcEventStaDisconnected_Closure)
                  (const RpcEventStaDisconnected *message,
                   void *closure_data);
+typedef void (*RpcGpioConfig_Closure)
+                 (const RpcGpioConfig *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioConfig_Closure)
+                 (const RpcReqGpioConfig *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioConfig_Closure)
+                 (const RpcRespGpioConfig *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioResetPin_Closure)
+                 (const RpcReqGpioResetPin *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioResetPin_Closure)
+                 (const RpcRespGpioResetPin *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioSetLevel_Closure)
+                 (const RpcReqGpioSetLevel *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioSetLevel_Closure)
+                 (const RpcRespGpioSetLevel *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioGetLevel_Closure)
+                 (const RpcReqGpioGetLevel *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioGetLevel_Closure)
+                 (const RpcRespGpioGetLevel *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioSetDirection_Closure)
+                 (const RpcReqGpioSetDirection *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioSetDirection_Closure)
+                 (const RpcRespGpioSetDirection *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioInputEnable_Closure)
+                 (const RpcReqGpioInputEnable *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioInputEnable_Closure)
+                 (const RpcRespGpioInputEnable *message,
+                  void *closure_data);
+typedef void (*RpcReqGpioSetPullMode_Closure)
+                 (const RpcReqGpioSetPullMode *message,
+                  void *closure_data);
+typedef void (*RpcRespGpioSetPullMode_Closure)
+                 (const RpcRespGpioSetPullMode *message,
+                  void *closure_data);
 typedef void (*RpcEventDhcpDnsStatus_Closure)
                  (const RpcEventDhcpDnsStatus *message,
                   void *closure_data);
@@ -11057,6 +12043,15 @@ typedef void (*RpcEventWifiDppCfgRecvd_Closure)
 typedef void (*RpcEventWifiDppFail_Closure)
                  (const RpcEventWifiDppFail *message,
                   void *closure_data);
+typedef void (*RpcReqCustomRpc_Closure)
+                 (const RpcReqCustomRpc *message,
+                  void *closure_data);
+typedef void (*RpcRespCustomRpc_Closure)
+                 (const RpcRespCustomRpc *message,
+                  void *closure_data);
+typedef void (*RpcEventCustomRpc_Closure)
+                 (const RpcEventCustomRpc *message,
+                  void *closure_data);
 typedef void (*Rpc_Closure)
                  (const Rpc *message,
                   void *closure_data);
@@ -11075,6 +12070,8 @@ extern const ProtobufCEnumDescriptor    rpc_feature__descriptor;
 extern const ProtobufCEnumDescriptor    rpc_feature_command__descriptor;
 extern const ProtobufCEnumDescriptor    rpc_feature_option__descriptor;
 extern const ProtobufCEnumDescriptor    rpc_id__descriptor;
+extern const ProtobufCEnumDescriptor    rpc__gpio_mode__descriptor;
+extern const ProtobufCEnumDescriptor    rpc__gpio_pull_mode__descriptor;
 extern const ProtobufCMessageDescriptor wifi_init_config__descriptor;
 extern const ProtobufCMessageDescriptor wifi_country__descriptor;
 extern const ProtobufCMessageDescriptor wifi_active_scan_time__descriptor;
@@ -11121,6 +12118,7 @@ extern const ProtobufCMessageDescriptor wifi_protocols__descriptor;
 extern const ProtobufCMessageDescriptor wifi_bandwidths__descriptor;
 extern const ProtobufCMessageDescriptor wifi_itwt_setup_config__descriptor;
 extern const ProtobufCMessageDescriptor wifi_twt_config__descriptor;
+extern const ProtobufCMessageDescriptor esp_app_desc__descriptor;
 extern const ProtobufCMessageDescriptor connected_stalist__descriptor;
 extern const ProtobufCMessageDescriptor eap_fast_config__descriptor;
 extern const ProtobufCMessageDescriptor rpc__req__get_mac_address__descriptor;
@@ -11141,6 +12139,10 @@ extern const ProtobufCMessageDescriptor rpc__req__otawrite__descriptor;
 extern const ProtobufCMessageDescriptor rpc__resp__otawrite__descriptor;
 extern const ProtobufCMessageDescriptor rpc__req__otaend__descriptor;
 extern const ProtobufCMessageDescriptor rpc__resp__otaend__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__otaactivate__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__otaactivate__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__app_get_desc__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__app_get_desc__descriptor;
 extern const ProtobufCMessageDescriptor rpc__req__wifi_set_max_tx_power__descriptor;
 extern const ProtobufCMessageDescriptor rpc__resp__wifi_set_max_tx_power__descriptor;
 extern const ProtobufCMessageDescriptor rpc__req__wifi_get_max_tx_power__descriptor;
@@ -11279,6 +12281,21 @@ extern const ProtobufCMessageDescriptor rpc__event__ap__sta_connected__descripto
 extern const ProtobufCMessageDescriptor rpc__event__sta_scan_done__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__sta_connected__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__sta_disconnected__descriptor;
+extern const ProtobufCMessageDescriptor rpc__gpio_config__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_config__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_config__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_reset_pin__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_reset_pin__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_set_level__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_set_level__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_get_level__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_get_level__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_set_direction__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_set_direction__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_input_enable__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_input_enable__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__gpio_set_pull_mode__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__gpio_set_pull_mode__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__dhcp_dns_status__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__sta_itwt_setup__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__sta_itwt_teardown__descriptor;
@@ -11338,6 +12355,9 @@ extern const ProtobufCMessageDescriptor rpc__event__supp_dpp_fail__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__wifi_dpp_uri_ready__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__wifi_dpp_cfg_recvd__descriptor;
 extern const ProtobufCMessageDescriptor rpc__event__wifi_dpp_fail__descriptor;
+extern const ProtobufCMessageDescriptor rpc__req__custom_rpc__descriptor;
+extern const ProtobufCMessageDescriptor rpc__resp__custom_rpc__descriptor;
+extern const ProtobufCMessageDescriptor rpc__event__custom_rpc__descriptor;
 extern const ProtobufCMessageDescriptor rpc__descriptor;
 
 PROTOBUF_C__END_DECLS

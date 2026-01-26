@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/espressif/esp-wifi-remote/commits/wifi_rmt_eppp-v0.3.0)
+
+### Features
+
+- Add support for easier SDIO setup ([6835259](https://github.com/espressif/esp-wifi-remote/commit/6835259))
+- Support for unsecure connection ([bbff8bd](https://github.com/espressif/esp-wifi-remote/commit/bbff8bd))
+
+## [0.2.1](https://github.com/espressif/esp-wifi-remote/commits/wifi_rmt_eppp-v0.2.1)
+
+### Bug Fixes
+
+- Move eppp slave to the wrmt-over-eppp component ([36a35a7](https://github.com/espressif/esp-wifi-remote/commit/36a35a7))
+- Fix EPPP server to process only wifi-station IP event ([59f6fc2](https://github.com/espressif/esp-wifi-remote/commit/59f6fc2))
+
 ## [0.2.0](https://github.com/espressif/esp-wifi-remote/commits/wifi_rmt_eppp-v0.2.0)
 
 ### Features

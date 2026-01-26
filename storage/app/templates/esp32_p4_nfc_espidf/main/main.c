@@ -25,6 +25,7 @@
 // UI Manager
 #if DISPLAY_ENABLED
 #include "ui_manager.h"
+#include "ui/ui.h"  // SquareLine Studio UI
 #endif
 
 // NFC driver - PN532 abstraction layer
@@ -112,16 +113,20 @@ void app_main(void) {
 	bsp_display_start();
 	bsp_display_backlight_on();
 
-	// Initialize UI manager
+	// Initialize SquareLine Studio UI
 	lvgl_port_lock(0);
-	ui_manager_init(DEVICE_NAME);
-	ui_set_setup_callback(validate_admin_password);  // Set password validation callback
-	ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_DISABLED);
-	ui_update_time("--:--", "---");
-	ui_show_ready_screen("Initializing...");
+	ui_init();  // Create all SquareLine screens
 	lvgl_port_unlock();
 
-	printf("Display initialized!\n");
+	// TODO: Update ui_manager.c to work with SquareLine UI elements (Phase 6)
+	// For now, SquareLine UI is initialized but ui_manager functions need to be updated
+	// ui_manager_init(DEVICE_NAME);
+	// ui_set_setup_callback(validate_admin_password);
+	// ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_DISABLED);
+	// ui_update_time("--:--", "---");
+	// ui_show_ready_screen("Initializing...");
+
+	printf("Display initialized with SquareLine UI!\n");
 	printf("Free heap after display: %lu bytes\n\n", (unsigned long)esp_get_free_heap_size());
 #else
 	printf("Display disabled\n\n");
@@ -246,11 +251,11 @@ void app_main(void) {
 	printf("Ready to read cards. Place a card near the reader...\n\n");
 
 #if DISPLAY_ENABLED
-	// Update UI - NFC is ready
-	lvgl_port_lock(0);
-	ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_READY);
-	ui_show_ready_screen("Ready to scan cards");
-	lvgl_port_unlock();
+	// TODO: Update UI - NFC is ready (Phase 6)
+	// lvgl_port_lock(0);
+	// ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_READY);
+	// ui_show_ready_screen("Ready to scan cards");
+	// lvgl_port_unlock();
 #endif
 #else
 	printf("NFC disabled for display testing\n\n");
@@ -375,9 +380,10 @@ void app_main(void) {
 				snprintf(scan_result.message, sizeof(scan_result.message),
 				         "Card #%lu scanned", (unsigned long)card_count);
 
-				lvgl_port_lock(0);
-				ui_show_card_scan(&scan_result, 3000);  // Show for 3 seconds
-				lvgl_port_unlock();
+				// TODO: Show card scan result on UI (Phase 6)
+				// lvgl_port_lock(0);
+				// ui_show_card_scan(&scan_result, 3000);  // Show for 3 seconds
+				// lvgl_port_unlock();
 #endif
 			}
 

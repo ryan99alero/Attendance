@@ -1,17 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2025 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 //
 
 #ifndef __STATS__H__
@@ -55,7 +47,7 @@
 #define TEST_RAW_TP                    CONFIG_ESP_RAW_THROUGHPUT_TRANSPORT
 
 #ifdef CONFIG_ESP_PKT_STATS
-#define ESP_PKT_STATS 1
+  #define ESP_PKT_STATS 1
 #endif
 
 #ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
@@ -101,7 +93,7 @@ typedef struct {
  * to change TEST_RAW_TP__BUF_SIZE as:
  *
  * UDP : Max unfragmented packet size: 1472.
- * H_ESP_PAYLOAD_HEADER_OFFSET is not included into the calulations.
+ * H_ESP_PAYLOAD_HEADER_OFFSET is not included into the calculations.
  *
  * TCP: Assess MSS and decide similar to above
  */
