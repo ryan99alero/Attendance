@@ -1,6 +1,6 @@
 {
-    "uiExportFolderPath": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_lvgl_test/ui",
-    "projectExportFolderPath": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_lvgl_test/SquareLineConsole",
+    "uiExportFolderPath": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/ui",
+    "projectExportFolderPath": "/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf/SquareLineConsole",
     "drive_stdio": "-",
     "drive_stdio_path": "",
     "drive_posix": "-",

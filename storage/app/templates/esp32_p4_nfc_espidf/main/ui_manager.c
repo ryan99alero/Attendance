@@ -2129,8 +2129,8 @@ static void ensure_api_initialized(void) {
 
         // Configure API client with Herd server
         api_config_t api_config = {
-            .server_host = "attend.test",
-            .server_port = 80,
+            .server_host = "192.168.29.25",
+            .server_port = 8000,
             .is_registered = false,
             .is_approved = false
         };

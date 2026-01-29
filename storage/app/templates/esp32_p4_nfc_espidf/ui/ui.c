@@ -25,18 +25,17 @@ lv_obj_t *ui_startevents____initial_actions0;
 ///////////////////// SCREENS ////////////////////
 
 void ui_init( void )
-{LV_EVENT_GET_COMP_CHILD = lv_event_register_id();
-
+{
 lv_disp_t *dispp = lv_display_get_default();
 lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, LV_FONT_DEFAULT);
 lv_disp_set_theme(dispp, theme);
 ui_screen_mainscreen_screen_init();
 ui_screen_adminlogin_screen_init();
 ui_screen_setupconfigurations_screen_init();
-ui_screen_wifisetup_screen_init();
-ui_screen_wiredsetup_screen_init();
+ui_screen_networksetup_screen_init();
 ui_screen_deviceinformation_screen_init();
 ui_screen_timeinformation_screen_init();
+ui_screen_serversetup_screen_init();
 ui_startevents____initial_actions0 = lv_obj_create(NULL);
 lv_disp_load_scr( ui_screen_mainscreen);
 }
@@ -45,8 +44,8 @@ void ui_destroy( void )
 {ui_screen_mainscreen_screen_destroy();
 ui_screen_adminlogin_screen_destroy();
 ui_screen_setupconfigurations_screen_destroy();
-ui_screen_wifisetup_screen_destroy();
-ui_screen_wiredsetup_screen_destroy();
+ui_screen_networksetup_screen_destroy();
 ui_screen_deviceinformation_screen_destroy();
 ui_screen_timeinformation_screen_destroy();
+ui_screen_serversetup_screen_destroy();
 }

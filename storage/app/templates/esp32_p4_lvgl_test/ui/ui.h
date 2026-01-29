@@ -21,10 +21,10 @@ extern "C" {
 #include "ui_screen_mainscreen.h"
 #include "ui_screen_adminlogin.h"
 #include "ui_screen_setupconfigurations.h"
-#include "ui_screen_wifisetup.h"
-#include "ui_screen_wiredsetup.h"
+#include "ui_screen_networksetup.h"
 #include "ui_screen_deviceinformation.h"
 #include "ui_screen_timeinformation.h"
+#include "ui_screen_serversetup.h"
 
 ///////////////////// VARIABLES ////////////////////
 

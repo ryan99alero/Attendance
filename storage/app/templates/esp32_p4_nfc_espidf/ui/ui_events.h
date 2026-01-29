@@ -11,6 +11,10 @@ extern "C" {
 #endif
 
 void ui_event_textarea(lv_event_t * e);
+void ui_event_keyboard_close(lv_event_t * e);
+void ui_event_sync_now(lv_event_t * e);
+void ui_event_server_test(lv_event_t * e);
+void ui_event_server_register(lv_event_t * e);
 
 #ifdef __cplusplus
 } /*extern "C"*/

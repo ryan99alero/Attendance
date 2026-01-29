@@ -13,18 +13,16 @@ extern "C" {
     #include "lvgl.h"
 
 #include "ui_helpers.h"
-#include "ui_comp.h"
-#include "ui_comp_hook.h"
 #include "ui_events.h"
 
 ///////////////////// SCREENS ////////////////////
 #include "ui_screen_mainscreen.h"
 #include "ui_screen_adminlogin.h"
 #include "ui_screen_setupconfigurations.h"
-#include "ui_screen_wifisetup.h"
-#include "ui_screen_wiredsetup.h"
+#include "ui_screen_networksetup.h"
 #include "ui_screen_deviceinformation.h"
 #include "ui_screen_timeinformation.h"
+#include "ui_screen_serversetup.h"
 
 ///////////////////// VARIABLES ////////////////////
 

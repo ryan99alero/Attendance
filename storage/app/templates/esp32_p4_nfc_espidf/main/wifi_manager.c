@@ -7,6 +7,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_mac.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "freertos/FreeRTOS.h"
@@ -83,6 +84,29 @@ esp_err_t wifi_manager_init(void) {
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
         return ret;
+    }
+
+    // Set WiFi mode before setting MAC
+    ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi mode: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Set custom MAC address for WiFi - use factory base MAC + 1
+    // MAC scheme: Hardware=base, WiFi=base+1, Ethernet=base+2
+    // This ensures consistent MAC across reboots and firmware updates
+    uint8_t base_mac[6];
+    esp_read_mac(base_mac, ESP_MAC_BASE);
+    uint8_t wifi_mac[6];
+    memcpy(wifi_mac, base_mac, 6);
+    wifi_mac[5] += 1;  // Increment last byte by 1 for WiFi
+    ret = esp_wifi_set_mac(WIFI_IF_STA, wifi_mac);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi MAC set to base+1: %02X:%02X:%02X:%02X:%02X:%02X",
+                 wifi_mac[0], wifi_mac[1], wifi_mac[2], wifi_mac[3], wifi_mac[4], wifi_mac[5]);
+    } else {
+        ESP_LOGW(TAG, "Failed to set WiFi MAC: %s (using default)", esp_err_to_name(ret));
     }
 
     // Register event handlers

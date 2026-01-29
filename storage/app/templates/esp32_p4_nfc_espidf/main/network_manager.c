@@ -22,9 +22,9 @@
 #include "ethernet_manager.h"
 #endif
 
-// Include UI manager for network status types (required for monitoring)
+// Include UI bridge for network status updates (required for monitoring)
 #if DISPLAY_ENABLED
-#include "ui_manager.h"
+#include "ui_bridge.h"
 #include "esp_lvgl_port.h"
 #endif
 
@@ -34,8 +34,8 @@ static const char *TAG = "NETWORK_MANAGER";
 #define NVS_NAMESPACE_NETWORK "network_mode"
 #define NVS_KEY_MODE "mode"
 
-// Current network mode (default to Ethernet for testing)
-static network_mode_t current_mode = NETWORK_MODE_ETHERNET_ONLY;
+// Current network mode (default to WiFi)
+static network_mode_t current_mode = NETWORK_MODE_WIFI_ONLY;
 static bool mode_loaded = false;
 
 // Monitoring task handle
@@ -45,58 +45,51 @@ static bool is_monitoring = false;
 #if DISPLAY_ENABLED
 // Internal monitoring task (only used when display is enabled)
 static void network_monitoring_task(void *pvParameters) {
-    network_status_t last_net_status = NET_STATUS_DISCONNECTED;
-    int last_rssi = 0;
+    bool last_connected = false;
+    bool last_is_wifi = false;
     char last_ip[16] = {0};
 
     ESP_LOGI(TAG, "Network monitoring task started");
 
     while (is_monitoring) {
-        network_status_t current_net_status = NET_STATUS_DISCONNECTED;
-        int current_rssi = 0;
+        bool current_connected = false;
+        bool current_is_wifi = false;
         char current_ip[16] = {0};
 
 #if ETHERNET_ENABLED
         // Check Ethernet first (wired takes priority over wireless)
         if (ethernet_manager_is_connected()) {
-            current_net_status = NET_STATUS_ETHERNET_CONNECTED;
-            current_rssi = 0;  // RSSI not applicable for Ethernet
+            current_connected = true;
+            current_is_wifi = false;
             ethernet_manager_get_ip_string(current_ip, sizeof(current_ip));
         }
 #endif
 
 #if WIFI_ENABLED
         // Check WiFi if Ethernet is not connected
-        if (current_net_status == NET_STATUS_DISCONNECTED && wifi_manager_is_connected()) {
-            current_net_status = NET_STATUS_WIFI_CONNECTED;
-            current_rssi = wifi_manager_get_rssi();
+        if (!current_connected && wifi_manager_is_connected()) {
+            current_connected = true;
+            current_is_wifi = true;
             wifi_manager_get_ip_string(current_ip, sizeof(current_ip));
         }
 #endif
 
-        // Update UI only if status changed
-        if (current_net_status != last_net_status) {
-#ifdef DISPLAY_ENABLED
-            lvgl_port_lock(0);
-            ui_update_status(current_net_status, NFC_STATUS_READY);
-            lvgl_port_unlock();
-#endif
-            last_net_status = current_net_status;
-            ESP_LOGI(TAG, "Network status changed: %s", network_manager_get_status_string());
-        }
+        // Update UI if status changed
+        if (current_connected != last_connected ||
+            current_is_wifi != last_is_wifi ||
+            strcmp(current_ip, last_ip) != 0) {
 
-        // Update network info if connected and signal/IP changed
-        if (current_net_status == NET_STATUS_WIFI_CONNECTED ||
-            current_net_status == NET_STATUS_ETHERNET_CONNECTED) {
-            if (current_rssi != last_rssi || strcmp(current_ip, last_ip) != 0) {
-#ifdef DISPLAY_ENABLED
-                lvgl_port_lock(0);
-                ui_update_network_info(current_ip, current_rssi);
-                lvgl_port_unlock();
-#endif
-                last_rssi = current_rssi;
-                strncpy(last_ip, current_ip, sizeof(last_ip) - 1);
-            }
+            lvgl_port_lock(0);
+            ui_bridge_update_network_status(current_connected, current_is_wifi, current_ip);
+            lvgl_port_unlock();
+
+            last_connected = current_connected;
+            last_is_wifi = current_is_wifi;
+            strncpy(last_ip, current_ip, sizeof(last_ip) - 1);
+
+            ESP_LOGI(TAG, "Network status: %s, IP: %s",
+                     current_connected ? (current_is_wifi ? "WiFi" : "Ethernet") : "Disconnected",
+                     current_ip);
         }
 
         // Check every 2 seconds
@@ -119,21 +112,21 @@ static void load_network_mode(void) {
     esp_err_t err = nvs_open(NVS_NAMESPACE_NETWORK, NVS_READONLY, &nvs_handle);
 
     if (err == ESP_OK) {
-        uint8_t mode_value = (uint8_t)NETWORK_MODE_ETHERNET_ONLY;
+        uint8_t mode_value = (uint8_t)NETWORK_MODE_WIFI_ONLY;
         err = nvs_get_u8(nvs_handle, NVS_KEY_MODE, &mode_value);
 
         if (err == ESP_OK) {
             current_mode = (network_mode_t)mode_value;
             ESP_LOGI(TAG, "Loaded network mode: %s", network_manager_get_mode_string(current_mode));
         } else {
-            ESP_LOGI(TAG, "No saved network mode, using default: Ethernet Only");
-            current_mode = NETWORK_MODE_ETHERNET_ONLY;
+            ESP_LOGI(TAG, "No saved network mode, using default: WiFi Only");
+            current_mode = NETWORK_MODE_WIFI_ONLY;
         }
 
         nvs_close(nvs_handle);
     } else {
-        ESP_LOGI(TAG, "Network mode NVS not found, using default: Ethernet Only");
-        current_mode = NETWORK_MODE_ETHERNET_ONLY;
+        ESP_LOGI(TAG, "Network mode NVS not found, using default: WiFi Only");
+        current_mode = NETWORK_MODE_WIFI_ONLY;
     }
 
     mode_loaded = true;
@@ -182,33 +175,34 @@ const char* network_manager_get_mode_string(network_mode_t mode) {
 esp_err_t network_manager_init(void) {
     ESP_LOGI(TAG, "Initializing network manager...");
 
-    // Load network mode preference
+    // Load network mode preference from NVS
     load_network_mode();
-    ESP_LOGI(TAG, "Network mode preference: %s", network_manager_get_mode_string(current_mode));
-    ESP_LOGI(TAG, "Note: Both WiFi and Ethernet will be initialized. Mode controls active interface.");
+    ESP_LOGI(TAG, "Saved network mode: %s", network_manager_get_mode_string(current_mode));
+    ESP_LOGI(TAG, "ONLY the selected interface will be connected - no fallback");
 
     esp_err_t ret = ESP_OK;
     bool any_initialized = false;
 
-    // Initialize BOTH WiFi and Ethernet (they can coexist with correct GPIO assignments)
+    // Initialize BOTH WiFi and Ethernet drivers (but only selected one will connect)
+    // Initializing both allows runtime switching between interfaces
 #if WIFI_ENABLED
-    ESP_LOGI(TAG, "Initializing WiFi manager...");
+    ESP_LOGI(TAG, "Initializing WiFi driver...");
     if (wifi_manager_init() == ESP_OK) {
-        ESP_LOGI(TAG, "✅ WiFi manager initialized");
+        ESP_LOGI(TAG, "✅ WiFi driver initialized");
         any_initialized = true;
     } else {
-        ESP_LOGE(TAG, "❌ WiFi manager initialization failed");
+        ESP_LOGE(TAG, "❌ WiFi driver initialization failed");
         ret = ESP_FAIL;
     }
 #endif
 
 #if ETHERNET_ENABLED
-    ESP_LOGI(TAG, "Initializing Ethernet manager...");
+    ESP_LOGI(TAG, "Initializing Ethernet driver...");
     if (ethernet_manager_init() == ESP_OK) {
-        ESP_LOGI(TAG, "✅ Ethernet manager initialized");
+        ESP_LOGI(TAG, "✅ Ethernet driver initialized");
         any_initialized = true;
     } else {
-        ESP_LOGE(TAG, "❌ Ethernet manager initialization failed");
+        ESP_LOGE(TAG, "❌ Ethernet driver initialization failed");
         ret = ESP_FAIL;
     }
 #endif
@@ -218,8 +212,8 @@ esp_err_t network_manager_init(void) {
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Network manager initialized successfully");
-    ESP_LOGI(TAG, "Active interface can be switched without reboot");
+    ESP_LOGI(TAG, "Network manager initialized");
+    ESP_LOGI(TAG, "Call load_and_connect() to connect the selected interface");
     return ret;
 }
 
@@ -375,15 +369,20 @@ int network_manager_get_rssi(void) {
 }
 
 esp_err_t network_manager_load_and_connect(void) {
+    ESP_EARLY_LOGI(TAG, ">>> load_and_connect ENTERED <<<");
     ESP_LOGI(TAG, "Loading saved network configurations...");
-    ESP_LOGI(TAG, "Preferred mode: %s", network_manager_get_mode_string(current_mode));
+    ESP_EARLY_LOGI(TAG, "About to get mode string...");
+    ESP_LOGI(TAG, "Selected mode: %s", network_manager_get_mode_string(current_mode));
+    ESP_EARLY_LOGI(TAG, "Mode string OK");
 
-    bool any_connected = false;
+    bool connected = false;
 
-    // Connect to preferred interface first based on mode
+    // ONLY connect to the selected interface - NO fallback to other interface
+    // This ensures only one network interface is active at a time
     if (current_mode == NETWORK_MODE_ETHERNET_ONLY) {
 #if ETHERNET_ENABLED
-        // Try Ethernet first
+        // Connect Ethernet ONLY - do not start WiFi
+        ESP_LOGI(TAG, "Mode is Ethernet Only - WiFi will NOT be started");
         ethernet_config_t eth_config;
         if (ethernet_manager_load_config(&eth_config) == ESP_OK) {
             ESP_LOGI(TAG, "Found saved Ethernet configuration");
@@ -398,26 +397,21 @@ esp_err_t network_manager_load_and_connect(void) {
                             char eth_ip_str[16];
                             ethernet_manager_get_ip_string(eth_ip_str, sizeof(eth_ip_str));
                             ESP_LOGI(TAG, "✅ Ethernet connected! IP: %s (after %d ms)", eth_ip_str, (i + 1) * 500);
-                            any_connected = true;
+                            connected = true;
+
+#if DISPLAY_ENABLED
+                            lvgl_port_lock(0);
+                            ui_bridge_update_network_status(true, false, eth_ip_str);
+                            lvgl_port_unlock();
+#endif
                             break;
                         }
                         ESP_LOGD(TAG, "Ethernet connection check %d/10...", i + 1);
                     }
 
-                    if (any_connected) {
-                        char eth_ip_str[16];
-                        ethernet_manager_get_ip_string(eth_ip_str, sizeof(eth_ip_str));
-                        ESP_LOGI(TAG, "Ethernet connection stable, skipping WiFi fallback");
-                        any_connected = true;
-
-#ifdef DISPLAY_ENABLED
-                        lvgl_port_lock(0);
-                        ui_update_status(NET_STATUS_ETHERNET_CONNECTED, NFC_STATUS_READY);
-                        ui_update_network_info(eth_ip_str, 0);
-                        lvgl_port_unlock();
-#endif
-                    } else {
+                    if (!connected) {
                         ESP_LOGW(TAG, "Ethernet connection timeout after 5 seconds");
+                        ESP_LOGW(TAG, "Check cable connection. WiFi will NOT be used as fallback.");
                     }
                 } else {
                     ESP_LOGE(TAG, "Failed to start Ethernet");
@@ -426,95 +420,64 @@ esp_err_t network_manager_load_and_connect(void) {
                 ESP_LOGE(TAG, "Failed to apply Ethernet config");
             }
         } else {
-            ESP_LOGI(TAG, "No saved Ethernet configuration");
-        }
-#endif
+            ESP_LOGI(TAG, "No saved Ethernet configuration - starting with DHCP");
+            if (ethernet_manager_start() == ESP_OK) {
+                for (int i = 0; i < 10; i++) {
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    if (ethernet_manager_is_connected()) {
+                        char eth_ip_str[16];
+                        ethernet_manager_get_ip_string(eth_ip_str, sizeof(eth_ip_str));
+                        ESP_LOGI(TAG, "✅ Ethernet connected (DHCP)! IP: %s", eth_ip_str);
+                        connected = true;
 
-#if WIFI_ENABLED
-        // Try WiFi as fallback ONLY if Ethernet completely failed
-        if (!any_connected) {
-            ESP_LOGI(TAG, "Ethernet failed or not configured, trying WiFi fallback...");
-            wifi_network_config_t wifi_config;
-            if (wifi_manager_load_config(&wifi_config) == ESP_OK) {
-                ESP_LOGI(TAG, "Found saved WiFi configuration (fallback)");
-                if (wifi_manager_apply_config(&wifi_config) == ESP_OK) {
-                    ESP_LOGI(TAG, "Connecting to WiFi as fallback...");
-                    if (wifi_manager_connect() == ESP_OK) {
-                        char wifi_ip_str[16];
-                        wifi_manager_get_ip_string(wifi_ip_str, sizeof(wifi_ip_str));
-                        ESP_LOGI(TAG, "✅ Connected to %s! IP: %s", wifi_config.ssid, wifi_ip_str);
-                        any_connected = true;
-
-#ifdef DISPLAY_ENABLED
+#if DISPLAY_ENABLED
                         lvgl_port_lock(0);
-                        ui_update_status(NET_STATUS_WIFI_CONNECTED, NFC_STATUS_READY);
-                        ui_update_network_info(wifi_ip_str, wifi_manager_get_rssi());
+                        ui_bridge_update_network_status(true, false, eth_ip_str);
                         lvgl_port_unlock();
 #endif
+                        break;
                     }
                 }
             }
         }
+#else
+        ESP_LOGE(TAG, "Ethernet mode selected but ETHERNET_ENABLED=0 in build");
 #endif
     } else if (current_mode == NETWORK_MODE_WIFI_ONLY) {
 #if WIFI_ENABLED
-        // Try WiFi first
+        // Connect WiFi ONLY - do not start Ethernet
+        ESP_LOGI(TAG, "Mode is WiFi Only - Ethernet will NOT be started");
         wifi_network_config_t wifi_config;
         if (wifi_manager_load_config(&wifi_config) == ESP_OK) {
             ESP_LOGI(TAG, "Found saved WiFi configuration");
             if (wifi_manager_apply_config(&wifi_config) == ESP_OK) {
-                ESP_LOGI(TAG, "Connecting to WiFi...");
+                ESP_LOGI(TAG, "Connecting to WiFi: %s", wifi_config.ssid);
                 if (wifi_manager_connect() == ESP_OK) {
                     char wifi_ip_str[16];
                     wifi_manager_get_ip_string(wifi_ip_str, sizeof(wifi_ip_str));
                     ESP_LOGI(TAG, "✅ Connected to %s! IP: %s", wifi_config.ssid, wifi_ip_str);
-                    any_connected = true;
+                    connected = true;
 
-#ifdef DISPLAY_ENABLED
+#if DISPLAY_ENABLED
                     lvgl_port_lock(0);
-                    ui_update_status(NET_STATUS_WIFI_CONNECTED, NFC_STATUS_READY);
-                    ui_update_network_info(wifi_ip_str, wifi_manager_get_rssi());
+                    ui_bridge_update_network_status(true, true, wifi_ip_str);
                     lvgl_port_unlock();
 #endif
+                } else {
+                    ESP_LOGE(TAG, "WiFi connection failed. Ethernet will NOT be used as fallback.");
                 }
             }
         } else {
             ESP_LOGI(TAG, "No saved WiFi configuration");
+            ESP_LOGI(TAG, "Please configure WiFi in Network Setup screen");
         }
-#endif
-
-#if ETHERNET_ENABLED
-        // Try Ethernet as fallback if WiFi didn't connect
-        if (!any_connected) {
-            ethernet_config_t eth_config;
-            if (ethernet_manager_load_config(&eth_config) == ESP_OK) {
-                ESP_LOGI(TAG, "Found saved Ethernet configuration (fallback)");
-                if (ethernet_manager_apply_config(&eth_config) == ESP_OK) {
-                    ESP_LOGI(TAG, "Starting Ethernet as fallback...");
-                    if (ethernet_manager_start() == ESP_OK) {
-                        vTaskDelay(pdMS_TO_TICKS(3000));
-                        if (ethernet_manager_is_connected()) {
-                            char eth_ip_str[16];
-                            ethernet_manager_get_ip_string(eth_ip_str, sizeof(eth_ip_str));
-                            ESP_LOGI(TAG, "✅ Ethernet connected! IP: %s", eth_ip_str);
-                            any_connected = true;
-
-#ifdef DISPLAY_ENABLED
-                            lvgl_port_lock(0);
-                            ui_update_status(NET_STATUS_ETHERNET_CONNECTED, NFC_STATUS_READY);
-                            ui_update_network_info(eth_ip_str, 0);
-                            lvgl_port_unlock();
-#endif
-                        }
-                    }
-                }
-            }
-        }
+#else
+        ESP_LOGE(TAG, "WiFi mode selected but WIFI_ENABLED=0 in build");
 #endif
     }
 
-    if (!any_connected) {
-        ESP_LOGI(TAG, "No saved configurations or failed to connect");
+    if (!connected) {
+        ESP_LOGI(TAG, "No network connection established");
         ESP_LOGI(TAG, "Use Setup menu to configure network");
         return ESP_ERR_NOT_FOUND;
     }

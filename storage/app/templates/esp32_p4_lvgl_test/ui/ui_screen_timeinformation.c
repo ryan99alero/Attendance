@@ -5,20 +5,42 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_TimeInformation_Dropdown_TimeZone;
-lv_obj_t *ui_TimeInformation_Container_TimeZoneContainer;
-lv_obj_t *ui_TimeInformation_Label_TimeInfoLabel;
-lv_obj_t *ui_TimeInformation_Dropdown_AMPM;
+lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_OkLabel;
+lv_obj_t *ui_TimeInformation_Button_TimeInformation_Button_OkButton;
+lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_CancelLabel;
+lv_obj_t *ui_TimeInformation_Button_CancelButton;
+lv_obj_t *ui_TimeInformation_Container_CancelOk;
+lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_NTPContainer;
+lv_obj_t *ui_TimeInformation_Dropdown_TimeInformation_Dropdown_TimeZone;
+lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_TimeZoneContainer;
+lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_MasterTimeZoneContainer;
+lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_TimeInfoLabel;
+lv_obj_t *ui_TimeInformation_Dropdown_TimeInformation_Dropdown_AMPM;
 lv_obj_t *ui_TimeInformation_Container_TimeInfoContainer;
-lv_obj_t *ui_TimeInformation_Container_MasterTimeContainer;
+lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_MasterTimeContainer;
 lv_obj_t *ui_TimeInformation_Label_SyncNow;
-lv_obj_t *ui_TimeInformation_Label_SyncIcon;
-lv_obj_t *ui_TimeInformation_Button_syncButton;
-lv_obj_t *ui_TimeInformation_Container_SyncButtonContainer;
-lv_obj_t *ui_BackGroundContainer6;
+lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_SyncIcon;
+lv_obj_t *ui_TimeInformation_Button_TimeInformation_Button_syncButton;
+lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_SyncButtonContainer;
+lv_obj_t *ui_TimeInformation_Container_BackGroundContainer;
 lv_obj_t *ui_Screen_TimeInformation;
-lv_obj_t *ui_screen_timeinformation = NULL;lv_obj_t *ui_timeinformation_backgroundcontainer_backgroundcontainer6 = NULL;lv_obj_t *ui_timeinformation_container_syncbuttoncontainer = NULL;lv_obj_t *ui_timeinformation_button_syncbutton = NULL;lv_obj_t *ui_timeinformation_label_syncicon = NULL;lv_obj_t *ui_timeinformation_label_syncnow = NULL;lv_obj_t *ui_timeinformation_container_mastertimecontainer = NULL;lv_obj_t *ui_timeinformation_container_timeinfocontainer = NULL;lv_obj_t *ui_timeinformation_spinbox_timeinput = NULL;lv_obj_t *ui_timeinformation_dropdown_ampm = NULL;lv_obj_t *ui_timeinformation_label_timeinfolabel = NULL;lv_obj_t *ui_timeinformation_container_mastertimezonecontainer = NULL;lv_obj_t *ui_timeinformation_container_timezonecontainer = NULL;lv_obj_t *ui_timeinformation_dropdown_timezone = NULL;lv_obj_t *ui_timeinformation_label_timezonelabel = NULL;lv_obj_t *ui_timeinformation_container_ntpcontainer = NULL;lv_obj_t *ui_timeinformation_textarea_ntpinput = NULL;lv_obj_t *ui_timeinformation_label_ntplabel = NULL;
+lv_obj_t *ui_screen_timeinformation = NULL;lv_obj_t *ui_timeinformation_backgroundcontainer_backgroundcontainer = NULL;lv_obj_t *ui_timeinformation_container_syncbuttoncontainer = NULL;lv_obj_t *ui_timeinformation_button_syncbutton = NULL;lv_obj_t *ui_timeinformation_label_syncicon = NULL;lv_obj_t *ui_timeinformation_label_syncnow = NULL;lv_obj_t *ui_timeinformation_container_mastertimecontainer = NULL;lv_obj_t *ui_timeinformation_container_timeinfocontainer = NULL;lv_obj_t *ui_timeinformation_spinbox_timeinput = NULL;lv_obj_t *ui_timeinformation_dropdown_ampm = NULL;lv_obj_t *ui_timeinformation_label_timeinfolabel = NULL;lv_obj_t *ui_timeinformation_container_mastertimezonecontainer = NULL;lv_obj_t *ui_timeinformation_container_timezonecontainer = NULL;lv_obj_t *ui_timeinformation_dropdown_timezone = NULL;lv_obj_t *ui_timeinformation_label_timezonelabel = NULL;lv_obj_t *ui_timeinformation_container_ntpcontainer = NULL;lv_obj_t *ui_timeinformation_textarea_ntpinput = NULL;lv_obj_t *ui_timeinformation_label_ntplabel = NULL;lv_obj_t *ui_timeinformation_container_cancelok = NULL;lv_obj_t *ui_timeinformation_button_cancelbutton = NULL;lv_obj_t *ui_timeinformation_label_cancellabel = NULL;lv_obj_t *ui_timeinformation_button_okbutton = NULL;lv_obj_t *ui_timeinformation_label_oklabel = NULL;
 // event funtions
+void ui_event_timeinformation_button_cancelbutton( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_screen_mainscreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_screen_mainscreen_screen_init);
+}
+}
+
+void ui_event_timeinformation_button_okbutton( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_screen_setupconfigurations, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_screen_setupconfigurations_screen_init);
+}
+}
 
 // build funtions
 
@@ -30,10 +52,10 @@ lv_obj_set_scrollbar_mode(ui_screen_timeinformation, LV_SCROLLBAR_MODE_OFF);
 lv_obj_set_style_outline_color(ui_screen_timeinformation, lv_color_hex(0xF50707), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_outline_opa(ui_screen_timeinformation, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_timeinformation_backgroundcontainer_backgroundcontainer6 = ui_container_backgroundcontainer_create(ui_screen_timeinformation);
-lv_obj_set_x( ui_timeinformation_backgroundcontainer_backgroundcontainer6, 0 );
-lv_obj_set_y( ui_timeinformation_backgroundcontainer_backgroundcontainer6, 0 );
-lv_obj_set_style_layout(ui_timeinformation_backgroundcontainer_backgroundcontainer6, 0, 0);
+ui_timeinformation_backgroundcontainer_backgroundcontainer = ui_container_backgroundcontainer_create(ui_screen_timeinformation);
+lv_obj_set_x( ui_timeinformation_backgroundcontainer_backgroundcontainer, 0 );
+lv_obj_set_y( ui_timeinformation_backgroundcontainer_backgroundcontainer, 0 );
+lv_obj_set_style_layout(ui_timeinformation_backgroundcontainer_backgroundcontainer, 0, 0);
 
 ui_timeinformation_container_syncbuttoncontainer = lv_obj_create(ui_screen_timeinformation);
 lv_obj_remove_style_all(ui_timeinformation_container_syncbuttoncontainer);
@@ -183,18 +205,71 @@ lv_label_set_text(ui_timeinformation_label_ntplabel,"NTP Server");
 lv_obj_set_style_text_color(ui_timeinformation_label_ntplabel, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_timeinformation_label_ntplabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_timeinformation_container_cancelok = lv_obj_create(ui_screen_timeinformation);
+lv_obj_remove_style_all(ui_timeinformation_container_cancelok);
+lv_obj_set_width( ui_timeinformation_container_cancelok, 924);
+lv_obj_set_height( ui_timeinformation_container_cancelok, 60);
+lv_obj_set_x( ui_timeinformation_container_cancelok, 4 );
+lv_obj_set_y( ui_timeinformation_container_cancelok, 511 );
+lv_obj_set_align( ui_timeinformation_container_cancelok, LV_ALIGN_TOP_MID );
+lv_obj_set_flex_flow(ui_timeinformation_container_cancelok,LV_FLEX_FLOW_ROW);
+lv_obj_set_flex_align(ui_timeinformation_container_cancelok, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+lv_obj_remove_flag( ui_timeinformation_container_cancelok, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+
+ui_timeinformation_button_cancelbutton = lv_button_create(ui_timeinformation_container_cancelok);
+lv_obj_set_width( ui_timeinformation_button_cancelbutton, 100);
+lv_obj_set_height( ui_timeinformation_button_cancelbutton, 50);
+lv_obj_set_align( ui_timeinformation_button_cancelbutton, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_timeinformation_button_cancelbutton, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
+lv_obj_remove_flag( ui_timeinformation_button_cancelbutton, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_set_style_bg_color(ui_timeinformation_button_cancelbutton, lv_color_hex(0xF60707), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_timeinformation_button_cancelbutton, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_timeinformation_label_cancellabel = lv_label_create(ui_timeinformation_button_cancelbutton);
+lv_obj_set_width( ui_timeinformation_label_cancellabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_timeinformation_label_cancellabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_timeinformation_label_cancellabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_timeinformation_label_cancellabel,"Cancel");
+lv_obj_set_style_text_font(ui_timeinformation_label_cancellabel, &lv_font_montserrat_20, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_timeinformation_button_okbutton = lv_button_create(ui_timeinformation_container_cancelok);
+lv_obj_set_width( ui_timeinformation_button_okbutton, 100);
+lv_obj_set_height( ui_timeinformation_button_okbutton, 50);
+lv_obj_set_align( ui_timeinformation_button_okbutton, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_timeinformation_button_okbutton, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
+lv_obj_remove_flag( ui_timeinformation_button_okbutton, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_set_style_bg_color(ui_timeinformation_button_okbutton, lv_color_hex(0x05FF00), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_timeinformation_button_okbutton, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_timeinformation_button_okbutton, &lv_font_montserrat_20, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_timeinformation_label_oklabel = lv_label_create(ui_timeinformation_button_okbutton);
+lv_obj_set_width( ui_timeinformation_label_oklabel, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_timeinformation_label_oklabel, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_timeinformation_label_oklabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_timeinformation_label_oklabel,"OK");
+lv_obj_set_style_text_font(ui_timeinformation_label_oklabel, &lv_font_montserrat_20, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+lv_obj_add_event_cb(ui_timeinformation_button_cancelbutton, ui_event_timeinformation_button_cancelbutton, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_timeinformation_button_okbutton, ui_event_timeinformation_button_okbutton, LV_EVENT_ALL, NULL);
 ui_Screen_TimeInformation = ui_screen_timeinformation;
-ui_BackGroundContainer6 = ui_timeinformation_backgroundcontainer_backgroundcontainer6;
-ui_TimeInformation_Container_SyncButtonContainer = ui_timeinformation_container_syncbuttoncontainer;
-ui_TimeInformation_Button_syncButton = ui_timeinformation_button_syncbutton;
-ui_TimeInformation_Label_SyncIcon = ui_timeinformation_label_syncicon;
+ui_TimeInformation_Container_BackGroundContainer = ui_timeinformation_backgroundcontainer_backgroundcontainer;
+ui_TimeInformation_Container_TimeInformation_Container_SyncButtonContainer = ui_timeinformation_container_syncbuttoncontainer;
+ui_TimeInformation_Button_TimeInformation_Button_syncButton = ui_timeinformation_button_syncbutton;
+ui_TimeInformation_Label_TimeInformation_Label_SyncIcon = ui_timeinformation_label_syncicon;
 ui_TimeInformation_Label_SyncNow = ui_timeinformation_label_syncnow;
-ui_TimeInformation_Container_MasterTimeContainer = ui_timeinformation_container_mastertimecontainer;
+ui_TimeInformation_Container_TimeInformation_Container_MasterTimeContainer = ui_timeinformation_container_mastertimecontainer;
 ui_TimeInformation_Container_TimeInfoContainer = ui_timeinformation_container_timeinfocontainer;
-ui_TimeInformation_Dropdown_AMPM = ui_timeinformation_dropdown_ampm;
-ui_TimeInformation_Label_TimeInfoLabel = ui_timeinformation_label_timeinfolabel;
-ui_TimeInformation_Container_TimeZoneContainer = ui_timeinformation_container_timezonecontainer;
-ui_TimeInformation_Dropdown_TimeZone = ui_timeinformation_dropdown_timezone;
+ui_TimeInformation_Dropdown_TimeInformation_Dropdown_AMPM = ui_timeinformation_dropdown_ampm;
+ui_TimeInformation_Label_TimeInformation_Label_TimeInfoLabel = ui_timeinformation_label_timeinfolabel;
+ui_TimeInformation_Container_TimeInformation_Container_MasterTimeZoneContainer = ui_timeinformation_container_mastertimezonecontainer;
+ui_TimeInformation_Container_TimeInformation_Container_TimeZoneContainer = ui_timeinformation_container_timezonecontainer;
+ui_TimeInformation_Dropdown_TimeInformation_Dropdown_TimeZone = ui_timeinformation_dropdown_timezone;
+ui_TimeInformation_Container_TimeInformation_Container_NTPContainer = ui_timeinformation_container_ntpcontainer;
+ui_TimeInformation_Container_CancelOk = ui_timeinformation_container_cancelok;
+ui_TimeInformation_Button_CancelButton = ui_timeinformation_button_cancelbutton;
+ui_TimeInformation_Label_TimeInformation_Label_CancelLabel = ui_timeinformation_label_cancellabel;
+ui_TimeInformation_Button_TimeInformation_Button_OkButton = ui_timeinformation_button_okbutton;
+ui_TimeInformation_Label_TimeInformation_Label_OkLabel = ui_timeinformation_label_oklabel;
 
 }
 
@@ -205,33 +280,45 @@ void ui_screen_timeinformation_screen_destroy(void)
 // NULL screen variables
 ui_Screen_TimeInformation= NULL;
 ui_screen_timeinformation= NULL;
-ui_BackGroundContainer6= NULL;
-ui_timeinformation_backgroundcontainer_backgroundcontainer6= NULL;
-ui_TimeInformation_Container_SyncButtonContainer= NULL;
+ui_TimeInformation_Container_BackGroundContainer= NULL;
+ui_timeinformation_backgroundcontainer_backgroundcontainer= NULL;
+ui_TimeInformation_Container_TimeInformation_Container_SyncButtonContainer= NULL;
 ui_timeinformation_container_syncbuttoncontainer= NULL;
-ui_TimeInformation_Button_syncButton= NULL;
+ui_TimeInformation_Button_TimeInformation_Button_syncButton= NULL;
 ui_timeinformation_button_syncbutton= NULL;
-ui_TimeInformation_Label_SyncIcon= NULL;
+ui_TimeInformation_Label_TimeInformation_Label_SyncIcon= NULL;
 ui_timeinformation_label_syncicon= NULL;
 ui_TimeInformation_Label_SyncNow= NULL;
 ui_timeinformation_label_syncnow= NULL;
-ui_TimeInformation_Container_MasterTimeContainer= NULL;
+ui_TimeInformation_Container_TimeInformation_Container_MasterTimeContainer= NULL;
 ui_timeinformation_container_mastertimecontainer= NULL;
 ui_TimeInformation_Container_TimeInfoContainer= NULL;
 ui_timeinformation_container_timeinfocontainer= NULL;
 ui_timeinformation_spinbox_timeinput= NULL;
-ui_TimeInformation_Dropdown_AMPM= NULL;
+ui_TimeInformation_Dropdown_TimeInformation_Dropdown_AMPM= NULL;
 ui_timeinformation_dropdown_ampm= NULL;
-ui_TimeInformation_Label_TimeInfoLabel= NULL;
+ui_TimeInformation_Label_TimeInformation_Label_TimeInfoLabel= NULL;
 ui_timeinformation_label_timeinfolabel= NULL;
+ui_TimeInformation_Container_TimeInformation_Container_MasterTimeZoneContainer= NULL;
 ui_timeinformation_container_mastertimezonecontainer= NULL;
-ui_TimeInformation_Container_TimeZoneContainer= NULL;
+ui_TimeInformation_Container_TimeInformation_Container_TimeZoneContainer= NULL;
 ui_timeinformation_container_timezonecontainer= NULL;
-ui_TimeInformation_Dropdown_TimeZone= NULL;
+ui_TimeInformation_Dropdown_TimeInformation_Dropdown_TimeZone= NULL;
 ui_timeinformation_dropdown_timezone= NULL;
 ui_timeinformation_label_timezonelabel= NULL;
+ui_TimeInformation_Container_TimeInformation_Container_NTPContainer= NULL;
 ui_timeinformation_container_ntpcontainer= NULL;
 ui_timeinformation_textarea_ntpinput= NULL;
 ui_timeinformation_label_ntplabel= NULL;
+ui_TimeInformation_Container_CancelOk= NULL;
+ui_timeinformation_container_cancelok= NULL;
+ui_TimeInformation_Button_CancelButton= NULL;
+ui_timeinformation_button_cancelbutton= NULL;
+ui_TimeInformation_Label_TimeInformation_Label_CancelLabel= NULL;
+ui_timeinformation_label_cancellabel= NULL;
+ui_TimeInformation_Button_TimeInformation_Button_OkButton= NULL;
+ui_timeinformation_button_okbutton= NULL;
+ui_TimeInformation_Label_TimeInformation_Label_OkLabel= NULL;
+ui_timeinformation_label_oklabel= NULL;
 
 }

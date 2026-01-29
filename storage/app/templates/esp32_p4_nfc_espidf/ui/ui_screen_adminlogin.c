@@ -5,19 +5,18 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_AdminLogin_Keyboard_PasswordKeyboard;
-lv_obj_t *ui_AdminLogin_Label_OkLabel;
-lv_obj_t *ui_AdminLogin_Button_OkButton;
-lv_obj_t *ui_AdminLogin_Label_CancelLabel;
-lv_obj_t *ui_AdminLogin_Button_CancelButton;
-lv_obj_t *ui_AdminLogin_Container_CancelOk;
-lv_obj_t *ui_AdminLogin_Textarea_PasswordInput;
-lv_obj_t *ui_AdminLogin_Label_PasswordLabel;
-lv_obj_t *ui_AdminLogin_Container_PasswordContainer;
+lv_obj_t *ui_AdminLogin_Keyboard_AdminLogin_Keyboard_PasswordKeyboard;
+lv_obj_t *ui_AdminLogin_Label_AdminLogin_Label_OkLabel;
+lv_obj_t *ui_AdminLogin_Button_AdminLogin_Button_OkButton;
+lv_obj_t *ui_AdminLogin_Label_AdminLogin_Label_CancelLabel;
+lv_obj_t *ui_AdminLogin_Button_AdminLogin_Button_CancelButton;
+lv_obj_t *ui_AdminLogin_Container_AdminLogin_Container_CancelOk;
+lv_obj_t *ui_AdminLogin_Textarea_AdminLogin_Textarea_PasswordInput;
+lv_obj_t *ui_AdminLogin_Label_AdminLogin_Label_PasswordLabel;
+lv_obj_t *ui_AdminLogin_Container_AdminLogin_Container_PasswordContainer;
 lv_obj_t *ui_AdminLogin_Container_CredentialContainer;
-lv_obj_t *ui_AdminLogin_BackGroundContainer_BackGroundContainer;
 lv_obj_t *ui_Screen_AdminLogin;
-lv_obj_t *ui_screen_adminlogin = NULL;lv_obj_t *ui_adminlogin_backgroundcontainer_backgroundcontainer = NULL;lv_obj_t *ui_adminlogin_container_credentialcontainer = NULL;lv_obj_t *ui_adminlogin_container_passwordcontainer = NULL;lv_obj_t *ui_adminlogin_label_passwordlabel = NULL;lv_obj_t *ui_adminlogin_textarea_passwordinput = NULL;lv_obj_t *ui_adminlogin_container_cancelok = NULL;lv_obj_t *ui_adminlogin_button_cancelbutton = NULL;lv_obj_t *ui_adminlogin_label_cancellabel = NULL;lv_obj_t *ui_adminlogin_button_okbutton = NULL;lv_obj_t *ui_adminlogin_label_oklabel = NULL;lv_obj_t *ui_adminlogin_keyboard_passwordkeyboard = NULL;
+lv_obj_t *ui_screen_adminlogin = NULL;lv_obj_t *ui_adminlogin_container_credentialcontainer = NULL;lv_obj_t *ui_adminlogin_container_passwordcontainer = NULL;lv_obj_t *ui_adminlogin_label_passwordlabel = NULL;lv_obj_t *ui_adminlogin_textarea_passwordinput = NULL;lv_obj_t *ui_adminlogin_container_cancelok = NULL;lv_obj_t *ui_adminlogin_button_cancelbutton = NULL;lv_obj_t *ui_adminlogin_label_cancellabel = NULL;lv_obj_t *ui_adminlogin_button_okbutton = NULL;lv_obj_t *ui_adminlogin_label_oklabel = NULL;lv_obj_t *ui_adminlogin_keyboard_passwordkeyboard = NULL;
 // event funtions
 void ui_event_adminlogin_textarea_passwordinput( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -62,10 +61,8 @@ void ui_screen_adminlogin_screen_init(void)
 {
 ui_screen_adminlogin = lv_obj_create(NULL);
 lv_obj_remove_flag( ui_screen_adminlogin, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-
-ui_adminlogin_backgroundcontainer_backgroundcontainer = ui_container_backgroundcontainer_create(ui_screen_adminlogin);
-lv_obj_set_x( ui_adminlogin_backgroundcontainer_backgroundcontainer, 0 );
-lv_obj_set_y( ui_adminlogin_backgroundcontainer_backgroundcontainer, 0 );
+lv_obj_set_style_bg_color(ui_screen_adminlogin, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_screen_adminlogin, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_adminlogin_container_credentialcontainer = lv_obj_create(ui_screen_adminlogin);
 lv_obj_remove_style_all(ui_adminlogin_container_credentialcontainer);
@@ -107,6 +104,8 @@ lv_textarea_set_placeholder_text(ui_adminlogin_textarea_passwordinput,"Admin Pas
 lv_textarea_set_password_mode(ui_adminlogin_textarea_passwordinput, true);
 lv_obj_add_flag( ui_adminlogin_textarea_passwordinput, LV_OBJ_FLAG_OVERFLOW_VISIBLE );   /// Flags
 lv_obj_set_style_text_font(ui_adminlogin_textarea_passwordinput, &lv_font_montserrat_16, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_adminlogin_textarea_passwordinput, lv_color_hex(0x404040), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_adminlogin_textarea_passwordinput, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_adminlogin_container_cancelok = lv_obj_create(ui_adminlogin_container_credentialcontainer);
 lv_obj_remove_style_all(ui_adminlogin_container_cancelok);
@@ -118,8 +117,6 @@ lv_obj_set_align( ui_adminlogin_container_cancelok, LV_ALIGN_TOP_MID );
 lv_obj_set_flex_flow(ui_adminlogin_container_cancelok,LV_FLEX_FLOW_ROW);
 lv_obj_set_flex_align(ui_adminlogin_container_cancelok, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 lv_obj_remove_flag( ui_adminlogin_container_cancelok, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-lv_obj_set_style_bg_color(ui_adminlogin_container_cancelok, lv_color_hex(0x171717), LV_PART_MAIN | LV_STATE_DEFAULT );
-lv_obj_set_style_bg_opa(ui_adminlogin_container_cancelok, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_adminlogin_button_cancelbutton = lv_button_create(ui_adminlogin_container_cancelok);
 lv_obj_set_width( ui_adminlogin_button_cancelbutton, 100);
@@ -168,17 +165,16 @@ lv_obj_add_event_cb(ui_adminlogin_button_okbutton, ui_event_adminlogin_button_ok
 lv_keyboard_set_textarea(ui_adminlogin_keyboard_passwordkeyboard,ui_adminlogin_textarea_passwordinput);
 lv_obj_add_event_cb(ui_adminlogin_keyboard_passwordkeyboard, ui_event_adminlogin_keyboard_passwordkeyboard, LV_EVENT_ALL, NULL);
 ui_Screen_AdminLogin = ui_screen_adminlogin;
-ui_AdminLogin_BackGroundContainer_BackGroundContainer = ui_adminlogin_backgroundcontainer_backgroundcontainer;
 ui_AdminLogin_Container_CredentialContainer = ui_adminlogin_container_credentialcontainer;
-ui_AdminLogin_Container_PasswordContainer = ui_adminlogin_container_passwordcontainer;
-ui_AdminLogin_Label_PasswordLabel = ui_adminlogin_label_passwordlabel;
-ui_AdminLogin_Textarea_PasswordInput = ui_adminlogin_textarea_passwordinput;
-ui_AdminLogin_Container_CancelOk = ui_adminlogin_container_cancelok;
-ui_AdminLogin_Button_CancelButton = ui_adminlogin_button_cancelbutton;
-ui_AdminLogin_Label_CancelLabel = ui_adminlogin_label_cancellabel;
-ui_AdminLogin_Button_OkButton = ui_adminlogin_button_okbutton;
-ui_AdminLogin_Label_OkLabel = ui_adminlogin_label_oklabel;
-ui_AdminLogin_Keyboard_PasswordKeyboard = ui_adminlogin_keyboard_passwordkeyboard;
+ui_AdminLogin_Container_AdminLogin_Container_PasswordContainer = ui_adminlogin_container_passwordcontainer;
+ui_AdminLogin_Label_AdminLogin_Label_PasswordLabel = ui_adminlogin_label_passwordlabel;
+ui_AdminLogin_Textarea_AdminLogin_Textarea_PasswordInput = ui_adminlogin_textarea_passwordinput;
+ui_AdminLogin_Container_AdminLogin_Container_CancelOk = ui_adminlogin_container_cancelok;
+ui_AdminLogin_Button_AdminLogin_Button_CancelButton = ui_adminlogin_button_cancelbutton;
+ui_AdminLogin_Label_AdminLogin_Label_CancelLabel = ui_adminlogin_label_cancellabel;
+ui_AdminLogin_Button_AdminLogin_Button_OkButton = ui_adminlogin_button_okbutton;
+ui_AdminLogin_Label_AdminLogin_Label_OkLabel = ui_adminlogin_label_oklabel;
+ui_AdminLogin_Keyboard_AdminLogin_Keyboard_PasswordKeyboard = ui_adminlogin_keyboard_passwordkeyboard;
 
 }
 
@@ -189,27 +185,25 @@ void ui_screen_adminlogin_screen_destroy(void)
 // NULL screen variables
 ui_Screen_AdminLogin= NULL;
 ui_screen_adminlogin= NULL;
-ui_AdminLogin_BackGroundContainer_BackGroundContainer= NULL;
-ui_adminlogin_backgroundcontainer_backgroundcontainer= NULL;
 ui_AdminLogin_Container_CredentialContainer= NULL;
 ui_adminlogin_container_credentialcontainer= NULL;
-ui_AdminLogin_Container_PasswordContainer= NULL;
+ui_AdminLogin_Container_AdminLogin_Container_PasswordContainer= NULL;
 ui_adminlogin_container_passwordcontainer= NULL;
-ui_AdminLogin_Label_PasswordLabel= NULL;
+ui_AdminLogin_Label_AdminLogin_Label_PasswordLabel= NULL;
 ui_adminlogin_label_passwordlabel= NULL;
-ui_AdminLogin_Textarea_PasswordInput= NULL;
+ui_AdminLogin_Textarea_AdminLogin_Textarea_PasswordInput= NULL;
 ui_adminlogin_textarea_passwordinput= NULL;
-ui_AdminLogin_Container_CancelOk= NULL;
+ui_AdminLogin_Container_AdminLogin_Container_CancelOk= NULL;
 ui_adminlogin_container_cancelok= NULL;
-ui_AdminLogin_Button_CancelButton= NULL;
+ui_AdminLogin_Button_AdminLogin_Button_CancelButton= NULL;
 ui_adminlogin_button_cancelbutton= NULL;
-ui_AdminLogin_Label_CancelLabel= NULL;
+ui_AdminLogin_Label_AdminLogin_Label_CancelLabel= NULL;
 ui_adminlogin_label_cancellabel= NULL;
-ui_AdminLogin_Button_OkButton= NULL;
+ui_AdminLogin_Button_AdminLogin_Button_OkButton= NULL;
 ui_adminlogin_button_okbutton= NULL;
-ui_AdminLogin_Label_OkLabel= NULL;
+ui_AdminLogin_Label_AdminLogin_Label_OkLabel= NULL;
 ui_adminlogin_label_oklabel= NULL;
-ui_AdminLogin_Keyboard_PasswordKeyboard= NULL;
+ui_AdminLogin_Keyboard_AdminLogin_Keyboard_PasswordKeyboard= NULL;
 ui_adminlogin_keyboard_passwordkeyboard= NULL;
 
 }

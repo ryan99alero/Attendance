@@ -14,10 +14,9 @@ extern "C" {
 extern void ui_screen_mainscreen_screen_init(void);
 extern void ui_screen_mainscreen_screen_destroy(void);
 extern lv_obj_t *ui_screen_mainscreen;
-extern lv_obj_t *ui_mainscreen_backgroundcontainer_backgroundcontainer2;
+extern lv_obj_t *ui_mainscreen_backgroundcontainer_backgroundcontainer;
 extern lv_obj_t *ui_mainscreen_container_topbarcontainer;
 extern lv_obj_t *ui_mainscreen_container_groupleftcontainer;
-extern void ui_event_mainscreen_label_neticonlabel( lv_event_t * e);
 extern lv_obj_t *ui_mainscreen_label_neticonlabel;
 extern lv_obj_t *ui_mainscreen_label_bluetoothiconlabel;
 extern lv_obj_t *ui_mainscreen_label_machinenamelabel;
@@ -30,18 +29,18 @@ extern lv_obj_t *ui_mainscreen_button_settingsbutton;
 extern lv_obj_t *ui_mainscreen_label_settingsbuttonlabel;
 // CUSTOM VARIABLES
 extern lv_obj_t *ui_Screen_MainScreen;
-extern lv_obj_t *ui_MainScreen_BackGroundContainer_BackGroundContainer2;
+extern lv_obj_t *ui_MainScreen_BackGroundContainer_MainScreen_Container_BackGroundContainer;
 extern lv_obj_t *ui_MainScreen_Container_topbarContainer;
-extern lv_obj_t *ui_MainScreen_Container_groupLeftContainer;
+extern lv_obj_t *ui_MainScreen_Container_MainScreen_Container_groupLeftContainer;
 extern lv_obj_t *ui_MainScreen_Label_neticonlabel;
-extern lv_obj_t *ui_MainScreen_Label_BluetoothIconlabel;
+extern lv_obj_t *ui_MainScreen_Label_MainScreen_Label_BluetoothIconlabel;
 extern lv_obj_t *ui_MainScreen_Label_machinenamelabel;
-extern lv_obj_t *ui_MainScreen_Container_grouprightContainer;
-extern lv_obj_t *ui_MainScreen_Label_timelabel;
-extern lv_obj_t *ui_MainScreen_Label_datelabel;
+extern lv_obj_t *ui_MainScreen_Container_MainScreen_Container_grouprightContainer;
+extern lv_obj_t *ui_MainScreen_Label_MainScreen_Label_timelabel;
+extern lv_obj_t *ui_MainScreen_Label_MainScreen_Label_datelabel;
 extern lv_obj_t *ui_MainScreen_Container_bottombarcontainer;
-extern lv_obj_t *ui_MainScreen_Button_SettingsButton;
-extern lv_obj_t *ui_MainScreen_Label_SettingsButtonLabel;
+extern lv_obj_t *ui_MainScreen_Button_MainScreen_Button_SettingsButton;
+extern lv_obj_t *ui_MainScreen_Label_MainScreen_Label_SettingsButtonLabel;
 
 #ifdef __cplusplus
 } /*extern "C"*/

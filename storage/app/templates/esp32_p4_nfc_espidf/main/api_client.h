@@ -26,6 +26,25 @@ typedef struct {
     bool is_approved;           // Approval status
 } api_config_t;
 
+// Time sync response data
+typedef struct {
+    char server_time[32];       // ISO 8601 time string
+    int64_t unix_timestamp;     // Unix timestamp (seconds)
+    char timezone[64];          // Timezone string (e.g., "America/New_York")
+    int timezone_offset;        // Timezone offset in seconds from UTC
+    char ntp_server[128];       // NTP server to use (if specified by server)
+    bool use_server_time;       // True if device should use server time sync
+    bool valid;                 // True if data is valid
+} time_sync_data_t;
+
+// Sync source tracking
+typedef enum {
+    SYNC_SOURCE_NONE = 0,
+    SYNC_SOURCE_SERVER,
+    SYNC_SOURCE_NTP,
+    SYNC_SOURCE_MANUAL
+} sync_source_t;
+
 // Punch/time record data
 typedef struct {
     char device_id[64];         // Device identifier
@@ -80,6 +99,32 @@ esp_err_t api_health_check(void);
  * @return ESP_OK on success
  */
 esp_err_t api_get_server_time(char *time_str, size_t time_str_size);
+
+/**
+ * Full time sync - gets time, timezone, NTP server from server
+ * @param sync_data Pointer to time_sync_data_t structure to fill
+ * @return ESP_OK on success
+ */
+esp_err_t api_sync_time(time_sync_data_t *sync_data);
+
+/**
+ * Send heartbeat/daily sync to server with device status
+ * @param ip_address Current IP address of the device
+ * @return ESP_OK on success
+ */
+esp_err_t api_send_heartbeat(const char *ip_address);
+
+/**
+ * Get current sync source
+ * @return Current sync source enum
+ */
+sync_source_t api_get_sync_source(void);
+
+/**
+ * Get current time sync settings
+ * @return Pointer to current time sync data (may have stale data if not recently synced)
+ */
+const time_sync_data_t* api_get_time_sync_data(void);
 
 /**
  * Get employee information and hours by card ID

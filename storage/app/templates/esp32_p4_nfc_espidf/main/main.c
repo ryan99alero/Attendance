@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,7 +26,8 @@
 // UI Manager
 #if DISPLAY_ENABLED
 #include "ui_manager.h"
-#include "ui/ui.h"  // SquareLine Studio UI
+#include "ui.h"  // SquareLine Studio UI
+#include "ui_bridge.h"  // Bridge between SquareLine UI and backend
 #endif
 
 // NFC driver - PN532 abstraction layer
@@ -51,8 +53,8 @@
 
 // API Configuration (TODO: Make configurable)
 #if API_ENABLED
-#define API_SERVER_HOST "attend.test"  // Herd local server
-#define API_SERVER_PORT 80               // HTTP port
+#define API_SERVER_HOST "192.168.29.25"  // Herd local server
+#define API_SERVER_PORT 8000             // HTTP port
 #define API_DEVICE_NAME "ESP32-P4-NFC-Clock-01"
 #endif
 
@@ -92,14 +94,66 @@ static void validate_admin_password(const char *password, bool *is_valid) {
 
 #endif
 
+#if API_ENABLED
+// Daily sync task - syncs time and sends heartbeat every 24 hours
+static void daily_sync_task(void *pvParameters) {
+	const TickType_t initial_delay = pdMS_TO_TICKS(30000);  // 30 sec after boot
+	const TickType_t sync_interval = pdMS_TO_TICKS(24 * 60 * 60 * 1000);  // 24 hours
+
+	// Initial delay to let network stabilize
+	vTaskDelay(initial_delay);
+
+	while (1) {
+		ESP_LOGI(TAG, "Daily sync starting...");
+
+		// Only sync if network is connected and device is registered
+		if (network_manager_is_connected()) {
+			api_config_t *config = api_get_config();
+
+			// Sync time from server
+			time_sync_data_t sync_data;
+			esp_err_t ret = api_sync_time(&sync_data);
+			if (ret == ESP_OK && sync_data.valid) {
+				// Set system time from unix timestamp
+				if (sync_data.unix_timestamp > 0) {
+					struct timeval tv;
+					tv.tv_sec = (time_t)sync_data.unix_timestamp;
+					tv.tv_usec = 0;
+					settimeofday(&tv, NULL);
+					ESP_LOGI(TAG, "System time synced: %lld", (long long)sync_data.unix_timestamp);
+				}
+			}
+
+			// Send heartbeat with IP address if registered
+			if (config->is_registered) {
+				char ip_str[16] = {0};
+				network_manager_get_ip_string(ip_str, sizeof(ip_str));
+				ret = api_send_heartbeat(ip_str);
+				if (ret == ESP_OK) {
+					ESP_LOGI(TAG, "Heartbeat sent with IP: %s", ip_str);
+				}
+			}
+		}
+
+		ESP_LOGI(TAG, "Daily sync complete, next sync in 24 hours");
+		vTaskDelay(sync_interval);
+	}
+}
+#endif
+
 void app_main(void) {
+	ESP_EARLY_LOGI("MAIN", ">>> app_main ENTERED <<<");
+	ESP_EARLY_LOGI("MAIN", "About to print banner...");
 	printf("\n\n=== ESP32-P4 NFC TIME CLOCK ===\n");
+	ESP_EARLY_LOGI("MAIN", "Banner printed, about to print version...");
 	printf("Firmware Version: %s\n", FIRMWARE_VERSION);
 	printf("Build Date: %s\n", FIRMWARE_BUILD_DATE);
 	printf("Build Time: %s\n\n", FIRMWARE_BUILD_TIME);
+	ESP_EARLY_LOGI("MAIN", "Version info printed, initializing NVS...");
 
 	// Initialize NVS (required for WiFi)
 	esp_err_t ret = nvs_flash_init();
+	ESP_EARLY_LOGI("MAIN", "NVS init returned: %d", ret);
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
 		ESP_ERROR_CHECK(nvs_flash_erase());
 		ret = nvs_flash_init();
@@ -109,38 +163,43 @@ void app_main(void) {
 
 #if DISPLAY_ENABLED
 	// Initialize display FIRST to claim frame buffer memory before WiFi/NFC
-	printf("Initializing display (allocating frame buffer)...\n");
+	ESP_EARLY_LOGI("MAIN", "About to call bsp_display_start()...");
 	bsp_display_start();
+	ESP_EARLY_LOGI("MAIN", "bsp_display_start() returned");
+
+	ESP_EARLY_LOGI("MAIN", "About to call bsp_display_backlight_on()...");
 	bsp_display_backlight_on();
+	ESP_EARLY_LOGI("MAIN", "bsp_display_backlight_on() returned");
 
 	// Initialize SquareLine Studio UI
+	ESP_EARLY_LOGI("MAIN", "About to call lvgl_port_lock()...");
 	lvgl_port_lock(0);
+	ESP_EARLY_LOGI("MAIN", "lvgl_port_lock() returned, calling ui_init()...");
 	ui_init();  // Create all SquareLine screens
+	ESP_EARLY_LOGI("MAIN", "ui_init() returned, calling ui_bridge_init()...");
+	ui_bridge_init();  // Connect SquareLine UI to backend managers
+	ESP_EARLY_LOGI("MAIN", "ui_bridge_init() returned, calling lvgl_port_unlock()...");
 	lvgl_port_unlock();
+	ESP_EARLY_LOGI("MAIN", "Display init complete");
 
-	// TODO: Update ui_manager.c to work with SquareLine UI elements (Phase 6)
-	// For now, SquareLine UI is initialized but ui_manager functions need to be updated
-	// ui_manager_init(DEVICE_NAME);
-	// ui_set_setup_callback(validate_admin_password);
-	// ui_update_status(NET_STATUS_DISCONNECTED, NFC_STATUS_DISABLED);
-	// ui_update_time("--:--", "---");
-	// ui_show_ready_screen("Initializing...");
-
-	printf("Display initialized with SquareLine UI!\n");
+	printf("Display initialized with SquareLine UI and backend bridge!\n");
 	printf("Free heap after display: %lu bytes\n\n", (unsigned long)esp_get_free_heap_size());
 #else
-	printf("Display disabled\n\n");
+	ESP_EARLY_LOGI("MAIN", "Display disabled");
 #endif
 
 #if WIFI_ENABLED || ETHERNET_ENABLED
 	// Initialize network manager (handles WiFi, Ethernet, Bluetooth)
-	printf("Initializing network manager...\n");
+	ESP_EARLY_LOGI("MAIN", "About to init network manager...");
 	if (network_manager_init() == ESP_OK) {
+		ESP_EARLY_LOGI("MAIN", "Network manager init OK");
 		printf("✅ Network manager initialized\n");
 		printf("   Configure networks through Setup menu\n\n");
 
 		// Try to load and connect to saved configurations
+		ESP_EARLY_LOGI("MAIN", "About to call load_and_connect...");
 		network_manager_load_and_connect();
+		ESP_EARLY_LOGI("MAIN", "load_and_connect returned");
 
 #if DISPLAY_ENABLED
 		// Start network monitoring task
@@ -178,22 +237,19 @@ void app_main(void) {
 
 		api_client_init(&api_config);
 
-		// Test server health
+		// Test server health (but don't auto-register - let user register via ServerSetup)
 		if (api_health_check() == ESP_OK) {
 			printf("✅ Server is reachable\n");
-
-			// Register device (if not already registered - TODO: save to NVS)
-			printf("Registering device...\n");
-			if (api_register_device(mac_str, API_DEVICE_NAME) == ESP_OK) {
-				printf("✅ Device registered successfully!\n\n");
-			} else {
-				printf("❌ Device registration failed\n\n");
-			}
+			printf("Use ServerSetup screen to register device\n\n");
 		} else {
 			printf("❌ Cannot reach server at %s:%d\n\n",
 			       API_SERVER_HOST, API_SERVER_PORT);
 		}
 	}
+
+	// Start daily sync task (time sync + heartbeat every 24h, first sync 30s after boot)
+	xTaskCreate(daily_sync_task, "daily_sync", 8192, NULL, 3, NULL);
+	printf("✅ Daily sync task started (first sync in 30s)\n\n");
 #else
 	printf("API disabled\n\n");
 #endif

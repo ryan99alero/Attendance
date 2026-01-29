@@ -14,7 +14,6 @@ extern "C" {
 extern void ui_screen_adminlogin_screen_init(void);
 extern void ui_screen_adminlogin_screen_destroy(void);
 extern lv_obj_t *ui_screen_adminlogin;
-extern lv_obj_t *ui_adminlogin_backgroundcontainer_backgroundcontainer;
 extern lv_obj_t *ui_adminlogin_container_credentialcontainer;
 extern lv_obj_t *ui_adminlogin_container_passwordcontainer;
 extern lv_obj_t *ui_adminlogin_label_passwordlabel;
@@ -31,17 +30,16 @@ extern void ui_event_adminlogin_keyboard_passwordkeyboard( lv_event_t * e);
 extern lv_obj_t *ui_adminlogin_keyboard_passwordkeyboard;
 // CUSTOM VARIABLES
 extern lv_obj_t *ui_Screen_AdminLogin;
-extern lv_obj_t *ui_AdminLogin_BackGroundContainer_BackGroundContainer;
 extern lv_obj_t *ui_AdminLogin_Container_CredentialContainer;
-extern lv_obj_t *ui_AdminLogin_Container_PasswordContainer;
-extern lv_obj_t *ui_AdminLogin_Label_PasswordLabel;
-extern lv_obj_t *ui_AdminLogin_Textarea_PasswordInput;
-extern lv_obj_t *ui_AdminLogin_Container_CancelOk;
-extern lv_obj_t *ui_AdminLogin_Button_CancelButton;
-extern lv_obj_t *ui_AdminLogin_Label_CancelLabel;
-extern lv_obj_t *ui_AdminLogin_Button_OkButton;
-extern lv_obj_t *ui_AdminLogin_Label_OkLabel;
-extern lv_obj_t *ui_AdminLogin_Keyboard_PasswordKeyboard;
+extern lv_obj_t *ui_AdminLogin_Container_AdminLogin_Container_PasswordContainer;
+extern lv_obj_t *ui_AdminLogin_Label_AdminLogin_Label_PasswordLabel;
+extern lv_obj_t *ui_AdminLogin_Textarea_AdminLogin_Textarea_PasswordInput;
+extern lv_obj_t *ui_AdminLogin_Container_AdminLogin_Container_CancelOk;
+extern lv_obj_t *ui_AdminLogin_Button_AdminLogin_Button_CancelButton;
+extern lv_obj_t *ui_AdminLogin_Label_AdminLogin_Label_CancelLabel;
+extern lv_obj_t *ui_AdminLogin_Button_AdminLogin_Button_OkButton;
+extern lv_obj_t *ui_AdminLogin_Label_AdminLogin_Label_OkLabel;
+extern lv_obj_t *ui_AdminLogin_Keyboard_AdminLogin_Keyboard_PasswordKeyboard;
 
 #ifdef __cplusplus
 } /*extern "C"*/

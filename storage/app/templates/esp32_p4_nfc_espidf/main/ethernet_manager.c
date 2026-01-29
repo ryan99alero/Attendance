@@ -8,6 +8,7 @@
 #include "esp_eth.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "driver/gpio.h"
@@ -156,6 +157,24 @@ esp_err_t ethernet_manager_init(void)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install Ethernet driver: %s", esp_err_to_name(ret));
         return ret;
+    }
+
+    // Set custom MAC address for Ethernet - use factory base MAC + 2
+    // MAC scheme: Hardware=base, WiFi=base+1, Ethernet=base+2
+    // This ensures consistent MAC across reboots and firmware updates
+    uint8_t base_mac[6];
+    esp_read_mac(base_mac, ESP_MAC_BASE);
+    uint8_t eth_custom_mac[6];
+    memcpy(eth_custom_mac, base_mac, 6);
+    eth_custom_mac[5] += 2;  // Increment last byte by 2 for Ethernet
+
+    ret = esp_eth_ioctl(eth_handle, ETH_CMD_S_MAC_ADDR, eth_custom_mac);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Ethernet MAC set to base+2: %02X:%02X:%02X:%02X:%02X:%02X",
+                 eth_custom_mac[0], eth_custom_mac[1], eth_custom_mac[2],
+                 eth_custom_mac[3], eth_custom_mac[4], eth_custom_mac[5]);
+    } else {
+        ESP_LOGW(TAG, "Failed to set Ethernet MAC: %s (using default)", esp_err_to_name(ret));
     }
 
     // Attach Ethernet driver to TCP/IP stack

@@ -14,7 +14,7 @@ extern "C" {
 extern void ui_screen_timeinformation_screen_init(void);
 extern void ui_screen_timeinformation_screen_destroy(void);
 extern lv_obj_t *ui_screen_timeinformation;
-extern lv_obj_t *ui_timeinformation_backgroundcontainer_backgroundcontainer6;
+extern lv_obj_t *ui_timeinformation_backgroundcontainer_backgroundcontainer;
 extern lv_obj_t *ui_timeinformation_container_syncbuttoncontainer;
 extern lv_obj_t *ui_timeinformation_button_syncbutton;
 extern lv_obj_t *ui_timeinformation_label_syncicon;
@@ -31,19 +31,33 @@ extern lv_obj_t *ui_timeinformation_label_timezonelabel;
 extern lv_obj_t *ui_timeinformation_container_ntpcontainer;
 extern lv_obj_t *ui_timeinformation_textarea_ntpinput;
 extern lv_obj_t *ui_timeinformation_label_ntplabel;
+extern lv_obj_t *ui_timeinformation_container_cancelok;
+extern void ui_event_timeinformation_button_cancelbutton( lv_event_t * e);
+extern lv_obj_t *ui_timeinformation_button_cancelbutton;
+extern lv_obj_t *ui_timeinformation_label_cancellabel;
+extern void ui_event_timeinformation_button_okbutton( lv_event_t * e);
+extern lv_obj_t *ui_timeinformation_button_okbutton;
+extern lv_obj_t *ui_timeinformation_label_oklabel;
 // CUSTOM VARIABLES
 extern lv_obj_t *ui_Screen_TimeInformation;
-extern lv_obj_t *ui_BackGroundContainer6;
-extern lv_obj_t *ui_TimeInformation_Container_SyncButtonContainer;
-extern lv_obj_t *ui_TimeInformation_Button_syncButton;
-extern lv_obj_t *ui_TimeInformation_Label_SyncIcon;
+extern lv_obj_t *ui_TimeInformation_Container_BackGroundContainer;
+extern lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_SyncButtonContainer;
+extern lv_obj_t *ui_TimeInformation_Button_TimeInformation_Button_syncButton;
+extern lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_SyncIcon;
 extern lv_obj_t *ui_TimeInformation_Label_SyncNow;
-extern lv_obj_t *ui_TimeInformation_Container_MasterTimeContainer;
+extern lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_MasterTimeContainer;
 extern lv_obj_t *ui_TimeInformation_Container_TimeInfoContainer;
-extern lv_obj_t *ui_TimeInformation_Dropdown_AMPM;
-extern lv_obj_t *ui_TimeInformation_Label_TimeInfoLabel;
-extern lv_obj_t *ui_TimeInformation_Container_TimeZoneContainer;
-extern lv_obj_t *ui_TimeInformation_Dropdown_TimeZone;
+extern lv_obj_t *ui_TimeInformation_Dropdown_TimeInformation_Dropdown_AMPM;
+extern lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_TimeInfoLabel;
+extern lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_MasterTimeZoneContainer;
+extern lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_TimeZoneContainer;
+extern lv_obj_t *ui_TimeInformation_Dropdown_TimeInformation_Dropdown_TimeZone;
+extern lv_obj_t *ui_TimeInformation_Container_TimeInformation_Container_NTPContainer;
+extern lv_obj_t *ui_TimeInformation_Container_CancelOk;
+extern lv_obj_t *ui_TimeInformation_Button_CancelButton;
+extern lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_CancelLabel;
+extern lv_obj_t *ui_TimeInformation_Button_TimeInformation_Button_OkButton;
+extern lv_obj_t *ui_TimeInformation_Label_TimeInformation_Label_OkLabel;
 
 #ifdef __cplusplus
 } /*extern "C"*/

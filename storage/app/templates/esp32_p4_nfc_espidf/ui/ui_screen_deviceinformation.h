@@ -14,7 +14,6 @@ extern "C" {
 extern void ui_screen_deviceinformation_screen_init(void);
 extern void ui_screen_deviceinformation_screen_destroy(void);
 extern lv_obj_t *ui_screen_deviceinformation;
-extern lv_obj_t *ui_deviceinformation_backgroundcontainer_backgroundcontainer1;
 extern lv_obj_t *ui_deviceinformation_container_headercontainer;
 extern lv_obj_t *ui_deviceinformation_label_deviceinfocontainer;
 extern lv_obj_t *ui_deviceinformation_container_devicedisplaytypecontainer;
@@ -23,17 +22,21 @@ extern lv_obj_t *ui_deviceinformation_label_hardwarelabel;
 extern lv_obj_t *ui_deviceinformation_button_softwarebutton;
 extern lv_obj_t *ui_deviceinformation_label_softwarelabel;
 extern lv_obj_t *ui_deviceinformation_container_informationarea;
+extern void ui_event_deviceinformation_button_okbutton( lv_event_t * e);
+extern lv_obj_t *ui_deviceinformation_button_okbutton;
+extern lv_obj_t *ui_deviceinformation_label_oklabel;
 // CUSTOM VARIABLES
 extern lv_obj_t *ui_Screen_DeviceInformation;
-extern lv_obj_t *ui_DeviceInformation_BackGroundContainer_BackGroundContainer1;
-extern lv_obj_t *ui_DeviceInformation_Container_HeaderContainer;
-extern lv_obj_t *ui_DeviceInformation_Label_DeviceInfoContainer;
-extern lv_obj_t *ui_DeviceInformation_Container_DeviceDisplayTypeContainer;
-extern lv_obj_t *ui_DeviceInformation_Button_HarwareButton;
-extern lv_obj_t *ui_DeviceInformation_Label_HardwareLabel;
-extern lv_obj_t *ui_DeviceInformation_Button_SoftwareButton;
-extern lv_obj_t *ui_DeviceInformation_Label_SoftwareLabel;
-extern lv_obj_t *ui_DeviceInformation_Container_InformationArea;
+extern lv_obj_t *ui_DeviceInformation_Container_DeviceInformation_Container_HeaderContainer;
+extern lv_obj_t *ui_DeviceInformation_Label_DeviceInformation_Label_DeviceInfoContainer;
+extern lv_obj_t *ui_DeviceInformation_Container_DeviceInformation_Container_DeviceDisplayTypeContainer;
+extern lv_obj_t *ui_DeviceInformation_Button_DeviceInformation_Button_HarwareButton;
+extern lv_obj_t *ui_DeviceInformation_Label_DeviceInformation_Label_HardwareLabel;
+extern lv_obj_t *ui_DeviceInformation_Button_DeviceInformation_Button_SoftwareButton;
+extern lv_obj_t *ui_DeviceInformation_Label_DeviceInformation_Label_SoftwareLabel;
+extern lv_obj_t *ui_DeviceInformation_Container_DeviceInformation_Container_InformationArea;
+extern lv_obj_t *ui_DeviceInformation_Button_DeviceInformation_Button_OkButton;
+extern lv_obj_t *ui_DeviceInformation_Label_DeviceInformation_Label_OkLabel;
 
 #ifdef __cplusplus
 } /*extern "C"*/

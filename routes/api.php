@@ -45,11 +45,11 @@ Route::middleware('web')->post('/web-keep-alive', function (Request $request) {
 */
 
 Route::prefix('v1/timeclock')->group(function () {
-    // Public health check
+    // Public health check | http://attend.test/api/v1/timeclock/health
     Route::get('/health', [TimeClockController::class, 'health'])
         ->name('timeclock.health');
 
-    // Lightweight time synchronization endpoint
+    // Lightweight time synchronization endpoint | http://attend.test/api/v1/timeclock/time
     Route::get('/time', [TimeClockController::class, 'getTime'])
         ->name('timeclock.time');
 

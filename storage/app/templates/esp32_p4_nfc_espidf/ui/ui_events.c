@@ -4,8 +4,754 @@
 // Project name: SquareLine_TimeClock_Rand
 
 #include "ui.h"
+#include "esp_log.h"
+#include "esp_mac.h"
+#include "esp_sntp.h"
+#include "api_client.h"
+#include "network_manager.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_lvgl_port.h"
+#include <string.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <time.h>
+
+// Debounce flag to prevent double registration
+static bool register_in_progress = false;
+
+static const char *TAG = "UI_EVENTS";
 
 void ui_event_textarea(lv_event_t * e)
 {
-	// Your code here
+    // Get the textarea that triggered the event
+    lv_obj_t *textarea = lv_event_get_target(e);
+
+    // Set keyboard target for ServerSetup screen textareas
+    if (ui_serversetup_keyboard_serversetupkeyboard && textarea) {
+        // Check if this textarea belongs to ServerSetup screen
+        if (textarea == ui_serversetup_textarea_serverurlinput ||
+            textarea == ui_serversetup_textarea_portinput ||
+            textarea == ui_serversetup_textarea_devicenameinput) {
+            lv_keyboard_set_textarea(ui_serversetup_keyboard_serversetupkeyboard, textarea);
+            ESP_LOGI(TAG, "ServerSetup keyboard target set");
+        }
+    }
+
+    // Set keyboard target for NetworkSetup VLAN (which was also missing)
+    if (ui_networksetup_keyboard_networkkeyboard && textarea) {
+        if (textarea == ui_networksetup_textarea_vlaninput) {
+            lv_keyboard_set_textarea(ui_networksetup_keyboard_networkkeyboard, textarea);
+            ESP_LOGI(TAG, "NetworkSetup keyboard target set for VLAN");
+        }
+    }
+}
+
+void ui_event_keyboard_close(lv_event_t * e)
+{
+    ESP_LOGI(TAG, "Keyboard close event");
+
+    // Hide the keyboard
+    if (ui_networksetup_keyboard_networkkeyboard) {
+        lv_obj_add_flag(ui_networksetup_keyboard_networkkeyboard, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Check if we're in Wired mode (switch checked) or WiFi mode (switch unchecked)
+    bool is_wired = false;
+    if (ui_networksetup_switch_networktypeselector) {
+        is_wired = lv_obj_has_state(ui_networksetup_switch_networktypeselector, LV_STATE_CHECKED);
+    }
+
+    ESP_LOGI(TAG, "Network mode: %s", is_wired ? "Wired" : "WiFi");
+
+    // Always show common fields
+    if (ui_networksetup_container_hostnamecontainer) {
+        lv_obj_remove_flag(ui_networksetup_container_hostnamecontainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_networksetup_container_networkoptionscontrolcontainer) {
+        lv_obj_remove_flag(ui_networksetup_container_networkoptionscontrolcontainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_networksetup_container_ipaddresscontainer) {
+        lv_obj_remove_flag(ui_networksetup_container_ipaddresscontainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_networksetup_container_gatewaycontainer) {
+        lv_obj_remove_flag(ui_networksetup_container_gatewaycontainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_networksetup_container_netmaskcontainer) {
+        lv_obj_remove_flag(ui_networksetup_container_netmaskcontainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_networksetup_container_dnscontainer) {
+        lv_obj_remove_flag(ui_networksetup_container_dnscontainer, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_networksetup_container_dns2container) {
+        lv_obj_remove_flag(ui_networksetup_container_dns2container, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Show/hide mode-specific fields based on switch state
+    if (is_wired) {
+        // Wired mode: show VLAN, hide WiFi fields
+        if (ui_networksetup_container_vlancontainer) {
+            lv_obj_remove_flag(ui_networksetup_container_vlancontainer, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (ui_networksetup_container_ssidcontainer) {
+            lv_obj_add_flag(ui_networksetup_container_ssidcontainer, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (ui_networksetup_container_passwordcontainer) {
+            lv_obj_add_flag(ui_networksetup_container_passwordcontainer, LV_OBJ_FLAG_HIDDEN);
+        }
+    } else {
+        // WiFi mode: show WiFi fields, hide VLAN
+        if (ui_networksetup_container_ssidcontainer) {
+            lv_obj_remove_flag(ui_networksetup_container_ssidcontainer, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (ui_networksetup_container_passwordcontainer) {
+            lv_obj_remove_flag(ui_networksetup_container_passwordcontainer, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (ui_networksetup_container_vlancontainer) {
+            lv_obj_add_flag(ui_networksetup_container_vlancontainer, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+// Helper to parse ISO8601 time and set system clock
+static bool set_system_time_from_iso8601(const char *iso_time, int64_t unix_ts) {
+    struct timeval tv;
+
+    // If we have unix timestamp, use it directly (more accurate)
+    if (unix_ts > 0) {
+        tv.tv_sec = (time_t)unix_ts;
+        tv.tv_usec = 0;
+        if (settimeofday(&tv, NULL) == 0) {
+            ESP_LOGI(TAG, "System time set from unix timestamp: %lld", (long long)unix_ts);
+            return true;
+        }
+    }
+
+    // Fall back to parsing ISO8601 string: "2026-01-29T03:36:53.883970Z"
+    if (iso_time && strlen(iso_time) > 0) {
+        struct tm tm_time = {0};
+        // Parse: YYYY-MM-DDTHH:MM:SS
+        int year, month, day, hour, min, sec;
+        if (sscanf(iso_time, "%d-%d-%dT%d:%d:%d", &year, &month, &day, &hour, &min, &sec) == 6) {
+            tm_time.tm_year = year - 1900;
+            tm_time.tm_mon = month - 1;
+            tm_time.tm_mday = day;
+            tm_time.tm_hour = hour;
+            tm_time.tm_min = min;
+            tm_time.tm_sec = sec;
+            tm_time.tm_isdst = 0;
+
+            // Set TZ to UTC temporarily to get correct epoch
+            setenv("TZ", "UTC0", 1);
+            tzset();
+            time_t epoch = mktime(&tm_time);
+
+            if (epoch > 0) {
+                tv.tv_sec = epoch;
+                tv.tv_usec = 0;
+                if (settimeofday(&tv, NULL) == 0) {
+                    ESP_LOGI(TAG, "System time set from ISO8601: %s", iso_time);
+                    return true;
+                }
+            }
+        }
+    }
+
+    ESP_LOGE(TAG, "Failed to set system time");
+    return false;
+}
+
+// Task to perform time sync (runs with adequate stack space)
+static void time_sync_task(void *pvParameters)
+{
+    char *ntp_server_param = (char *)pvParameters;
+    ESP_LOGI(TAG, "Time sync task started, NTP server: %s", ntp_server_param ? ntp_server_param : "pool.ntp.org");
+
+    // Try to get time from API server first
+    time_sync_data_t sync_data;
+    esp_err_t ret = api_sync_time(&sync_data);
+
+    if (ret == ESP_OK && sync_data.valid) {
+        ESP_LOGI(TAG, "Got server time: %s (unix: %lld)", sync_data.server_time, sync_data.unix_timestamp);
+
+        // Set timezone BEFORE setting system time so localtime_r works correctly
+        // Format: "UTC+HH" or "UTC-HH" (note: POSIX TZ uses inverted sign)
+        int offset_hours = sync_data.timezone_offset / 3600;
+        char tz_str[32];
+        // POSIX TZ format uses inverted sign: UTC-6 means 6 hours BEHIND UTC
+        // So for Chicago (UTC-6), we need "CST6CDT" or simply "UTC+6"
+        if (offset_hours <= 0) {
+            snprintf(tz_str, sizeof(tz_str), "UTC%d", -offset_hours);
+        } else {
+            snprintf(tz_str, sizeof(tz_str), "UTC-%d", offset_hours);
+        }
+        setenv("TZ", tz_str, 1);
+        tzset();
+        ESP_LOGI(TAG, "Set timezone: TZ=%s (offset=%d hours)", tz_str, offset_hours);
+
+        // Set the system clock (UTC time)
+        if (set_system_time_from_iso8601(sync_data.server_time, sync_data.unix_timestamp)) {
+            // Get LOCAL time after timezone is set
+            time_t now;
+            struct tm timeinfo;
+            time(&now);
+            localtime_r(&now, &timeinfo);
+
+            char time_buf[32];
+            char date_buf[32];
+            strftime(time_buf, sizeof(time_buf), "%I:%M:%S %p", &timeinfo);
+            strftime(date_buf, sizeof(date_buf), "%a %b %d", &timeinfo);
+            ESP_LOGI(TAG, "Local time after TZ set: %s %s", date_buf, time_buf);
+
+            // Update UI from LVGL context
+            ESP_LOGW(TAG, "=== UPDATING TIME INFORMATION SCREEN FIELDS ===");
+            ESP_LOGI(TAG, "UI Element pointers - label_syncnow: %p, spinbox: %p, ampm: %p, ntp: %p, tz: %p",
+                     (void*)ui_timeinformation_label_syncnow,
+                     (void*)ui_timeinformation_spinbox_timeinput,
+                     (void*)ui_timeinformation_dropdown_ampm,
+                     (void*)ui_timeinformation_textarea_ntpinput,
+                     (void*)ui_timeinformation_dropdown_timezone);
+
+            if (lvgl_port_lock(100)) {
+                ESP_LOGI(TAG, "LVGL lock acquired");
+
+                // Update sync status label
+                if (ui_timeinformation_label_syncnow) {
+                    lv_label_set_text(ui_timeinformation_label_syncnow, "Synced (Server)");
+                    ESP_LOGI(TAG, "FIELD: ui_timeinformation_label_syncnow = 'Synced (Server)'");
+                } else {
+                    ESP_LOGW(TAG, "SKIP: ui_timeinformation_label_syncnow is NULL");
+                }
+
+                // Update time spinbox with LOCAL hour:minute
+                if (ui_timeinformation_spinbox_timeinput) {
+                    // Spinbox expects HHMM format (e.g., 1230 for 12:30)
+                    int hour_12 = timeinfo.tm_hour % 12;
+                    if (hour_12 == 0) hour_12 = 12;
+                    int spinbox_value = hour_12 * 100 + timeinfo.tm_min;
+                    int32_t old_value = lv_spinbox_get_value(ui_timeinformation_spinbox_timeinput);
+                    lv_spinbox_set_value(ui_timeinformation_spinbox_timeinput, spinbox_value);
+                    int32_t new_value = lv_spinbox_get_value(ui_timeinformation_spinbox_timeinput);
+                    ESP_LOGI(TAG, "FIELD: ui_timeinformation_spinbox_timeinput: %d -> %d (target: %d, local_hour=%d)",
+                             (int)old_value, (int)new_value, spinbox_value, timeinfo.tm_hour);
+                } else {
+                    ESP_LOGW(TAG, "SKIP: ui_timeinformation_spinbox_timeinput is NULL");
+                }
+
+                // Update AM/PM dropdown (0=AM, 1=PM) based on LOCAL time
+                if (ui_timeinformation_dropdown_ampm) {
+                    uint16_t old_idx = lv_dropdown_get_selected(ui_timeinformation_dropdown_ampm);
+                    uint16_t ampm_index = (timeinfo.tm_hour >= 12) ? 1 : 0;
+                    lv_dropdown_set_selected(ui_timeinformation_dropdown_ampm, ampm_index);
+                    uint16_t new_idx = lv_dropdown_get_selected(ui_timeinformation_dropdown_ampm);
+                    ESP_LOGI(TAG, "FIELD: ui_timeinformation_dropdown_ampm: %d -> %d (target: %d=%s, local_hour=%d)",
+                             old_idx, new_idx, ampm_index, ampm_index ? "PM" : "AM", timeinfo.tm_hour);
+                } else {
+                    ESP_LOGW(TAG, "SKIP: ui_timeinformation_dropdown_ampm is NULL");
+                }
+
+                // Update NTP server field ONLY if server provided one (don't overwrite user's value)
+                if (ui_timeinformation_textarea_ntpinput) {
+                    const char *old_ntp = lv_textarea_get_text(ui_timeinformation_textarea_ntpinput);
+                    if (strlen(sync_data.ntp_server) > 0) {
+                        // Server provided an NTP server, use it
+                        lv_textarea_set_text(ui_timeinformation_textarea_ntpinput, sync_data.ntp_server);
+                        ESP_LOGI(TAG, "FIELD: ui_timeinformation_textarea_ntpinput: '%s' -> '%s' (from server)",
+                                 old_ntp ? old_ntp : "(null)", sync_data.ntp_server);
+                    } else {
+                        // Keep existing value
+                        ESP_LOGI(TAG, "FIELD: ui_timeinformation_textarea_ntpinput: keeping '%s' (no server NTP)",
+                                 old_ntp ? old_ntp : "(null)");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "SKIP: ui_timeinformation_textarea_ntpinput is NULL");
+                }
+
+                // Update timezone dropdown - log options to understand mapping
+                if (ui_timeinformation_dropdown_timezone) {
+                    uint16_t old_tz = lv_dropdown_get_selected(ui_timeinformation_dropdown_timezone);
+                    uint32_t opt_count = lv_dropdown_get_option_count(ui_timeinformation_dropdown_timezone);
+
+                    // Log all dropdown options to understand the mapping
+                    ESP_LOGI(TAG, "Timezone dropdown has %lu options:", (unsigned long)opt_count);
+                    char opt_buf[64];
+                    for (uint32_t i = 0; i < opt_count && i < 15; i++) {
+                        lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, i);
+                        lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
+                        ESP_LOGI(TAG, "  [%lu] = '%s'", (unsigned long)i, opt_buf);
+                    }
+
+                    // Try to find matching timezone by exact name match
+                    uint16_t tz_index = old_tz;  // Default to keeping current
+                    bool found = false;
+
+                    ESP_LOGI(TAG, "Searching for timezone: '%s'", sync_data.timezone);
+
+                    // First pass: exact match
+                    for (uint32_t i = 0; i < opt_count; i++) {
+                        lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, i);
+                        lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
+                        if (strcmp(opt_buf, sync_data.timezone) == 0) {
+                            tz_index = i;
+                            found = true;
+                            ESP_LOGI(TAG, "EXACT timezone match: '%s' at index %d", opt_buf, i);
+                            break;
+                        }
+                    }
+
+                    // Second pass: case-insensitive or partial match
+                    if (!found) {
+                        for (uint32_t i = 0; i < opt_count; i++) {
+                            lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, i);
+                            lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
+                            // Check if either contains the other (partial match)
+                            if (strstr(opt_buf, sync_data.timezone) != NULL ||
+                                strstr(sync_data.timezone, opt_buf) != NULL) {
+                                tz_index = i;
+                                found = true;
+                                ESP_LOGI(TAG, "PARTIAL timezone match: '%s' at index %d", opt_buf, i);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!found) {
+                        ESP_LOGW(TAG, "No timezone match found for '%s', keeping current index %d",
+                                 sync_data.timezone, old_tz);
+                    }
+
+                    lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, tz_index);
+                    uint16_t new_tz = lv_dropdown_get_selected(ui_timeinformation_dropdown_timezone);
+                    lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
+                    ESP_LOGI(TAG, "FIELD: ui_timeinformation_dropdown_timezone: %d -> %d ('%s', server: %s)",
+                             old_tz, new_tz, opt_buf, sync_data.timezone);
+                } else {
+                    ESP_LOGW(TAG, "SKIP: ui_timeinformation_dropdown_timezone is NULL");
+                }
+
+                // Update main screen time and date labels
+                if (ui_mainscreen_label_timelabel) {
+                    char main_time[16];
+                    strftime(main_time, sizeof(main_time), "%I:%M %p", &timeinfo);
+                    lv_label_set_text(ui_mainscreen_label_timelabel, main_time);
+                    ESP_LOGI(TAG, "FIELD: ui_mainscreen_label_timelabel = '%s'", main_time);
+                }
+                if (ui_mainscreen_label_datelabel) {
+                    char main_date[32];
+                    strftime(main_date, sizeof(main_date), "%a %b %d", &timeinfo);
+                    lv_label_set_text(ui_mainscreen_label_datelabel, main_date);
+                    ESP_LOGI(TAG, "FIELD: ui_mainscreen_label_datelabel = '%s'", main_date);
+                }
+
+                // Update "Use Server Time" checkbox based on API response
+                // Note: ui_ServerTime is a custom variable that points to the same checkbox
+                if (ui_timeinformation_checkbox_servertime) {
+                    if (sync_data.use_server_time) {
+                        lv_obj_add_state(ui_timeinformation_checkbox_servertime, LV_STATE_CHECKED);
+                    } else {
+                        lv_obj_remove_state(ui_timeinformation_checkbox_servertime, LV_STATE_CHECKED);
+                    }
+
+                    // Update checkbox text with server time info
+                    // Format: "Server Time: YYYY-MM-DD HH:MM:SS"
+                    char server_time_display[64];
+                    char time_part[32];
+                    strftime(time_part, sizeof(time_part), "%Y-%m-%d %H:%M:%S", &timeinfo);
+                    snprintf(server_time_display, sizeof(server_time_display), "Server Time: %s UTC%+d",
+                             time_part, offset_hours);
+                    lv_checkbox_set_text(ui_timeinformation_checkbox_servertime, server_time_display);
+
+                    ESP_LOGI(TAG, "FIELD: ui_timeinformation_checkbox_servertime = %s, text='%s'",
+                             sync_data.use_server_time ? "CHECKED" : "UNCHECKED", server_time_display);
+                }
+
+                lvgl_port_unlock();
+                ESP_LOGI(TAG, "LVGL lock released");
+            } else {
+                ESP_LOGE(TAG, "FAILED to acquire LVGL lock!");
+            }
+            ESP_LOGW(TAG, "=== FIELD UPDATE COMPLETE ===");
+        } else {
+            // Time set failed, update UI
+            if (lvgl_port_lock(100)) {
+                if (ui_timeinformation_label_syncnow) {
+                    lv_label_set_text(ui_timeinformation_label_syncnow, "Sync Error");
+                }
+                lvgl_port_unlock();
+            }
+        }
+    } else {
+        // Fall back to NTP
+        ESP_LOGI(TAG, "Server time failed, falling back to NTP");
+
+        // Determine which NTP server to use (priority order):
+        // 1. Server-provided NTP from last successful sync
+        // 2. UI field parameter
+        // 3. Default pool.ntp.org
+        const char *ntp_to_use = NULL;
+
+        // First, check if we have a server-provided NTP from previous sync
+        const time_sync_data_t *last_sync = api_get_time_sync_data();
+        if (last_sync && strlen(last_sync->ntp_server) > 0) {
+            ntp_to_use = last_sync->ntp_server;
+            ESP_LOGI(TAG, "Using server-provided NTP: %s", ntp_to_use);
+        }
+        // Second, check UI field parameter
+        else if (ntp_server_param && strlen(ntp_server_param) > 0) {
+            ntp_to_use = ntp_server_param;
+            ESP_LOGI(TAG, "Using UI-provided NTP: %s", ntp_to_use);
+        }
+        // Fall back to default
+        else {
+            ntp_to_use = "pool.ntp.org";
+            ESP_LOGI(TAG, "Using default NTP: %s", ntp_to_use);
+        }
+
+        // Stop any existing SNTP
+        if (esp_sntp_enabled()) {
+            esp_sntp_stop();
+        }
+
+        // Configure and start SNTP
+        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, ntp_to_use);
+        esp_sntp_init();
+
+        ESP_LOGI(TAG, "SNTP started with server: %s", ntp_to_use);
+
+        // Update UI
+        if (lvgl_port_lock(100)) {
+            if (ui_timeinformation_label_syncnow) {
+                lv_label_set_text(ui_timeinformation_label_syncnow, "Syncing (NTP)...");
+            }
+            lvgl_port_unlock();
+        }
+
+        // Wait a bit for SNTP sync
+        vTaskDelay(pdMS_TO_TICKS(5000));
+
+        // Check if time is now valid
+        time_t now;
+        time(&now);
+        if (now > 1704067200) {  // After Jan 1, 2024
+            if (lvgl_port_lock(100)) {
+                if (ui_timeinformation_label_syncnow) {
+                    lv_label_set_text(ui_timeinformation_label_syncnow, "Synced (NTP)");
+                }
+                lvgl_port_unlock();
+            }
+        }
+    }
+
+    // Free NTP server string if allocated
+    if (ntp_server_param) {
+        free(ntp_server_param);
+    }
+
+    ESP_LOGI(TAG, "Time sync task complete");
+    vTaskDelete(NULL);
+}
+
+void ui_event_sync_now(lv_event_t * e)
+{
+    ESP_LOGI(TAG, "Time sync requested");
+
+    // Update status label immediately
+    if (ui_timeinformation_label_syncnow) {
+        lv_label_set_text(ui_timeinformation_label_syncnow, "Syncing...");
+    }
+
+    // Get NTP server from input field
+    char *ntp_server = NULL;
+    if (ui_timeinformation_textarea_ntpinput) {
+        const char *input = lv_textarea_get_text(ui_timeinformation_textarea_ntpinput);
+        if (input && strlen(input) > 0) {
+            ntp_server = strdup(input);
+        }
+    }
+    if (ntp_server == NULL) {
+        ntp_server = strdup("pool.ntp.org");
+    }
+
+    ESP_LOGI(TAG, "Starting sync task with NTP server: %s", ntp_server);
+
+    // Create task with adequate stack for HTTP operations
+    BaseType_t task_created = xTaskCreate(
+        time_sync_task,
+        "time_sync",
+        8192,  // 8KB stack for HTTP client
+        ntp_server,
+        5,
+        NULL
+    );
+
+    if (task_created != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create time sync task");
+        if (ntp_server) free(ntp_server);
+        if (ui_timeinformation_label_syncnow) {
+            lv_label_set_text(ui_timeinformation_label_syncnow, "Sync Failed");
+        }
+    }
+}
+
+// Structure to pass server config to task
+typedef struct {
+    char host[128];
+    int port;
+} server_test_params_t;
+
+// Task to perform server test (runs with adequate stack space)
+static void server_test_task(void *pvParameters)
+{
+    server_test_params_t *params = (server_test_params_t *)pvParameters;
+    ESP_LOGI(TAG, "Server test task started: %s:%d", params->host, params->port);
+
+    // Configure API client with these settings
+    api_config_t temp_config = {0};
+    strncpy(temp_config.server_host, params->host, sizeof(temp_config.server_host) - 1);
+    temp_config.server_port = params->port;
+
+    // Preserve existing registration info
+    api_config_t *current = api_get_config();
+    if (current) {
+        strncpy(temp_config.api_token, current->api_token, sizeof(temp_config.api_token) - 1);
+        strncpy(temp_config.device_id, current->device_id, sizeof(temp_config.device_id) - 1);
+        strncpy(temp_config.device_name, current->device_name, sizeof(temp_config.device_name) - 1);
+        temp_config.is_registered = current->is_registered;
+        temp_config.is_approved = current->is_approved;
+    }
+
+    api_client_init(&temp_config);
+
+    // Test connection
+    esp_err_t ret = api_health_check();
+
+    // Update status display
+    if (lvgl_port_lock(100)) {
+        if (ui_serversetup_textarea_statusinput) {
+            if (ret == ESP_OK) {
+                lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Connected!");
+                ESP_LOGI(TAG, "Server connection successful");
+            } else {
+                lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Connection Failed");
+                ESP_LOGE(TAG, "Server connection failed: %s", esp_err_to_name(ret));
+            }
+        }
+        lvgl_port_unlock();
+    }
+
+    free(params);
+    ESP_LOGI(TAG, "Server test task complete");
+    vTaskDelete(NULL);
+}
+
+void ui_event_server_test(lv_event_t * e)
+{
+    ESP_LOGI(TAG, "Testing server connection");
+
+    // Update status to show we're testing
+    if (ui_serversetup_textarea_statusinput) {
+        lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Testing...");
+    }
+
+    // Allocate params for task
+    server_test_params_t *params = malloc(sizeof(server_test_params_t));
+    if (!params) {
+        ESP_LOGE(TAG, "Failed to allocate params");
+        return;
+    }
+
+    // Get current values from fields
+    params->host[0] = '\0';
+    params->port = 80;
+
+    if (ui_serversetup_textarea_serverurlinput) {
+        strncpy(params->host, lv_textarea_get_text(ui_serversetup_textarea_serverurlinput), sizeof(params->host) - 1);
+    }
+    if (ui_serversetup_textarea_portinput) {
+        params->port = atoi(lv_textarea_get_text(ui_serversetup_textarea_portinput));
+    }
+
+    ESP_LOGI(TAG, "Starting server test task: %s:%d", params->host, params->port);
+
+    // Create task with adequate stack for HTTP operations
+    BaseType_t task_created = xTaskCreate(
+        server_test_task,
+        "srv_test",
+        8192,  // 8KB stack for HTTP client
+        params,
+        5,
+        NULL
+    );
+
+    if (task_created != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create server test task");
+        free(params);
+        if (ui_serversetup_textarea_statusinput) {
+            lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Test Failed");
+        }
+    }
+}
+
+// Structure to pass registration params to task
+typedef struct {
+    char host[128];
+    int port;
+    char device_name[64];
+    char mac_str[18];
+} register_params_t;
+
+// Task to perform device registration (runs with adequate stack space)
+static void register_task(void *pvParameters)
+{
+    register_params_t *params = (register_params_t *)pvParameters;
+    ESP_LOGI(TAG, "Register task started: %s:%d, device: %s, MAC: %s",
+             params->host, params->port, params->device_name, params->mac_str);
+
+    // Initialize API client with params
+    api_config_t config = {0};
+    strncpy(config.server_host, params->host, sizeof(config.server_host) - 1);
+    config.server_port = params->port;
+
+    // Preserve existing registration info if any
+    api_config_t *current = api_get_config();
+    if (current) {
+        strncpy(config.api_token, current->api_token, sizeof(config.api_token) - 1);
+        strncpy(config.device_id, current->device_id, sizeof(config.device_id) - 1);
+        strncpy(config.device_name, current->device_name, sizeof(config.device_name) - 1);
+        config.is_registered = current->is_registered;
+        config.is_approved = current->is_approved;
+    }
+
+    api_client_init(&config);
+
+    // Register device
+    esp_err_t ret = api_register_device(params->mac_str, params->device_name);
+
+    // Update UI
+    if (lvgl_port_lock(100)) {
+        if (ret == ESP_OK) {
+            api_config_t *cfg = api_get_config();
+
+            if (ui_serversetup_textarea_statusinput) {
+                lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Registered!");
+            }
+            if (ui_serversetup_textarea_deviceidinput && cfg) {
+                lv_textarea_set_text(ui_serversetup_textarea_deviceidinput, cfg->device_id);
+            }
+
+            ESP_LOGI(TAG, "Device registered successfully with ID: %s", cfg ? cfg->device_id : "unknown");
+        } else {
+            if (ui_serversetup_textarea_statusinput) {
+                lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Registration Failed");
+            }
+            ESP_LOGE(TAG, "Device registration failed: %s", esp_err_to_name(ret));
+        }
+        lvgl_port_unlock();
+    }
+
+    free(params);
+    register_in_progress = false;
+    ESP_LOGI(TAG, "Register task complete");
+    vTaskDelete(NULL);
+}
+
+void ui_event_server_register(lv_event_t * e)
+{
+    // Prevent double-registration from multiple event triggers
+    if (register_in_progress) {
+        ESP_LOGW(TAG, "Registration already in progress, ignoring");
+        return;
+    }
+    register_in_progress = true;
+
+    ESP_LOGW(TAG, "========== REGISTER BUTTON PRESSED ==========");
+    ESP_LOGI(TAG, "Registering device");
+
+    // Update status
+    if (ui_serversetup_textarea_statusinput) {
+        lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Registering...");
+    }
+
+    // Check if network is connected first (this is quick, no HTTP)
+    if (!network_manager_is_connected()) {
+        ESP_LOGE(TAG, "No network connected - cannot register");
+        if (ui_serversetup_textarea_statusinput) {
+            lv_textarea_set_text(ui_serversetup_textarea_statusinput, "No Network!");
+        }
+        register_in_progress = false;
+        return;
+    }
+
+    // Allocate params for task
+    register_params_t *params = malloc(sizeof(register_params_t));
+    if (!params) {
+        ESP_LOGE(TAG, "Failed to allocate params");
+        register_in_progress = false;
+        return;
+    }
+
+    // Get server URL and port from UI fields
+    params->host[0] = '\0';
+    params->port = 80;
+
+    if (ui_serversetup_textarea_serverurlinput) {
+        strncpy(params->host, lv_textarea_get_text(ui_serversetup_textarea_serverurlinput), sizeof(params->host) - 1);
+    }
+    if (ui_serversetup_textarea_portinput) {
+        params->port = atoi(lv_textarea_get_text(ui_serversetup_textarea_portinput));
+    }
+
+    // Get device name from field
+    strncpy(params->device_name, "ESP32-TimeClock", sizeof(params->device_name) - 1);
+    if (ui_serversetup_textarea_devicenameinput) {
+        const char *input = lv_textarea_get_text(ui_serversetup_textarea_devicenameinput);
+        if (input && strlen(input) > 0) {
+            strncpy(params->device_name, input, sizeof(params->device_name) - 1);
+        }
+    }
+
+    // Get the ACTUAL connected interface type for logging
+    network_type_t active_type = network_manager_get_active_type();
+    ESP_LOGI(TAG, "Active network type: %d (1=WiFi, 2=Ethernet)", active_type);
+
+    // Always use BASE MAC for device registration
+    uint8_t mac[6] = {0};
+    esp_err_t mac_err = esp_read_mac(mac, ESP_MAC_BASE);
+    ESP_LOGI(TAG, "Using factory base MAC for registration (unique hardware ID)");
+
+    if (mac_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read MAC: %s", esp_err_to_name(mac_err));
+        if (ui_serversetup_textarea_statusinput) {
+            lv_textarea_set_text(ui_serversetup_textarea_statusinput, "MAC Error!");
+        }
+        free(params);
+        register_in_progress = false;
+        return;
+    }
+
+    snprintf(params->mac_str, sizeof(params->mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    ESP_LOGI(TAG, "Device MAC: %s", params->mac_str);
+
+    ESP_LOGI(TAG, "Starting register task: %s:%d, device: %s", params->host, params->port, params->device_name);
+
+    // Create task with adequate stack for HTTP operations
+    BaseType_t task_created = xTaskCreate(
+        register_task,
+        "register",
+        8192,  // 8KB stack for HTTP client
+        params,
+        5,
+        NULL
+    );
+
+    if (task_created != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create register task");
+        free(params);
+        register_in_progress = false;
+        if (ui_serversetup_textarea_statusinput) {
+            lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Task Failed");
+        }
+    }
 }

@@ -254,7 +254,7 @@ IGNORE_EXTRA_COMPONENT:UNINITIALIZED=
 PROJECT_SOURCE_DIR:UNINITIALIZED=/Users/ryangoff/Herd/Attend/storage/app/templates/esp32_p4_nfc_espidf
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python
+PYTHON:UNINITIALIZED=/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/bin/python
 
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1

@@ -11,7 +11,7 @@
 #define NFC_ENABLED 1           // Enable NFC card reader
 #define WIFI_ENABLED 1          // Enable WiFi networking (compile-time)
 #define ETHERNET_ENABLED 1      // Enable Ethernet networking (compile-time)
-#define API_ENABLED 0           // Enable API client (requires network)
+#define API_ENABLED 1           // Enable API client (requires network)
 
 // NOTE: WiFi and Ethernet can now run simultaneously on ESP32-P4-Function-EV-Board v1.5.2
 // The GPIO 50 conflict has been resolved (GPIO 50 is RMII CLK, MDC is GPIO 31).

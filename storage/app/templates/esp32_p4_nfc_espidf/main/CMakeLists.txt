@@ -6,6 +6,7 @@ idf_component_register(SRCS "main.c"
                             "pn532_driver_i2c.c"
                             "pn532_driver_hsu.c"
                             "ui_manager.c"
+                            "ui_bridge.c"
                             "time_settings.c"
                             "wifi_manager.c"
                             "ethernet_manager.c"
@@ -17,4 +18,5 @@ idf_component_register(SRCS "main.c"
                             esp_http_client
                             json
                             espressif__esp32_p4_function_ev_board
-                            espressif__esp_lvgl_port)
+                            espressif__esp_lvgl_port
+                            ui)

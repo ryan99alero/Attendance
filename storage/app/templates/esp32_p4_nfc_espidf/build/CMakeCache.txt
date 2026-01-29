@@ -350,7 +350,7 @@ Mbed TLS_IS_TOP_LEVEL:STATIC=OFF
 Mbed TLS_SOURCE_DIR:STATIC=/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/mbedtls/mbedtls
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python
+PYTHON:UNINITIALIZED=/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/bin/python
 
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1
@@ -595,7 +595,7 @@ C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS:INTERNAL=1
 //Details about finding Git
 FIND_PACKAGE_MESSAGE_DETAILS_Git:INTERNAL=[/opt/homebrew/bin/git][v2.47.0()]
 //Details about finding Python3
-FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python][cfound components: Interpreter ][v3.13.7()]
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/bin/python][cfound components: Interpreter ][v3.14.1()]
 //Details about finding Threads
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
 //ADVANCED property for variable: GIT_EXECUTABLE
@@ -606,10 +606,10 @@ _GNUInstallDirs_LAST_CMAKE_INSTALL_PREFIX:INTERNAL=/usr/local
 _Python3_Compiler_REASON_FAILURE:INTERNAL=
 //Development reason failure
 _Python3_Development_REASON_FAILURE:INTERNAL=
-_Python3_EXECUTABLE:INTERNAL=/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/bin/python
+_Python3_EXECUTABLE:INTERNAL=/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/bin/python
 //Python3 Properties
-_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;13;7;32;64;;;abi3;/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib/python3.13;/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/lib/python3.13;/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/lib/python3.13/site-packages;/Users/ryangoff/.espressif/python_env/idf5.5_py3.13_env/lib/python3.13/site-packages
-_Python3_INTERPRETER_SIGNATURE:INTERNAL=944b540811752510b6ad414beda75aef
+_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;14;1;32;64;;;abi3;/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/lib/python3.14;/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/lib/python3.14;/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/lib/python3.14/site-packages;/Users/ryangoff/.espressif/python_env/idf5.5_py3.14_env/lib/python3.14/site-packages
+_Python3_INTERPRETER_SIGNATURE:INTERNAL=be83e90048f712c12f03cc574f9d3b74
 //NumPy reason failure
 _Python3_NumPy_REASON_FAILURE:INTERNAL=
 

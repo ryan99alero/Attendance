@@ -5,29 +5,20 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_MainScreen_Label_SettingsButtonLabel;
-lv_obj_t *ui_MainScreen_Button_SettingsButton;
+lv_obj_t *ui_MainScreen_Label_MainScreen_Label_SettingsButtonLabel;
+lv_obj_t *ui_MainScreen_Button_MainScreen_Button_SettingsButton;
 lv_obj_t *ui_MainScreen_Container_bottombarcontainer;
-lv_obj_t *ui_MainScreen_Label_datelabel;
-lv_obj_t *ui_MainScreen_Label_timelabel;
-lv_obj_t *ui_MainScreen_Container_grouprightContainer;
+lv_obj_t *ui_MainScreen_Label_MainScreen_Label_datelabel;
+lv_obj_t *ui_MainScreen_Label_MainScreen_Label_timelabel;
+lv_obj_t *ui_MainScreen_Container_MainScreen_Container_grouprightContainer;
 lv_obj_t *ui_MainScreen_Label_machinenamelabel;
-lv_obj_t *ui_MainScreen_Label_BluetoothIconlabel;
+lv_obj_t *ui_MainScreen_Label_MainScreen_Label_BluetoothIconlabel;
 lv_obj_t *ui_MainScreen_Label_neticonlabel;
-lv_obj_t *ui_MainScreen_Container_groupLeftContainer;
+lv_obj_t *ui_MainScreen_Container_MainScreen_Container_groupLeftContainer;
 lv_obj_t *ui_MainScreen_Container_topbarContainer;
-lv_obj_t *ui_MainScreen_BackGroundContainer_BackGroundContainer2;
 lv_obj_t *ui_Screen_MainScreen;
-lv_obj_t *ui_screen_mainscreen = NULL;lv_obj_t *ui_mainscreen_backgroundcontainer_backgroundcontainer2 = NULL;lv_obj_t *ui_mainscreen_container_topbarcontainer = NULL;lv_obj_t *ui_mainscreen_container_groupleftcontainer = NULL;lv_obj_t *ui_mainscreen_label_neticonlabel = NULL;lv_obj_t *ui_mainscreen_label_bluetoothiconlabel = NULL;lv_obj_t *ui_mainscreen_label_machinenamelabel = NULL;lv_obj_t *ui_mainscreen_container_grouprightcontainer = NULL;lv_obj_t *ui_mainscreen_label_timelabel = NULL;lv_obj_t *ui_mainscreen_label_datelabel = NULL;lv_obj_t *ui_mainscreen_container_bottombarcontainer = NULL;lv_obj_t *ui_mainscreen_button_settingsbutton = NULL;lv_obj_t *ui_mainscreen_label_settingsbuttonlabel = NULL;
+lv_obj_t *ui_screen_mainscreen = NULL;lv_obj_t *ui_mainscreen_container_topbarcontainer = NULL;lv_obj_t *ui_mainscreen_container_groupleftcontainer = NULL;lv_obj_t *ui_mainscreen_label_neticonlabel = NULL;lv_obj_t *ui_mainscreen_label_bluetoothiconlabel = NULL;lv_obj_t *ui_mainscreen_label_machinenamelabel = NULL;lv_obj_t *ui_mainscreen_container_grouprightcontainer = NULL;lv_obj_t *ui_mainscreen_label_timelabel = NULL;lv_obj_t *ui_mainscreen_label_datelabel = NULL;lv_obj_t *ui_mainscreen_container_bottombarcontainer = NULL;lv_obj_t *ui_mainscreen_button_settingsbutton = NULL;lv_obj_t *ui_mainscreen_label_settingsbuttonlabel = NULL;
 // event funtions
-void ui_event_mainscreen_label_neticonlabel( lv_event_t * e) {
-    lv_event_code_t event_code = lv_event_get_code(e);
-
-if ( event_code == LV_EVENT_CLICKED) {
-      _ui_state_modify( ui_mainscreen_label_neticonlabel, LV_STATE_USER_1, _UI_MODIFY_STATE_TOGGLE);
-}
-}
-
 void ui_event_mainscreen_button_settingsbutton( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
 
@@ -42,13 +33,11 @@ void ui_screen_mainscreen_screen_init(void)
 {
 ui_screen_mainscreen = lv_obj_create(NULL);
 lv_obj_remove_flag( ui_screen_mainscreen, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_set_style_bg_color(ui_screen_mainscreen, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_screen_mainscreen, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_color(ui_screen_mainscreen, lv_color_hex(0xEA0000), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_screen_mainscreen, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_screen_mainscreen, &ui_font_Icons, LV_PART_MAIN| LV_STATE_DEFAULT);
-
-ui_mainscreen_backgroundcontainer_backgroundcontainer2 = ui_container_backgroundcontainer_create(ui_screen_mainscreen);
-lv_obj_set_x( ui_mainscreen_backgroundcontainer_backgroundcontainer2, 0 );
-lv_obj_set_y( ui_mainscreen_backgroundcontainer_backgroundcontainer2, 0 );
 
 ui_mainscreen_container_topbarcontainer = lv_obj_create(ui_screen_mainscreen);
 lv_obj_remove_style_all(ui_mainscreen_container_topbarcontainer);
@@ -57,7 +46,7 @@ lv_obj_set_height( ui_mainscreen_container_topbarcontainer, 60);
 lv_obj_set_flex_flow(ui_mainscreen_container_topbarcontainer,LV_FLEX_FLOW_ROW);
 lv_obj_set_flex_align(ui_mainscreen_container_topbarcontainer, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 lv_obj_remove_flag( ui_mainscreen_container_topbarcontainer, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-lv_obj_set_style_bg_color(ui_mainscreen_container_topbarcontainer, lv_color_hex(0x4C4C4C), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_color(ui_mainscreen_container_topbarcontainer, lv_color_hex(0x404040), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_mainscreen_container_topbarcontainer, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_left(ui_mainscreen_container_topbarcontainer, 15, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_right(ui_mainscreen_container_topbarcontainer, 15, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -100,7 +89,7 @@ lv_obj_set_width( ui_mainscreen_label_machinenamelabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_mainscreen_label_machinenamelabel, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_mainscreen_label_machinenamelabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_mainscreen_label_machinenamelabel,"MACHINE-001");
-lv_obj_set_style_text_color(ui_mainscreen_label_machinenamelabel, lv_color_hex(0x0000FF), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_color(ui_mainscreen_label_machinenamelabel, lv_color_hex(0xFAFAFE), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_mainscreen_label_machinenamelabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_mainscreen_label_machinenamelabel, &lv_font_montserrat_20, LV_PART_MAIN| LV_STATE_DEFAULT);
 
@@ -154,7 +143,7 @@ lv_obj_set_flex_flow(ui_mainscreen_button_settingsbutton,LV_FLEX_FLOW_ROW);
 lv_obj_set_flex_align(ui_mainscreen_button_settingsbutton, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 lv_obj_add_flag( ui_mainscreen_button_settingsbutton, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
 lv_obj_remove_flag( ui_mainscreen_button_settingsbutton, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-lv_obj_set_style_bg_color(ui_mainscreen_button_settingsbutton, lv_color_hex(0x4C4C4C), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_color(ui_mainscreen_button_settingsbutton, lv_color_hex(0x404040), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_mainscreen_button_settingsbutton, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_mainscreen_label_settingsbuttonlabel = lv_label_create(ui_mainscreen_button_settingsbutton);
@@ -166,21 +155,19 @@ lv_obj_set_flex_align(ui_mainscreen_label_settingsbuttonlabel, LV_FLEX_ALIGN_STA
 lv_label_set_text(ui_mainscreen_label_settingsbuttonlabel,"");
 lv_obj_set_style_text_font(ui_mainscreen_label_settingsbuttonlabel, &ui_font_Icons, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_add_event_cb(ui_mainscreen_label_neticonlabel, ui_event_mainscreen_label_neticonlabel, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_mainscreen_button_settingsbutton, ui_event_mainscreen_button_settingsbutton, LV_EVENT_ALL, NULL);
 ui_Screen_MainScreen = ui_screen_mainscreen;
-ui_MainScreen_BackGroundContainer_BackGroundContainer2 = ui_mainscreen_backgroundcontainer_backgroundcontainer2;
 ui_MainScreen_Container_topbarContainer = ui_mainscreen_container_topbarcontainer;
-ui_MainScreen_Container_groupLeftContainer = ui_mainscreen_container_groupleftcontainer;
+ui_MainScreen_Container_MainScreen_Container_groupLeftContainer = ui_mainscreen_container_groupleftcontainer;
 ui_MainScreen_Label_neticonlabel = ui_mainscreen_label_neticonlabel;
-ui_MainScreen_Label_BluetoothIconlabel = ui_mainscreen_label_bluetoothiconlabel;
+ui_MainScreen_Label_MainScreen_Label_BluetoothIconlabel = ui_mainscreen_label_bluetoothiconlabel;
 ui_MainScreen_Label_machinenamelabel = ui_mainscreen_label_machinenamelabel;
-ui_MainScreen_Container_grouprightContainer = ui_mainscreen_container_grouprightcontainer;
-ui_MainScreen_Label_timelabel = ui_mainscreen_label_timelabel;
-ui_MainScreen_Label_datelabel = ui_mainscreen_label_datelabel;
+ui_MainScreen_Container_MainScreen_Container_grouprightContainer = ui_mainscreen_container_grouprightcontainer;
+ui_MainScreen_Label_MainScreen_Label_timelabel = ui_mainscreen_label_timelabel;
+ui_MainScreen_Label_MainScreen_Label_datelabel = ui_mainscreen_label_datelabel;
 ui_MainScreen_Container_bottombarcontainer = ui_mainscreen_container_bottombarcontainer;
-ui_MainScreen_Button_SettingsButton = ui_mainscreen_button_settingsbutton;
-ui_MainScreen_Label_SettingsButtonLabel = ui_mainscreen_label_settingsbuttonlabel;
+ui_MainScreen_Button_MainScreen_Button_SettingsButton = ui_mainscreen_button_settingsbutton;
+ui_MainScreen_Label_MainScreen_Label_SettingsButtonLabel = ui_mainscreen_label_settingsbuttonlabel;
 
 }
 
@@ -191,29 +178,27 @@ void ui_screen_mainscreen_screen_destroy(void)
 // NULL screen variables
 ui_Screen_MainScreen= NULL;
 ui_screen_mainscreen= NULL;
-ui_MainScreen_BackGroundContainer_BackGroundContainer2= NULL;
-ui_mainscreen_backgroundcontainer_backgroundcontainer2= NULL;
 ui_MainScreen_Container_topbarContainer= NULL;
 ui_mainscreen_container_topbarcontainer= NULL;
-ui_MainScreen_Container_groupLeftContainer= NULL;
+ui_MainScreen_Container_MainScreen_Container_groupLeftContainer= NULL;
 ui_mainscreen_container_groupleftcontainer= NULL;
 ui_MainScreen_Label_neticonlabel= NULL;
 ui_mainscreen_label_neticonlabel= NULL;
-ui_MainScreen_Label_BluetoothIconlabel= NULL;
+ui_MainScreen_Label_MainScreen_Label_BluetoothIconlabel= NULL;
 ui_mainscreen_label_bluetoothiconlabel= NULL;
 ui_MainScreen_Label_machinenamelabel= NULL;
 ui_mainscreen_label_machinenamelabel= NULL;
-ui_MainScreen_Container_grouprightContainer= NULL;
+ui_MainScreen_Container_MainScreen_Container_grouprightContainer= NULL;
 ui_mainscreen_container_grouprightcontainer= NULL;
-ui_MainScreen_Label_timelabel= NULL;
+ui_MainScreen_Label_MainScreen_Label_timelabel= NULL;
 ui_mainscreen_label_timelabel= NULL;
-ui_MainScreen_Label_datelabel= NULL;
+ui_MainScreen_Label_MainScreen_Label_datelabel= NULL;
 ui_mainscreen_label_datelabel= NULL;
 ui_MainScreen_Container_bottombarcontainer= NULL;
 ui_mainscreen_container_bottombarcontainer= NULL;
-ui_MainScreen_Button_SettingsButton= NULL;
+ui_MainScreen_Button_MainScreen_Button_SettingsButton= NULL;
 ui_mainscreen_button_settingsbutton= NULL;
-ui_MainScreen_Label_SettingsButtonLabel= NULL;
+ui_MainScreen_Label_MainScreen_Label_SettingsButtonLabel= NULL;
 ui_mainscreen_label_settingsbuttonlabel= NULL;
 
 }
