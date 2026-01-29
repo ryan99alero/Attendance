@@ -28,3 +28,4 @@ yarn-error.log
 /public/vendor/livewire/livewire.min.js
 /public/vendor/livewire/livewire.min.js.map
 /public/vendor/livewire/manifest.json
+/storage/debugbar/
