@@ -237,10 +237,25 @@ void app_main(void) {
 
 		api_client_init(&api_config);
 
+		// Load saved registration state from NVS (persists across reboots)
+		if (api_load_config() == ESP_OK) {
+			api_config_t *saved_config = api_get_config();
+			if (saved_config->is_registered) {
+				printf("✅ Restored registration from NVS\n");
+				printf("   Device ID: %s\n", saved_config->device_id);
+				printf("   Server: %s:%d\n\n", saved_config->server_host, saved_config->server_port);
+			}
+		}
+
 		// Test server health (but don't auto-register - let user register via ServerSetup)
 		if (api_health_check() == ESP_OK) {
 			printf("✅ Server is reachable\n");
-			printf("Use ServerSetup screen to register device\n\n");
+			api_config_t *cfg = api_get_config();
+			if (cfg->is_registered) {
+				printf("✅ Device is registered\n\n");
+			} else {
+				printf("Use ServerSetup screen to register device\n\n");
+			}
 		} else {
 			printf("❌ Cannot reach server at %s:%d\n\n",
 			       API_SERVER_HOST, API_SERVER_PORT);

@@ -10,6 +10,23 @@ class Credential extends Model
 {
     use HasFactory;
 
+    /**
+     * Boot the model - auto-recalculate hash when identifier changes
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Recalculate hash whenever identifier is created or updated
+        static::saving(function ($credential) {
+            if ($credential->isDirty('identifier') && $credential->identifier) {
+                $normalized = static::normalizeIdentifier($credential->identifier);
+                $credential->identifier_hash = hash('sha256', $normalized);
+                // Note: hash_algo ENUM doesn't include 'sha256', leave it null for identifier hashes
+            }
+        });
+    }
+
     protected $fillable = [
         'employee_id',
         'kind',
@@ -69,7 +86,7 @@ class Credential extends Model
         if (isset($attributes['identifier']) && !isset($attributes['identifier_hash'])) {
             $normalized = static::normalizeIdentifier($attributes['identifier']);
             $attributes['identifier_hash'] = hash('sha256', $normalized);
-            $attributes['hash_algo'] = 'sha256';
+            // Note: hash_algo ENUM doesn't include 'sha256', leave it unset for identifier hashes
         }
 
         return static::create($attributes);

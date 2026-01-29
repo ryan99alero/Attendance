@@ -764,8 +764,9 @@ static void save_server_config(void) {
 
     api_client_init(&config);
 
-    // TODO: Save to NVS
-    ESP_LOGI(TAG, "Server config saved: %s:%d", config.server_host, config.server_port);
+    // Save to NVS so config persists across reboots
+    api_save_config();
+    ESP_LOGI(TAG, "Server config saved to NVS: %s:%d", config.server_host, config.server_port);
 }
 
 // =====================================================

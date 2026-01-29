@@ -19,6 +19,29 @@ use Carbon\Carbon;
 class TimeClockController extends Controller
 {
     /**
+     * Timezone display name mapping (IANA name => Display name)
+     * Must match exactly what's in the TimeClock UI dropdown
+     */
+    private const TIMEZONE_DISPLAY_NAMES = [
+        'America/New_York'    => 'Eastern Time (EST/EDT)',
+        'America/Chicago'     => 'Central Time (CST/CDT)',
+        'America/Denver'      => 'Mountain Time (MST/MDT)',
+        'America/Los_Angeles' => 'Pacific Time (PST/PDT)',
+        'America/Anchorage'   => 'Alaska Time (AKST/AKDT)',
+        'Pacific/Honolulu'    => 'Hawaii Time (HST)',
+        'America/Phoenix'     => 'Arizona Time (MST)',
+        'UTC'                 => 'UTC',
+    ];
+
+    /**
+     * Get display name for a timezone
+     */
+    private function getTimezoneDisplayName(string $ianaTimezone): string
+    {
+        return self::TIMEZONE_DISPLAY_NAMES[$ianaTimezone] ?? $ianaTimezone;
+    }
+
+    /**
      * Authenticate time clock device and establish handshake
      * POST /api/v1/timeclock/auth
      */
@@ -143,11 +166,66 @@ class TimeClockController extends Controller
             $normalizedValue = Credential::normalizeIdentifier($request->credential_value);
             $credentialHash = hash('sha256', $normalizedValue);
 
-            // 3. Find credential and employee
+            Log::info("[TimeClockAPI] Credential lookup debug", [
+                'raw_value' => $request->credential_value,
+                'normalized_value' => $normalizedValue,
+                'credential_hash' => $credentialHash,
+                'credential_kind_from_device' => $request->credential_kind,
+            ]);
+
+            // 3. Find credential and employee - try exact kind match first, then any NFC-type
             $credential = Credential::where('kind', $request->credential_kind)
                                   ->where('identifier_hash', $credentialHash)
                                   ->active()
                                   ->first();
+
+            // If not found, try with normalized kind names (nfc, rfid, mifare)
+            if (!$credential) {
+                $nfcKinds = ['nfc', 'rfid', 'mifare', 'mifare_classic', 'mifare_ultralight', 'MIFARE Ultralight', 'MIFARE Classic'];
+                $credential = Credential::whereIn('kind', $nfcKinds)
+                                      ->where('identifier_hash', $credentialHash)
+                                      ->active()
+                                      ->first();
+
+                if ($credential) {
+                    Log::info("[TimeClockAPI] Found credential with alternate kind", [
+                        'matched_kind' => $credential->kind,
+                        'device_sent_kind' => $request->credential_kind,
+                    ]);
+                }
+            }
+
+            // Fallback: try matching by normalized identifier directly (not hash)
+            if (!$credential) {
+                $credential = Credential::where('identifier', $normalizedValue)
+                                      ->active()
+                                      ->first();
+
+                if ($credential) {
+                    Log::info("[TimeClockAPI] Found by direct identifier match (hash mismatch - needs re-hash)", [
+                        'identifier' => $normalizedValue,
+                    ]);
+                }
+            }
+
+            // Debug: show what credentials exist
+            if (!$credential) {
+                // Get all credentials to show what's in the DB
+                $allCredentials = Credential::select('id', 'kind', 'identifier', 'employee_id')->get();
+
+                Log::warning("[TimeClockAPI] Credential NOT found - showing all credentials for debug", [
+                    'searched_normalized' => $normalizedValue,
+                    'searched_hash' => $credentialHash,
+                    'all_credentials' => $allCredentials->map(function($c) {
+                        return [
+                            'id' => $c->id,
+                            'kind' => $c->kind,
+                            'identifier' => $c->identifier,
+                            'normalized' => Credential::normalizeIdentifier($c->identifier ?? ''),
+                        ];
+                    })->toArray(),
+                ]);
+            }
 
             $employee = null;
             $status = 'unmatched';
@@ -281,13 +359,48 @@ class TimeClockController extends Controller
             $normalizedValue = Credential::normalizeIdentifier($credentialValue);
             $credentialHash = hash('sha256', $normalizedValue);
 
-            // Find employee by credential
+            Log::info("[TimeClockAPI] Employee lookup debug", [
+                'raw_value' => $credentialValue,
+                'normalized_value' => $normalizedValue,
+                'credential_hash' => $credentialHash,
+                'credential_kind' => $credentialKind,
+            ]);
+
+            // Find employee by credential - try exact kind first
             $credential = Credential::where('kind', $credentialKind)
                                   ->where('identifier_hash', $credentialHash)
                                   ->active()
                                   ->first();
 
+            // If not found, try with any NFC-type kind
+            if (!$credential) {
+                $nfcKinds = ['nfc', 'rfid', 'mifare', 'mifare_classic', 'mifare_ultralight', 'MIFARE Ultralight', 'MIFARE Classic'];
+                $credential = Credential::whereIn('kind', $nfcKinds)
+                                      ->where('identifier_hash', $credentialHash)
+                                      ->active()
+                                      ->first();
+            }
+
+            // Still not found? Try matching by hash alone (ignore kind)
+            if (!$credential) {
+                $credential = Credential::where('identifier_hash', $credentialHash)
+                                      ->active()
+                                      ->first();
+
+                if ($credential) {
+                    Log::info("[TimeClockAPI] Found credential ignoring kind", [
+                        'db_kind' => $credential->kind,
+                        'request_kind' => $credentialKind,
+                    ]);
+                }
+            }
+
             if (!$credential || !$credential->employee) {
+                Log::warning("[TimeClockAPI] Employee NOT found", [
+                    'normalized_value' => $normalizedValue,
+                    'hash' => $credentialHash,
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Employee not found'
@@ -427,6 +540,8 @@ class TimeClockController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'mac_address' => 'nullable|string|max:17',
+            'mac' => 'nullable|string|max:17',  // ESP32 sends 'mac', not 'mac_address'
+            'device_id' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -441,15 +556,59 @@ class TimeClockController extends Controller
             $now = now();
             $device = null;
 
-            // Try to find device by MAC address if provided
-            if ($request->has('mac_address')) {
-                $device = Device::where('mac_address', $request->mac_address)->first();
+            // Log incoming request parameters for debugging
+            Log::info("[TimeClockAPI] getTime request", [
+                'device_id' => $request->device_id ?? 'not provided',
+                'mac_address' => $request->mac_address ?? 'not provided',
+                'all_params' => $request->all(),
+            ]);
 
-                // Update last seen timestamp for registered devices
-                if ($device) {
-                    $device->update(['last_seen_at' => $now]);
-                }
+            // Try to find device by device_id first, then mac_address
+            // Use filled() to ensure non-empty values
+            if ($request->filled('device_id')) {
+                $device = Device::where('device_id', $request->device_id)->first();
+                Log::info("[TimeClockAPI] device_id lookup", [
+                    'device_id' => $request->device_id,
+                    'found' => $device ? true : false,
+                ]);
             }
+
+            if (!$device && $request->filled('mac_address')) {
+                $device = Device::where('mac_address', $request->mac_address)->first();
+                Log::info("[TimeClockAPI] mac_address lookup", [
+                    'mac_address' => $request->mac_address,
+                    'found' => $device ? true : false,
+                ]);
+            }
+
+            // ESP32 firmware sends 'mac' param, not 'mac_address'
+            if (!$device && $request->filled('mac')) {
+                $device = Device::where('mac_address', $request->mac)->first();
+                Log::info("[TimeClockAPI] mac (short param) lookup", [
+                    'mac' => $request->mac,
+                    'found' => $device ? true : false,
+                ]);
+            }
+
+            // Update last seen timestamp for registered devices
+            if ($device) {
+                $device->update(['last_seen_at' => $now]);
+                Log::info("[TimeClockAPI] Device found", [
+                    'db_device_id' => $device->device_id,
+                    'db_mac_address' => $device->mac_address,
+                    'ntp_server' => $device->ntp_server,
+                    'timezone' => $device->timezone,
+                ]);
+            } else {
+                Log::warning("[TimeClockAPI] Device NOT found in database");
+            }
+
+            // Determine timezone to use (device's timezone if registered, otherwise app default)
+            $deviceTimezone = $device?->timezone ?? config('app.timezone', 'America/Chicago');
+            $timezoneDisplayName = $this->getTimezoneDisplayName($deviceTimezone);
+
+            // Get NTP server from device config or use default
+            $ntpServer = $device?->ntp_server ?? 'pool.ntp.org';
 
             // Build response data
             $responseData = [
@@ -457,7 +616,8 @@ class TimeClockController extends Controller
                 'server_time' => $now->toISOString(),
                 'unix_timestamp' => $now->timestamp,
                 'formatted_time' => $now->format('Y-m-d H:i:s'),
-                'server_timezone' => config('app.timezone'),
+                'server_timezone' => $timezoneDisplayName,  // Display name for UI matching
+                'ntp_server' => $ntpServer,  // NTP server for device time sync fallback
             ];
 
             // If we found a device, include its specific timezone configuration
@@ -473,6 +633,7 @@ class TimeClockController extends Controller
 
                 $responseData['device_timezone'] = [
                     'timezone_name' => $defaultTimezone,
+                    'timezone_display' => $this->getTimezoneDisplayName($defaultTimezone),
                     'current_offset' => (int)$offsetHours,
                     'is_dst' => $defaultTime->format('I') == '1',
                     'timezone_abbr' => $defaultTime->format('T'),
@@ -720,6 +881,7 @@ class TimeClockController extends Controller
 
             return [
                 'timezone_name' => $deviceTimezone,
+                'timezone_display' => $this->getTimezoneDisplayName($deviceTimezone),
                 'current_offset' => (int)$offsetHours,
                 'is_dst' => $deviceTime->format('I') == '1', // 1 if DST, 0 if not
                 'timezone_abbr' => $deviceTime->format('T'), // e.g., "CDT", "CST"
@@ -729,6 +891,7 @@ class TimeClockController extends Controller
             // Fallback to Central Time if timezone parsing fails
             return [
                 'timezone_name' => 'America/Chicago',
+                'timezone_display' => 'Central Time (CST/CDT)',
                 'current_offset' => -5, // Default to CDT
                 'is_dst' => true,
                 'timezone_abbr' => 'CDT',

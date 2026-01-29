@@ -66,6 +66,18 @@ typedef struct {
 esp_err_t api_client_init(api_config_t *config);
 
 /**
+ * Save API config to NVS (persists across reboots)
+ * @return ESP_OK on success
+ */
+esp_err_t api_save_config(void);
+
+/**
+ * Load API config from NVS (restores state after reboot)
+ * @return ESP_OK on success, ESP_ERR_NVS_NOT_FOUND if no config exists
+ */
+esp_err_t api_load_config(void);
+
+/**
  * Register device with server
  * @param mac_address Device MAC address
  * @param device_name Friendly device name

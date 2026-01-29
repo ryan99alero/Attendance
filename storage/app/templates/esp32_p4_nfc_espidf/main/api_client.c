@@ -6,10 +6,14 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "nvs_flash.h"
 #include "cJSON.h"
 #include <string.h>
 
 static const char *TAG = "API_CLIENT";
+
+// NVS namespace for API config persistence
+#define NVS_NAMESPACE_API "api_config"
 
 // Global API configuration - initialized with defaults
 static api_config_t g_api_config = {
@@ -74,6 +78,125 @@ esp_err_t api_client_init(api_config_t *config) {
     memcpy(&g_api_config, config, sizeof(api_config_t));
     ESP_LOGI(TAG, "API client initialized");
     ESP_LOGI(TAG, "Server: %s:%d", g_api_config.server_host, g_api_config.server_port);
+
+    return ESP_OK;
+}
+
+/**
+ * Save API config to NVS (persists across reboots)
+ */
+esp_err_t api_save_config(void) {
+    ESP_LOGW(TAG, "========== SAVING API CONFIG TO NVS ==========");
+    ESP_LOGI(TAG, "  server_host: %s", g_api_config.server_host);
+    ESP_LOGI(TAG, "  server_port: %d", g_api_config.server_port);
+    ESP_LOGI(TAG, "  device_id: %s", g_api_config.device_id);
+    ESP_LOGI(TAG, "  device_name: %s", g_api_config.device_name);
+    ESP_LOGI(TAG, "  is_registered: %d", g_api_config.is_registered);
+    ESP_LOGI(TAG, "  api_token: %.20s...", g_api_config.api_token);
+
+    nvs_handle_t nvs_handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE_API, NVS_READWRITE, &nvs_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS for writing: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "NVS opened for writing");
+
+    // Save individual fields with error checking
+    esp_err_t err;
+
+    err = nvs_set_str(nvs_handle, "srv_host", g_api_config.server_host);
+    ESP_LOGI(TAG, "  nvs_set srv_host: %s", esp_err_to_name(err));
+
+    err = nvs_set_u16(nvs_handle, "srv_port", g_api_config.server_port);
+    ESP_LOGI(TAG, "  nvs_set srv_port: %s", esp_err_to_name(err));
+
+    err = nvs_set_str(nvs_handle, "api_token", g_api_config.api_token);
+    ESP_LOGI(TAG, "  nvs_set api_token: %s", esp_err_to_name(err));
+
+    err = nvs_set_str(nvs_handle, "device_id", g_api_config.device_id);
+    ESP_LOGI(TAG, "  nvs_set device_id: %s", esp_err_to_name(err));
+
+    err = nvs_set_str(nvs_handle, "dev_name", g_api_config.device_name);
+    ESP_LOGI(TAG, "  nvs_set dev_name: %s", esp_err_to_name(err));
+
+    err = nvs_set_u8(nvs_handle, "registered", g_api_config.is_registered ? 1 : 0);
+    ESP_LOGI(TAG, "  nvs_set registered: %s", esp_err_to_name(err));
+
+    err = nvs_set_u8(nvs_handle, "approved", g_api_config.is_approved ? 1 : 0);
+    ESP_LOGI(TAG, "  nvs_set approved: %s", esp_err_to_name(err));
+
+    ret = nvs_commit(nvs_handle);
+    ESP_LOGI(TAG, "  nvs_commit: %s", esp_err_to_name(ret));
+
+    nvs_close(nvs_handle);
+
+    if (ret == ESP_OK) {
+        ESP_LOGW(TAG, "✅ API config saved to NVS successfully!");
+    } else {
+        ESP_LOGE(TAG, "❌ Failed to commit NVS: %s", esp_err_to_name(ret));
+    }
+
+    return ret;
+}
+
+/**
+ * Load API config from NVS (restores state after reboot)
+ */
+esp_err_t api_load_config(void) {
+    ESP_LOGW(TAG, "========== LOADING API CONFIG FROM NVS ==========");
+
+    nvs_handle_t nvs_handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE_API, NVS_READONLY, &nvs_handle);
+    if (ret != ESP_OK) {
+        if (ret == ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGI(TAG, "No saved API config found (first boot or namespace doesn't exist)");
+        } else {
+            ESP_LOGW(TAG, "Failed to open NVS for reading: %s", esp_err_to_name(ret));
+        }
+        return ret;
+    }
+    ESP_LOGI(TAG, "NVS opened for reading");
+
+    // Load individual fields with error checking
+    esp_err_t err;
+    size_t len;
+
+    len = sizeof(g_api_config.server_host);
+    err = nvs_get_str(nvs_handle, "srv_host", g_api_config.server_host, &len);
+    ESP_LOGI(TAG, "  nvs_get srv_host: %s -> '%s'", esp_err_to_name(err), g_api_config.server_host);
+
+    err = nvs_get_u16(nvs_handle, "srv_port", &g_api_config.server_port);
+    ESP_LOGI(TAG, "  nvs_get srv_port: %s -> %d", esp_err_to_name(err), g_api_config.server_port);
+
+    len = sizeof(g_api_config.api_token);
+    err = nvs_get_str(nvs_handle, "api_token", g_api_config.api_token, &len);
+    ESP_LOGI(TAG, "  nvs_get api_token: %s -> %.20s...", esp_err_to_name(err), g_api_config.api_token);
+
+    len = sizeof(g_api_config.device_id);
+    err = nvs_get_str(nvs_handle, "device_id", g_api_config.device_id, &len);
+    ESP_LOGI(TAG, "  nvs_get device_id: %s -> '%s'", esp_err_to_name(err), g_api_config.device_id);
+
+    len = sizeof(g_api_config.device_name);
+    err = nvs_get_str(nvs_handle, "dev_name", g_api_config.device_name, &len);
+    ESP_LOGI(TAG, "  nvs_get dev_name: %s -> '%s'", esp_err_to_name(err), g_api_config.device_name);
+
+    uint8_t is_registered = 0;
+    err = nvs_get_u8(nvs_handle, "registered", &is_registered);
+    g_api_config.is_registered = (is_registered == 1);
+    ESP_LOGI(TAG, "  nvs_get registered: %s -> %d", esp_err_to_name(err), is_registered);
+
+    uint8_t is_approved = 0;
+    err = nvs_get_u8(nvs_handle, "approved", &is_approved);
+    g_api_config.is_approved = (is_approved == 1);
+    ESP_LOGI(TAG, "  nvs_get approved: %s -> %d", esp_err_to_name(err), is_approved);
+
+    nvs_close(nvs_handle);
+
+    ESP_LOGW(TAG, "========== API CONFIG LOADED ==========");
+    ESP_LOGI(TAG, "  Server: %s:%d", g_api_config.server_host, g_api_config.server_port);
+    ESP_LOGI(TAG, "  Device ID: %s", g_api_config.device_id);
+    ESP_LOGI(TAG, "  Registered: %s", g_api_config.is_registered ? "YES" : "NO");
 
     return ESP_OK;
 }
@@ -157,6 +280,9 @@ esp_err_t api_register_device(const char *mac_address, const char *device_name) 
                                 ESP_LOGW(TAG, "✅ REGISTRATION SUCCESSFUL!");
                                 ESP_LOGI(TAG, "Device ID: %s", g_api_config.device_id);
                                 ESP_LOGI(TAG, "Token: %.16s...", g_api_config.api_token);
+
+                                // Save to NVS so registration persists across reboots
+                                api_save_config();
 
                                 ret = ESP_OK;
                             } else {
