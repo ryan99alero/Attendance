@@ -71,6 +71,8 @@ class Device extends Model
         'config_updated_at',
         'config_synced_at',
         'config_version',
+        // Offline alerting
+        'offline_alerted_at',
     ];
 
     /**
@@ -84,6 +86,7 @@ class Device extends Model
         'config_synced_at' => 'datetime',
         'is_active' => 'boolean',
         'device_config' => 'array',
+        'offline_alerted_at' => 'datetime',
     ];
 
     /**
@@ -172,5 +175,21 @@ class Device extends Model
     public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Check if device is currently in offline alert state.
+     */
+    public function isOfflineAlerted(): bool
+    {
+        return $this->offline_alerted_at !== null;
+    }
+
+    /**
+     * Scope for devices that have triggered offline alerts.
+     */
+    public function scopeOfflineAlerted($query)
+    {
+        return $query->whereNotNull('offline_alerted_at');
     }
 }

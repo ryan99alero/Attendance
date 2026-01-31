@@ -15,8 +15,10 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_sntp.h"
 #include "nvs_flash.h"
 #include "firmware_info.h"
+#include "time_settings.h"
 
 // Board Support Package for ESP32-P4-Function-EV-Board
 #include "bsp/esp32_p4_function_ev_board.h"
@@ -28,6 +30,7 @@
 #include "ui_manager.h"
 #include "ui.h"  // SquareLine Studio UI
 #include "ui_bridge.h"  // Bridge between SquareLine UI and backend
+#include "ui_events.h"  // Event handlers with punch display helpers
 #endif
 
 // NFC driver - PN532 abstraction layer
@@ -42,6 +45,7 @@
 
 #if API_ENABLED
 #include "api_client.h"
+#include "punch_queue.h"
 #include "esp_mac.h"
 #endif
 
@@ -95,6 +99,49 @@ static void validate_admin_password(const char *password, bool *is_valid) {
 #endif
 
 #if API_ENABLED
+// Connectivity monitor task - checks server health every 30 seconds
+// Shows/hides "Server Offline" alert based on consecutive failures
+static void connectivity_monitor_task(void *pvParameters) {
+	const TickType_t check_interval = pdMS_TO_TICKS(30000);  // 30 seconds
+	const int failure_threshold = 3;  // Show alert after 3 consecutive failures
+	int consecutive_failures = 0;
+
+	// Initial delay to let network stabilize
+	vTaskDelay(pdMS_TO_TICKS(15000));  // 15 sec after boot
+
+	while (1) {
+		// Only check if network is connected
+		if (network_manager_is_connected()) {
+			esp_err_t ret = api_health_check();
+
+			if (ret == ESP_OK) {
+				// Server is reachable
+				if (consecutive_failures > 0) {
+					ESP_LOGI(TAG, "Server back online after %d failures", consecutive_failures);
+				}
+				consecutive_failures = 0;
+				punch_queue_set_server_status(true);  // Hide alert
+			} else {
+				// Health check failed
+				consecutive_failures++;
+				ESP_LOGW(TAG, "Health check failed (%d/%d)", consecutive_failures, failure_threshold);
+
+				if (consecutive_failures >= failure_threshold) {
+					punch_queue_set_server_status(false);  // Show alert
+				}
+			}
+		} else {
+			// Network not connected
+			consecutive_failures++;
+			if (consecutive_failures >= failure_threshold) {
+				punch_queue_set_server_status(false);  // Show alert
+			}
+		}
+
+		vTaskDelay(check_interval);
+	}
+}
+
 // Daily sync task - syncs time and sends heartbeat every 24 hours
 static void daily_sync_task(void *pvParameters) {
 	const TickType_t initial_delay = pdMS_TO_TICKS(30000);  // 30 sec after boot
@@ -161,6 +208,13 @@ void app_main(void) {
 	ESP_ERROR_CHECK(ret);
 	printf("NVS initialized\n\n");
 
+	// Restore time settings (timezone, NTP server) from NVS
+	// This must be called AFTER nvs_flash_init()
+	time_settings_init_nvs();
+	printf("Time settings restored from NVS\n");
+	printf("   Timezone: %s\n", getenv("TZ") ? getenv("TZ") : "(default)");
+	printf("   NTP Server: %s\n\n", time_settings_get_ntp_server());
+
 #if DISPLAY_ENABLED
 	// Initialize display FIRST to claim frame buffer memory before WiFi/NFC
 	ESP_EARLY_LOGI("MAIN", "About to call bsp_display_start()...");
@@ -200,6 +254,24 @@ void app_main(void) {
 		ESP_EARLY_LOGI("MAIN", "About to call load_and_connect...");
 		network_manager_load_and_connect();
 		ESP_EARLY_LOGI("MAIN", "load_and_connect returned");
+
+		// Initialize SNTP with saved NTP server once network is connected
+		if (network_manager_is_connected()) {
+			const char *ntp_server = time_settings_get_ntp_server();
+			ESP_LOGI(TAG, "Starting SNTP with server: %s", ntp_server);
+
+			// Stop any existing SNTP
+			if (esp_sntp_enabled()) {
+				esp_sntp_stop();
+			}
+
+			// Configure and start SNTP
+			esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+			esp_sntp_setservername(0, ntp_server);
+			esp_sntp_init();
+
+			printf("✅ SNTP initialized with server: %s\n", ntp_server);
+		}
 
 #if DISPLAY_ENABLED
 		// Start network monitoring task
@@ -264,7 +336,25 @@ void app_main(void) {
 
 	// Start daily sync task (time sync + heartbeat every 24h, first sync 30s after boot)
 	xTaskCreate(daily_sync_task, "daily_sync", 8192, NULL, 3, NULL);
-	printf("✅ Daily sync task started (first sync in 30s)\n\n");
+	printf("✅ Daily sync task started (first sync in 30s)\n");
+
+	// Start connectivity monitor task (health check every 30s, alert after 3 failures)
+	xTaskCreate(connectivity_monitor_task, "conn_monitor", 4096, NULL, 3, NULL);
+	printf("✅ Connectivity monitor started (checks every 30s)\n\n");
+
+	// Initialize punch queue for offline buffering
+	if (punch_queue_init() == ESP_OK) {
+		printf("✅ Punch queue initialized\n");
+		uint32_t pending = punch_queue_pending_count();
+		if (pending > 0) {
+			printf("   ⚠️  %lu punches pending sync\n", (unsigned long)pending);
+		}
+		// Start background sync task (every 30 seconds)
+		punch_queue_start_sync_task(30000);
+		printf("✅ Punch sync task started\n\n");
+	} else {
+		printf("❌ Failed to initialize punch queue\n\n");
+	}
 #else
 	printf("API disabled\n\n");
 #endif
@@ -370,36 +460,49 @@ void app_main(void) {
 				printf("   Size: %d bytes\n", uid.size);
 				printf("   Time: %llu ms\n\n", current_time);
 
+				// Generate timestamp from device clock (shared by API and Display)
+				time_t now = time(NULL);
+				struct tm timeinfo;
+				localtime_r(&now, &timeinfo);
+
 #if API_ENABLED
-				// Send punch data to server
+				// Queue punch for sync (offline-first approach)
 				api_config_t *api_config = api_get_config();
-				if (api_config->is_registered) {
-					// Prepare punch data
-					punch_data_t punch_data;
-					strncpy(punch_data.device_id, api_config->device_id, sizeof(punch_data.device_id) - 1);
-					strncpy(punch_data.credential_kind, type_name, sizeof(punch_data.credential_kind) - 1);
-					strncpy(punch_data.credential_value, uid_str, sizeof(punch_data.credential_value) - 1);
 
-					// Simple ISO 8601 timestamp (TODO: Add proper time sync)
-					time_t now = time(NULL);
-					struct tm timeinfo;
-					localtime_r(&now, &timeinfo);
-					strftime(punch_data.event_time, sizeof(punch_data.event_time),
-					         "%Y-%m-%dT%H:%M:%S", &timeinfo);
+				// Format event time for API (ISO 8601)
+				char event_time[32];
+				strftime(event_time, sizeof(event_time), "%Y-%m-%dT%H:%M:%S", &timeinfo);
 
-					strncpy(punch_data.event_type, "unknown", sizeof(punch_data.event_type) - 1);
-					punch_data.confidence = 100;
-					punch_data.timezone_offset = -5;  // TODO: Make configurable
+				// Always queue the punch first (survives network issues/reboots)
+				esp_err_t queue_result = punch_queue_add(
+					uid_str,                              // credential_value (card UID)
+					type_name,                            // credential_kind (card type)
+					event_time,                           // event_time (device local time)
+					api_config->device_id,                // device_id
+					-6                                    // timezone_offset (CST) TODO: Make configurable
+				);
 
-					// Send to API
-					if (api_send_punch(&punch_data) == ESP_OK) {
-						printf("✅ Punch sent to server\n\n");
+				if (queue_result == ESP_OK) {
+					printf("✅ Punch queued (time: %s)\n", event_time);
+
+					// Trigger immediate sync attempt if registered
+					if (api_config->is_registered) {
+						punch_queue_trigger_sync();
 					} else {
-						printf("❌ Failed to send punch to server\n\n");
+						printf("⚠️  Device not registered - punch saved for later sync\n");
 					}
+				} else if (queue_result == ESP_ERR_NO_MEM) {
+					printf("❌ Punch queue full! Cannot record punch\n");
 				} else {
-					printf("⚠️  Device not registered, punch not sent to server\n\n");
+					printf("❌ Failed to queue punch: %s\n", esp_err_to_name(queue_result));
 				}
+
+				// Show queue status
+				uint32_t pending = punch_queue_pending_count();
+				if (pending > 1) {
+					printf("   📋 %lu punches pending sync\n", (unsigned long)pending);
+				}
+				printf("\n");
 #endif
 
 #if DISPLAY_ENABLED
@@ -423,7 +526,8 @@ void app_main(void) {
 				api_config_t *api_cfg = api_get_config();
 				if (api_cfg->is_registered) {
 					employee_info_t emp_info = {0};
-					if (api_get_employee_info(uid_str, &emp_info) == ESP_OK) {
+					esp_err_t emp_result = api_get_employee_info(uid_str, &emp_info);
+					if (emp_result == ESP_OK) {
 						// Copy employee info to scan result
 						strncpy(scan_result.employee.name, emp_info.name, sizeof(scan_result.employee.name) - 1);
 						strncpy(scan_result.employee.employee_id, emp_info.employee_id, sizeof(scan_result.employee.employee_id) - 1);
@@ -434,16 +538,26 @@ void app_main(void) {
 						scan_result.employee.pay_period_hours = emp_info.pay_period_hours;
 						scan_result.employee.vacation_balance = emp_info.vacation_balance;
 						printf("✅ Employee info retrieved from API\n\n");
-					} else {
+
+						// Server is reachable
+						punch_queue_set_server_status(true);
+					} else if (emp_result == ESP_ERR_NOT_FOUND) {
 						printf("⚠️  Employee not found in system\n\n");
+						// Server is reachable, just no employee record
+						punch_queue_set_server_status(true);
+					} else if (emp_result == ESP_ERR_TIMEOUT) {
+						printf("❌ Server unreachable - punch queued for later sync\n\n");
+						// Server is unreachable
+						punch_queue_set_server_status(false);
+					} else {
+						printf("⚠️  Failed to fetch employee info (error: %s)\n\n", esp_err_to_name(emp_result));
+						// Other error - assume server issue
+						punch_queue_set_server_status(false);
 					}
 				}
 #endif
 
-				// Format timestamp
-				time_t now = time(NULL);
-				struct tm timeinfo;
-				localtime_r(&now, &timeinfo);
+				// Format timestamp for display
 				strftime(scan_result.timestamp, sizeof(scan_result.timestamp),
 				         "%Y-%m-%d %H:%M:%S", &timeinfo);
 
@@ -451,10 +565,15 @@ void app_main(void) {
 				snprintf(scan_result.message, sizeof(scan_result.message),
 				         "Card #%lu scanned", (unsigned long)card_count);
 
-				// TODO: Show card scan result on UI (Phase 6)
-				// lvgl_port_lock(0);
-				// ui_show_card_scan(&scan_result, 3000);  // Show for 3 seconds
-				// lvgl_port_unlock();
+				// Show punch info on MainScreen UI
+				ui_show_employee_info(scan_result.employee.name);
+
+				// Format date and time for punch display
+				char punch_date[16];
+				char punch_time[16];
+				strftime(punch_date, sizeof(punch_date), "%m/%d/%Y", &timeinfo);
+				strftime(punch_time, sizeof(punch_time), "%I:%M %p", &timeinfo);
+				ui_show_punch_info(punch_date, punch_time);
 #endif
 			}
 

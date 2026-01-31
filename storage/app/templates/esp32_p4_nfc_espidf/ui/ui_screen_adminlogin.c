@@ -89,6 +89,7 @@ lv_obj_set_x( ui_adminlogin_label_passwordlabel, 0 );
 lv_obj_set_y( ui_adminlogin_label_passwordlabel, -3 );
 lv_obj_set_align( ui_adminlogin_label_passwordlabel, LV_ALIGN_CENTER );
 lv_label_set_text(ui_adminlogin_label_passwordlabel,"Admin Access - Enter Password");
+lv_obj_add_flag( ui_adminlogin_label_passwordlabel, LV_OBJ_FLAG_HIDDEN );   /// Flags
 lv_obj_set_style_text_color(ui_adminlogin_label_passwordlabel, lv_color_hex(0x3399FF), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_adminlogin_label_passwordlabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_adminlogin_label_passwordlabel, &lv_font_montserrat_20, LV_PART_MAIN| LV_STATE_DEFAULT);

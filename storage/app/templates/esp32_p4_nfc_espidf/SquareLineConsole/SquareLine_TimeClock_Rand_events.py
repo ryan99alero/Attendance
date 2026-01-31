@@ -18,3 +18,11 @@ def ui_event_server_register(event_struct):
 def ui_event_sync_now(event_struct):
     return
 
+
+def EmployeeInfo(event_struct):
+    return
+
+
+def PunchInfo(event_struct):
+    return
+

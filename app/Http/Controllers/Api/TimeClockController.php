@@ -131,7 +131,7 @@ class TimeClockController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'device_id' => 'required|string',
-            'credential_kind' => 'required|string|in:rfid,nfc,magstripe,qrcode,barcode,ble,biometric,pin,mobile',
+            'credential_kind' => 'required|string', // Accept any kind, normalize later
             'credential_value' => 'required|string',
             'event_time' => 'nullable|date',
             'event_type' => 'nullable|string|in:in,out,break_in,break_out,unknown',
@@ -246,7 +246,8 @@ class TimeClockController extends Controller
             if ($request->event_time) {
                 // Store the device's local time exactly as recorded (no timezone conversion)
                 // This preserves the actual time the person clocked in at their location
-                $eventTime = Carbon::createFromFormat('Y-m-d H:i:s', $request->event_time);
+                // Use Carbon::parse() to auto-detect format (handles both "Y-m-d H:i:s" and ISO 8601 "Y-m-d\TH:i:s")
+                $eventTime = Carbon::parse($request->event_time);
             } else {
                 $eventTime = now();
             }
@@ -518,9 +519,23 @@ class TimeClockController extends Controller
     /**
      * Health check endpoint for time clock devices
      * GET /api/v1/timeclock/health
+     *
+     * If device credentials are provided (X-Device-Token header), also updates last_seen_at.
+     * This allows the connectivity monitor to keep the device's heartbeat fresh.
      */
-    public function health()
+    public function health(Request $request)
     {
+        // Try to identify and update the device if credentials provided
+        $apiToken = $request->header('X-Device-Token');
+        $deviceId = $request->header('X-Device-ID');
+
+        if ($apiToken && $deviceId) {
+            $device = Device::where('device_id', $deviceId)->first();
+            if ($device && $device->isTokenValid($apiToken)) {
+                $device->markAsSeen();
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Time Clock API is healthy',

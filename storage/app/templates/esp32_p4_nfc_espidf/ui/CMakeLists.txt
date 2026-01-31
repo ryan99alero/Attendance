@@ -1,24 +1,16 @@
-# ESP-IDF component for SquareLine Studio UI
-idf_component_register(
-    SRCS
-        "ui.c"
-        "ui_comp_hook.c"
-        "ui_events.c"
-        "ui_font_Icon2.c"
-        "ui_font_Icons.c"
-        "ui_helpers.c"
-        "ui_img_baseline_wifi_black_36dp_png.c"
-        "ui_screen_adminlogin.c"
-        "ui_screen_deviceinformation.c"
-        "ui_screen_mainscreen.c"
-        "ui_screen_networksetup.c"
-        "ui_screen_serversetup.c"
-        "ui_screen_setupconfigurations.c"
-        "ui_screen_timeinformation.c"
-    INCLUDE_DIRS
-        "."
-    REQUIRES
-        lvgl
-        esp_lvgl_port
-        main
-)
+idf_component_register(SRCS "ui_screen_mainscreen.c"
+                            "ui_screen_adminlogin.c"
+                            "ui_screen_setupconfigurations.c"
+                            "ui_screen_networksetup.c"
+                            "ui_screen_deviceinformation.c"
+                            "ui_screen_timeinformation.c"
+                            "ui_screen_serversetup.c"
+                            "ui.c"
+                            "ui_comp_hook.c"
+                            "ui_helpers.c"
+                            "ui_events.c"
+                            "ui_img_baseline_wifi_black_36dp_png.c"
+                            "ui_font_Icon2.c"
+                            "ui_font_Icons.c"
+                       INCLUDE_DIRS "."
+                       REQUIRES lvgl__lvgl espressif__esp_lvgl_port main)

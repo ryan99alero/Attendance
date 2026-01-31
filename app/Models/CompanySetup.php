@@ -77,6 +77,21 @@ class CompanySetup extends Model
         'config_poll_interval_minutes',
         'firmware_check_interval_hours',
         'allow_device_poll_override',
+        // Device Offline Alerting
+        'device_alert_email',
+        'device_offline_threshold_minutes',
+        // SMTP Configuration
+        'smtp_enabled',
+        'smtp_host',
+        'smtp_port',
+        'smtp_username',
+        'smtp_password',
+        'smtp_encryption',
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_reply_to',
+        'smtp_timeout',
+        'smtp_verify_peer',
     ];
 
     protected $casts = [
@@ -104,6 +119,10 @@ class CompanySetup extends Model
         'clock_event_daily_sync_time' => 'datetime:H:i:s',
         // Device Management Casts
         'allow_device_poll_override' => 'boolean',
+        // SMTP Casts
+        'smtp_enabled' => 'boolean',
+        'smtp_password' => 'encrypted',
+        'smtp_verify_peer' => 'boolean',
     ];
 
     /**

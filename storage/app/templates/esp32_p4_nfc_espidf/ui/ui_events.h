@@ -10,11 +10,20 @@
 extern "C" {
 #endif
 
+void EmployeeInfo(lv_event_t * e);
+void PunchInfo(lv_event_t * e);
 void ui_event_textarea(lv_event_t * e);
 void ui_event_keyboard_close(lv_event_t * e);
 void ui_event_sync_now(lv_event_t * e);
 void ui_event_server_test(lv_event_t * e);
 void ui_event_server_register(lv_event_t * e);
+
+// Helper functions to display punch info on MainScreen (called from main.c)
+void ui_show_employee_info(const char *employee_name);
+void ui_show_punch_info(const char *punch_date, const char *punch_time);
+void ui_hide_punch_display(void);
+void ui_show_server_offline_alert(void);
+void ui_hide_server_offline_alert(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

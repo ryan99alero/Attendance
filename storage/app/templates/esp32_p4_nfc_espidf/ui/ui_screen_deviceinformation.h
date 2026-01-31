@@ -14,8 +14,6 @@ extern "C" {
 extern void ui_screen_deviceinformation_screen_init(void);
 extern void ui_screen_deviceinformation_screen_destroy(void);
 extern lv_obj_t *ui_screen_deviceinformation;
-extern lv_obj_t *ui_deviceinformation_container_headercontainer;
-extern lv_obj_t *ui_deviceinformation_label_deviceinfocontainer;
 extern lv_obj_t *ui_deviceinformation_container_devicedisplaytypecontainer;
 extern lv_obj_t *ui_deviceinformation_button_harwarebutton;
 extern lv_obj_t *ui_deviceinformation_label_hardwarelabel;
@@ -27,8 +25,6 @@ extern lv_obj_t *ui_deviceinformation_button_okbutton;
 extern lv_obj_t *ui_deviceinformation_label_oklabel;
 // CUSTOM VARIABLES
 extern lv_obj_t *ui_Screen_DeviceInformation;
-extern lv_obj_t *ui_DeviceInformation_Container_DeviceInformation_Container_HeaderContainer;
-extern lv_obj_t *ui_DeviceInformation_Label_DeviceInformation_Label_DeviceInfoContainer;
 extern lv_obj_t *ui_DeviceInformation_Container_DeviceInformation_Container_DeviceDisplayTypeContainer;
 extern lv_obj_t *ui_DeviceInformation_Button_DeviceInformation_Button_HarwareButton;
 extern lv_obj_t *ui_DeviceInformation_Label_DeviceInformation_Label_HardwareLabel;

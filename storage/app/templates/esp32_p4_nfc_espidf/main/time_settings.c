@@ -141,13 +141,57 @@ static int load_timezone_index_nvs(int fallback_idx)
     return (err == ESP_OK) ? (int)idx : fallback_idx;
 }
 
-// Call once early in app (e.g., app_main) before creating the dropdown.
-// Ensures NVS is ready for load/save above.
+// Saved NTP server (for external access)
+static char s_saved_ntp_server[64] = {0};
+
+// Get the saved NTP server (returns "pool.ntp.org" if none saved)
+const char* time_settings_get_ntp_server(void)
+{
+    if (strlen(s_saved_ntp_server) > 0) {
+        return s_saved_ntp_server;
+    }
+    return "pool.ntp.org";
+}
+
+// Call once early in app (e.g., app_main) after nvs_flash_init() has been called.
+// This restores timezone and NTP settings from NVS so they persist across reboots.
+// NOTE: This should be called AFTER nvs_flash_init() is done in main.c
 void time_settings_init_nvs(void)
 {
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
+    // Note: We assume nvs_flash_init() has already been called in main.c
+    // Do NOT call nvs_flash_init() here again
+
+    // Try to load and apply timezone_posix from server sync (takes precedence over dropdown index)
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NS, NVS_READONLY, &h);
+    if (err == ESP_OK) {
+        // Load timezone POSIX string
+        char tz_posix[64] = {0};
+        size_t tz_len = sizeof(tz_posix);
+        err = nvs_get_str(h, NVS_KEY_TZ_POSIX, tz_posix, &tz_len);
+        if (err == ESP_OK && strlen(tz_posix) > 0) {
+            setenv("TZ", tz_posix, 1);
+            tzset();
+            ESP_LOGI(TAG, "Restored timezone from NVS: TZ=%s", tz_posix);
+        } else {
+            ESP_LOGI(TAG, "No timezone in NVS, using default");
+        }
+
+        // Load NTP server if saved
+        size_t ntp_len = sizeof(s_saved_ntp_server);
+        err = nvs_get_str(h, "ntp_server", s_saved_ntp_server, &ntp_len);
+        if (err == ESP_OK && strlen(s_saved_ntp_server) > 0) {
+            ESP_LOGI(TAG, "Restored NTP server from NVS: %s", s_saved_ntp_server);
+        } else {
+            // Use default NTP server
+            strncpy(s_saved_ntp_server, "pool.ntp.org", sizeof(s_saved_ntp_server) - 1);
+            ESP_LOGI(TAG, "No NTP server in NVS, using default: %s", s_saved_ntp_server);
+        }
+
+        nvs_close(h);
+    } else {
+        ESP_LOGW(TAG, "Could not open NVS for time settings: %s", esp_err_to_name(err));
+        // Use defaults
+        strncpy(s_saved_ntp_server, "pool.ntp.org", sizeof(s_saved_ntp_server) - 1);
     }
 }

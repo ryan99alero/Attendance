@@ -474,6 +474,12 @@ esp_err_t api_health_check(void) {
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
+    // If device is registered, include credentials so server can update last_seen_at
+    if (g_api_config.is_registered && strlen(g_api_config.api_token) > 0) {
+        esp_http_client_set_header(client, "X-Device-Token", g_api_config.api_token);
+        esp_http_client_set_header(client, "X-Device-ID", g_api_config.device_id);
+    }
+
     // Perform GET request
     esp_err_t err = esp_http_client_perform(client);
     esp_err_t ret = ESP_FAIL;
@@ -481,7 +487,7 @@ esp_err_t api_health_check(void) {
     if (err == ESP_OK) {
         int status_code = esp_http_client_get_status_code(client);
         if (status_code == 200) {
-            ESP_LOGI(TAG, "✅ Server is healthy");
+            ESP_LOGI(TAG, "✅ Server is healthy (last_seen updated)");
             ret = ESP_OK;
         } else {
             ESP_LOGE(TAG, "Health check failed: %d", status_code);
@@ -627,8 +633,15 @@ esp_err_t api_get_employee_info(const char *card_id, employee_info_t *employee_i
             if (response_json != NULL) {
                 cJSON *success = cJSON_GetObjectItem(response_json, "success");
                 if (success != NULL && cJSON_IsTrue(success)) {
-                    // Get employee data
-                    cJSON *employee = cJSON_GetObjectItem(response_json, "employee");
+                    // Get "data" object first (API wraps response in "data")
+                    cJSON *data = cJSON_GetObjectItem(response_json, "data");
+                    if (data == NULL) {
+                        // Fallback: try root level for backwards compatibility
+                        data = response_json;
+                    }
+
+                    // Get employee data from data object
+                    cJSON *employee = cJSON_GetObjectItem(data, "employee");
                     if (employee != NULL) {
                         cJSON *name = cJSON_GetObjectItem(employee, "name");
                         cJSON *emp_id = cJSON_GetObjectItem(employee, "id");
@@ -636,6 +649,7 @@ esp_err_t api_get_employee_info(const char *card_id, employee_info_t *employee_i
 
                         if (name != NULL && cJSON_IsString(name)) {
                             strncpy(employee_info->name, name->valuestring, sizeof(employee_info->name) - 1);
+                            ESP_LOGI(TAG, "Employee name: %s", employee_info->name);
                         }
                         if (emp_id != NULL && cJSON_IsNumber(emp_id)) {
                             snprintf(employee_info->employee_id, sizeof(employee_info->employee_id), "%d", emp_id->valueint);
@@ -646,8 +660,8 @@ esp_err_t api_get_employee_info(const char *card_id, employee_info_t *employee_i
                         employee_info->is_authorized = true;
                     }
 
-                    // Get hours data
-                    cJSON *hours = cJSON_GetObjectItem(response_json, "hours");
+                    // Get hours data from data object
+                    cJSON *hours = cJSON_GetObjectItem(data, "hours");
                     if (hours != NULL) {
                         cJSON *today = cJSON_GetObjectItem(hours, "today_hours");
                         cJSON *week = cJSON_GetObjectItem(hours, "week_hours");
@@ -680,14 +694,20 @@ esp_err_t api_get_employee_info(const char *card_id, employee_info_t *employee_i
                 } else {
                     ESP_LOGW(TAG, "Employee not found or unauthorized");
                     employee_info->is_authorized = false;
+                    ret = ESP_ERR_NOT_FOUND;  // Server reached, but employee not found
                 }
                 cJSON_Delete(response_json);
             }
+        } else if (status_code == 404) {
+            ESP_LOGW(TAG, "Employee not found (404)");
+            ret = ESP_ERR_NOT_FOUND;  // Server reached, employee not in system
         } else if (status_code != 200) {
             ESP_LOGW(TAG, "Employee lookup failed with status %d", status_code);
+            ret = ESP_FAIL;  // Server reached but error response
         }
     } else {
         ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
+        ret = ESP_ERR_TIMEOUT;  // Server unreachable
     }
 
     esp_http_client_cleanup(client);

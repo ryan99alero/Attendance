@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_sntp.h"
+#include "nvs.h"
 #include "api_client.h"
 #include "network_manager.h"
 #include "freertos/FreeRTOS.h"
@@ -371,6 +372,38 @@ static void time_sync_task(void *pvParameters)
                 ESP_LOGE(TAG, "FAILED to acquire LVGL lock!");
             }
             ESP_LOGW(TAG, "=== FIELD UPDATE COMPLETE ===");
+
+            // Save synced settings to NVS so they persist across reboots
+            ESP_LOGI(TAG, "Saving time settings to NVS...");
+            nvs_handle_t nvs_h;
+            esp_err_t nvs_err = nvs_open("app_settings", NVS_READWRITE, &nvs_h);
+            if (nvs_err == ESP_OK) {
+                // Save timezone POSIX string
+                nvs_set_str(nvs_h, "timezone_posix", tz_str);
+
+                // Save NTP server if provided
+                if (strlen(sync_data.ntp_server) > 0) {
+                    nvs_set_str(nvs_h, "ntp_server", sync_data.ntp_server);
+                }
+
+                // Save use_server_time preference
+                nvs_set_u8(nvs_h, "use_server_time", sync_data.use_server_time ? 1 : 0);
+
+                // Save timezone name for reference
+                nvs_set_str(nvs_h, "timezone_name", sync_data.timezone);
+
+                nvs_err = nvs_commit(nvs_h);
+                nvs_close(nvs_h);
+
+                if (nvs_err == ESP_OK) {
+                    ESP_LOGI(TAG, "Time settings saved to NVS: TZ=%s, NTP=%s, use_server=%d",
+                             tz_str, sync_data.ntp_server, sync_data.use_server_time);
+                } else {
+                    ESP_LOGE(TAG, "Failed to commit NVS: %s", esp_err_to_name(nvs_err));
+                }
+            } else {
+                ESP_LOGE(TAG, "Failed to open NVS for time settings: %s", esp_err_to_name(nvs_err));
+            }
         } else {
             // Time set failed, update UI
             if (lvgl_port_lock(100)) {
@@ -753,5 +786,141 @@ void ui_event_server_register(lv_event_t * e)
         if (ui_serversetup_textarea_statusinput) {
             lv_textarea_set_text(ui_serversetup_textarea_statusinput, "Task Failed");
         }
+    }
+}
+
+void EmployeeInfo(lv_event_t * e)
+{
+    // Called when EmployeeInfoInput textarea is clicked (if needed)
+    ESP_LOGI(TAG, "EmployeeInfo event triggered");
+}
+
+void PunchInfo(lv_event_t * e)
+{
+    // Called when PunchInfoInput textarea is clicked (if needed)
+    ESP_LOGI(TAG, "PunchInfo event triggered");
+}
+
+// Static timer for auto-hide (prevent duplicates)
+static lv_timer_t *s_punch_hide_timer = NULL;
+
+// Timer callback to hide punch display after timeout
+static void punch_display_timer_cb(lv_timer_t *timer)
+{
+    // Hide the fields (already have LVGL lock from timer context)
+    if (ui_mainscreen_textarea_employeeinfoinput) {
+        lv_obj_add_flag(ui_mainscreen_textarea_employeeinfoinput, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_mainscreen_textarea_punchinfoinput) {
+        lv_obj_add_flag(ui_mainscreen_textarea_punchinfoinput, LV_OBJ_FLAG_HIDDEN);
+    }
+    ESP_LOGI(TAG, "Punch display auto-hidden");
+    s_punch_hide_timer = NULL;  // Timer deletes itself after one-shot
+}
+
+// Show employee name on MainScreen (called from card scan in main.c)
+void ui_show_employee_info(const char *employee_name)
+{
+    if (lvgl_port_lock(100)) {
+        if (ui_mainscreen_textarea_employeeinfoinput) {
+            char display_text[128];
+            snprintf(display_text, sizeof(display_text), "Punch Recorded: %s",
+                     employee_name ? employee_name : "Unknown");
+            lv_textarea_set_text(ui_mainscreen_textarea_employeeinfoinput, display_text);
+            lv_obj_remove_flag(ui_mainscreen_textarea_employeeinfoinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGI(TAG, "Showing employee info: %s", display_text);
+        }
+        lvgl_port_unlock();
+    }
+}
+
+// Show punch date/time on MainScreen
+void ui_show_punch_info(const char *punch_date, const char *punch_time)
+{
+    if (lvgl_port_lock(100)) {
+        if (ui_mainscreen_textarea_punchinfoinput) {
+            char display_text[64];
+            snprintf(display_text, sizeof(display_text), "%s\n%s",
+                     punch_date ? punch_date : "",
+                     punch_time ? punch_time : "");
+            lv_textarea_set_text(ui_mainscreen_textarea_punchinfoinput, display_text);
+            lv_obj_remove_flag(ui_mainscreen_textarea_punchinfoinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGI(TAG, "Showing punch info: %s %s", punch_date, punch_time);
+
+            // Cancel existing timer if any
+            if (s_punch_hide_timer) {
+                lv_timer_delete(s_punch_hide_timer);
+                s_punch_hide_timer = NULL;
+            }
+
+            // Create one-shot timer to auto-hide after 5 seconds
+            s_punch_hide_timer = lv_timer_create(punch_display_timer_cb, 5000, NULL);
+            if (s_punch_hide_timer) {
+                lv_timer_set_repeat_count(s_punch_hide_timer, 1);  // One-shot
+                ESP_LOGI(TAG, "Auto-hide timer started (5 seconds)");
+            }
+        }
+        lvgl_port_unlock();
+    }
+}
+
+// Hide both punch display fields
+void ui_hide_punch_display(void)
+{
+    if (lvgl_port_lock(100)) {
+        // Cancel timer if running
+        if (s_punch_hide_timer) {
+            lv_timer_delete(s_punch_hide_timer);
+            s_punch_hide_timer = NULL;
+        }
+        if (ui_mainscreen_textarea_employeeinfoinput) {
+            lv_obj_add_flag(ui_mainscreen_textarea_employeeinfoinput, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (ui_mainscreen_textarea_punchinfoinput) {
+            lv_obj_add_flag(ui_mainscreen_textarea_punchinfoinput, LV_OBJ_FLAG_HIDDEN);
+        }
+        ESP_LOGI(TAG, "Punch display hidden");
+        lvgl_port_unlock();
+    }
+}
+
+// Static label for server offline alert (created dynamically)
+static lv_obj_t *s_server_offline_label = NULL;
+
+// Show server offline alert on MainScreen
+void ui_show_server_offline_alert(void)
+{
+    if (lvgl_port_lock(100)) {
+        // Create alert label if it doesn't exist
+        if (s_server_offline_label == NULL && ui_screen_mainscreen != NULL) {
+            s_server_offline_label = lv_label_create(ui_screen_mainscreen);
+            lv_label_set_text(s_server_offline_label, "Server Offline\nAlert Manager");
+            lv_obj_set_style_text_color(s_server_offline_label, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(s_server_offline_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_align(s_server_offline_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_align(s_server_offline_label, LV_ALIGN_CENTER);
+            lv_obj_set_width(s_server_offline_label, LV_SIZE_CONTENT);
+            lv_obj_set_height(s_server_offline_label, LV_SIZE_CONTENT);
+            ESP_LOGW(TAG, "Server offline alert label created");
+        }
+
+        // Show the alert
+        if (s_server_offline_label) {
+            lv_obj_remove_flag(s_server_offline_label, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGW(TAG, "SERVER OFFLINE ALERT SHOWN");
+        }
+        lvgl_port_unlock();
+    }
+}
+
+// Hide server offline alert
+void ui_hide_server_offline_alert(void)
+{
+    if (lvgl_port_lock(100)) {
+        if (s_server_offline_label) {
+            lv_obj_add_flag(s_server_offline_label, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGI(TAG, "Server offline alert hidden");
+        }
+        lvgl_port_unlock();
     }
 }

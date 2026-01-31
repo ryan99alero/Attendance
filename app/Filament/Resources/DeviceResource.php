@@ -122,6 +122,16 @@ class DeviceResource extends Resource
                             'suspended' => 'Suspended',
                         ])
                         ->default('pending'),
+
+                    TextInput::make('last_seen_at')
+                        ->label('Last Seen')
+                        ->disabled()
+                        ->helperText('Last heartbeat from device'),
+
+                    TextInput::make('offline_alerted_at')
+                        ->label('Offline Alert Sent')
+                        ->disabled()
+                        ->helperText('When offline alert was sent (empty = online)'),
                 ])
                 ->columns(2),
         ]);
@@ -130,6 +140,13 @@ class DeviceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
+            IconColumn::make('offline_alerted_at')
+                ->label('Alert')
+                ->icon(fn ($state) => $state ? 'heroicon-s-exclamation-triangle' : null)
+                ->color('danger')
+                ->tooltip(fn ($state) => $state ? 'Offline alert sent' : null)
+                ->alignCenter(),
+
             TextColumn::make('device_name')
                 ->label('Device Name')
                 ->searchable(),
@@ -186,7 +203,15 @@ class DeviceResource extends Resource
                 ->label('Last Seen')
                 ->dateTime()
                 ->since()
-                ->placeholder('Never'),
+                ->placeholder('Never')
+                ->color(fn ($record) => $record->offline_alerted_at ? 'danger' : null),
+
+            TextColumn::make('offline_alerted_at')
+                ->label('Alert Sent')
+                ->dateTime()
+                ->since()
+                ->placeholder('-')
+                ->color('danger'),
 
             TextColumn::make('firmware_version')
                 ->label('Firmware')

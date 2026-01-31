@@ -23,6 +23,8 @@
 #include "ethernet_manager.h"
 #include "network_manager.h"
 #include "api_client.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
@@ -978,10 +980,70 @@ static void time_ok_cb(lv_event_t *e) {
 // which is called via SquareLine-generated ui_event_timeinformation_button_syncbutton()
 
 static void populate_time_fields(void) {
-    if (ui_timeinformation_textarea_ntpinput) {
-        lv_textarea_set_text(ui_timeinformation_textarea_ntpinput, "pool.ntp.org");
+    // Read saved settings from NVS
+    char ntp_server[64] = "pool.ntp.org";  // default
+    char timezone_name[64] = "";
+    int timezone_index = 7;  // default to Pacific Time
+
+    nvs_handle_t nvs_h;
+    esp_err_t err = nvs_open("app_settings", NVS_READONLY, &nvs_h);
+    if (err == ESP_OK) {
+        // Read NTP server
+        size_t ntp_len = sizeof(ntp_server);
+        if (nvs_get_str(nvs_h, "ntp_server", ntp_server, &ntp_len) == ESP_OK) {
+            ESP_LOGI(TAG, "Loaded NTP server from NVS: %s", ntp_server);
+        }
+
+        // Read timezone name
+        size_t tz_len = sizeof(timezone_name);
+        if (nvs_get_str(nvs_h, "timezone_name", timezone_name, &tz_len) == ESP_OK) {
+            ESP_LOGI(TAG, "Loaded timezone from NVS: %s", timezone_name);
+
+            // Map timezone name to dropdown index
+            // Dropdown options:
+            // 0 - Alaska Time (AKST/AKDT) - America/Anchorage
+            // 1 - Atlantic Time (AST) - America/Puerto_Rico
+            // 2 - Central Time (CST/CDT) - America/Chicago
+            // 3 - Chamorro Time (ChST) - Pacific/Guam
+            // 4 - Eastern Time (EST/EDT) - America/New_York
+            // 5 - Hawaii–Aleutian Time (HST/HDT) - Pacific/Honolulu
+            // 6 - Mountain Time (MST/MDT) - America/Denver
+            // 7 - Pacific Time (PST/PDT) - America/Los_Angeles
+            // 8 - Samoa Time (SST) - Pacific/Pago_Pago
+            if (strstr(timezone_name, "Anchorage") || strstr(timezone_name, "Alaska")) {
+                timezone_index = 0;
+            } else if (strstr(timezone_name, "Puerto_Rico") || strstr(timezone_name, "Atlantic")) {
+                timezone_index = 1;
+            } else if (strstr(timezone_name, "Chicago") || strstr(timezone_name, "Central")) {
+                timezone_index = 2;
+            } else if (strstr(timezone_name, "Guam") || strstr(timezone_name, "Chamorro")) {
+                timezone_index = 3;
+            } else if (strstr(timezone_name, "New_York") || strstr(timezone_name, "Eastern")) {
+                timezone_index = 4;
+            } else if (strstr(timezone_name, "Honolulu") || strstr(timezone_name, "Hawaii")) {
+                timezone_index = 5;
+            } else if (strstr(timezone_name, "Denver") || strstr(timezone_name, "Mountain")) {
+                timezone_index = 6;
+            } else if (strstr(timezone_name, "Los_Angeles") || strstr(timezone_name, "Pacific")) {
+                timezone_index = 7;
+            } else if (strstr(timezone_name, "Pago_Pago") || strstr(timezone_name, "Samoa")) {
+                timezone_index = 8;
+            }
+            ESP_LOGI(TAG, "Mapped timezone '%s' to dropdown index %d", timezone_name, timezone_index);
+        }
+
+        nvs_close(nvs_h);
+    } else {
+        ESP_LOGW(TAG, "Could not open NVS for time settings, using defaults");
     }
 
+    // Populate NTP server field
+    if (ui_timeinformation_textarea_ntpinput) {
+        lv_textarea_set_text(ui_timeinformation_textarea_ntpinput, ntp_server);
+        ESP_LOGI(TAG, "Set NTP field to: %s", ntp_server);
+    }
+
+    // Populate AM/PM based on current time
     time_t now;
     struct tm timeinfo;
     time(&now);
@@ -991,8 +1053,10 @@ static void populate_time_fields(void) {
         lv_dropdown_set_selected(ui_timeinformation_dropdown_ampm, timeinfo.tm_hour >= 12 ? 1 : 0);
     }
 
+    // Populate timezone dropdown
     if (ui_timeinformation_dropdown_timezone) {
-        lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, 7);
+        lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, timezone_index);
+        ESP_LOGI(TAG, "Set timezone dropdown to index %d", timezone_index);
     }
 }
 
