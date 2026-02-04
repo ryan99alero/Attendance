@@ -67,10 +67,29 @@ class TimeClockController extends Controller
             // Generate device_id from MAC address if not provided
             $deviceId = $request->device_id ?? 'ESP32_' . strtoupper(str_replace([':', '-'], '', $request->mac_address));
 
-            // Find or create device using MAC address as primary identifier
-            $device = Device::updateOrCreate(
-                ['mac_address' => $request->mac_address],
-                [
+            // Find existing device or prepare to create new one
+            $device = Device::where('mac_address', $request->mac_address)->first();
+            $isNewDevice = !$device;
+
+            if ($device) {
+                // Update existing device - preserve admin-set registration_status
+                $device->update([
+                    'device_id' => $deviceId,
+                    'device_name' => $request->device_name ?? $device->device_name ?? $deviceId,
+                    'display_name' => $device->display_name ?? $request->device_name ?? 'TimeClock (' . substr($request->mac_address, -5) . ')',
+                    'ip_address' => $request->ip_address ?? $request->ip(),
+                    'last_seen_at' => now(),
+                    'last_ip' => $request->ip(),
+                    'last_mac' => $request->mac_address,
+                    'firmware_version' => $request->firmware_version,
+                    'device_type' => 'esp32_timeclock',
+                    'is_active' => true,
+                    'config_synced_at' => now(),
+                ]);
+            } else {
+                // Create new device with pending status
+                $device = Device::create([
+                    'mac_address' => $request->mac_address,
                     'device_id' => $deviceId,
                     'device_name' => $request->device_name ?? $deviceId,
                     'display_name' => $request->device_name ?? 'TimeClock (' . substr($request->mac_address, -5) . ')',
@@ -81,11 +100,11 @@ class TimeClockController extends Controller
                     'firmware_version' => $request->firmware_version,
                     'device_type' => 'esp32_timeclock',
                     'is_active' => true,
-                    'registration_status' => 'approved', // Auto-approve for now
-                    'timezone' => $device->timezone ?? 'America/Chicago', // Default timezone if not set
+                    'registration_status' => 'pending', // New devices await admin approval
+                    'timezone' => 'America/Chicago', // Default timezone
                     'config_synced_at' => now(),
-                ]
-            );
+                ]);
+            }
 
             Log::info("[TimeClockAPI] Device authenticated", [
                 'device_id' => $request->device_id,
@@ -99,7 +118,7 @@ class TimeClockController extends Controller
                     'device_id' => $device->device_id,
                     'device_name' => $device->device_name,
                     'api_token' => $device->generateApiToken(),
-                    'registration_status' => $device->registration_status ?? 'approved',
+                    'registration_status' => $device->registration_status ?? 'pending',
                     'server_time' => now()->toISOString(),
                     'timezone' => config('app.timezone'),
                     'api_version' => '1.0',
@@ -150,17 +169,45 @@ class TimeClockController extends Controller
         }
 
         try {
-            // 1. Resolve/update device (same logic as auth endpoint)
-            $device = Device::updateOrCreate(
-                ['device_id' => $request->device_id],
-                [
-                    'device_name' => $request->device_id,
-                    'ip_address' => $request->ip(),
-                    'last_seen_at' => now(),
-                    'last_ip' => $request->ip(),
-                    'is_active' => true
-                ]
-            );
+            // 1. Find device - do NOT auto-create (deleted devices should stay deleted)
+            $device = Device::where('device_id', $request->device_id)->first();
+
+            if (!$device) {
+                Log::warning("[TimeClockAPI] Punch from unknown device", [
+                    'device_id' => $request->device_id,
+                    'ip' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Device not registered',
+                    'display_message' => 'Clock not registered. Contact Admin.',
+                    'error_code' => 'DEVICE_NOT_FOUND'
+                ], 404);
+            }
+
+            // Check if device is approved
+            if ($device->registration_status !== 'approved') {
+                Log::warning("[TimeClockAPI] Punch from unapproved device", [
+                    'device_id' => $request->device_id,
+                    'status' => $device->registration_status,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Device not authorized',
+                    'display_message' => 'Clock not authorized. Contact Manager.',
+                    'error_code' => 'DEVICE_NOT_APPROVED',
+                    'registration_status' => $device->registration_status
+                ], 403);
+            }
+
+            // Update device last seen
+            $device->update([
+                'ip_address' => $request->ip(),
+                'last_seen_at' => now(),
+                'last_ip' => $request->ip(),
+            ]);
 
             // 2. Normalize and hash credential
             $normalizedValue = Credential::normalizeIdentifier($request->credential_value);
@@ -525,6 +572,13 @@ class TimeClockController extends Controller
      */
     public function health(Request $request)
     {
+        $response = [
+            'success' => true,
+            'message' => 'Time Clock API is healthy',
+            'server_time' => now()->toISOString(),
+            'api_version' => '1.0'
+        ];
+
         // Try to identify and update the device if credentials provided
         $apiToken = $request->header('X-Device-Token');
         $deviceId = $request->header('X-Device-ID');
@@ -533,15 +587,26 @@ class TimeClockController extends Controller
             $device = Device::where('device_id', $deviceId)->first();
             if ($device && $device->isTokenValid($apiToken)) {
                 $device->markAsSeen();
+
+                // Include device status in response for connectivity monitor
+                $response['device'] = [
+                    'device_id' => $device->device_id,
+                    'registration_status' => $device->registration_status ?? 'pending',
+                    'is_approved' => ($device->registration_status === 'approved'),
+                    'reboot_requested' => (bool) $device->reboot_requested,
+                ];
+
+                // Clear reboot flag after it's been sent
+                if ($device->reboot_requested) {
+                    $device->update(['reboot_requested' => false]);
+                    Log::info("[TimeClockAPI] Reboot command sent to device", [
+                        'device_id' => $deviceId,
+                    ]);
+                }
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Time Clock API is healthy',
-            'server_time' => now()->toISOString(),
-            'api_version' => '1.0'
-        ]);
+        return response()->json($response);
     }
 
     /**
@@ -730,7 +795,7 @@ class TimeClockController extends Controller
                     'last_ip' => $request->ip(),
                     'last_seen_at' => now(),
                     'last_wakeup_at' => now(),
-                    'registration_status' => 'registered',
+                    // Keep existing registration_status - don't overwrite admin's approval
                     'is_active' => true, // Set to active on re-registration
                 ]);
 
@@ -770,7 +835,7 @@ class TimeClockController extends Controller
                     'last_ip' => $request->ip(),
                     'last_seen_at' => now(),
                     'last_wakeup_at' => now(),
-                    'registration_status' => 'registered', // Auto-approve new devices
+                    'registration_status' => 'pending', // New devices await admin approval
                     'is_active' => true, // Set to active immediately
                     'created_by' => null, // System created
                 ]);
@@ -998,7 +1063,7 @@ class TimeClockController extends Controller
         $validator = Validator::make($request->all(), [
             'display_name' => 'nullable|string|max:100',
             'timezone' => 'nullable|string|max:50',
-            'registration_status' => 'nullable|string|in:pending,approved,rejected',
+            'registration_status' => 'nullable|string|in:pending,approved,rejected,suspended',
         ]);
 
         if ($validator->fails()) {

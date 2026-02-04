@@ -18,12 +18,27 @@ void ui_event_sync_now(lv_event_t * e);
 void ui_event_server_test(lv_event_t * e);
 void ui_event_server_register(lv_event_t * e);
 
-// Helper functions to display punch info on MainScreen (called from main.c)
-void ui_show_employee_info(const char *employee_name);
-void ui_show_punch_info(const char *punch_date, const char *punch_time);
-void ui_hide_punch_display(void);
+// Clock status types for the ClockStatusInput field
+typedef enum {
+    CLOCK_STATUS_OK = 0,           // All good - clear status
+    CLOCK_STATUS_SERVER_OFFLINE,   // Server unreachable
+    CLOCK_STATUS_NOT_REGISTERED,   // Device not registered
+    CLOCK_STATUS_NOT_AUTHORIZED,   // Device pending approval or rejected
+    CLOCK_STATUS_SUSPENDED,        // Device suspended by admin
+} clock_status_t;
+
+// Clock status display functions (uses ClockStatusInput field on MainScreen)
+void ui_set_clock_status(clock_status_t status, const char *device_name);
+clock_status_t ui_get_clock_status(void);
+
+// Legacy server offline alert functions (now use ClockStatusInput)
 void ui_show_server_offline_alert(void);
 void ui_hide_server_offline_alert(void);
+
+// Punch display helpers
+void ui_show_employee_info(const char *employee_name);
+void ui_show_punch_info(const char *date_str, const char *time_str);
+void ui_hide_punch_display(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

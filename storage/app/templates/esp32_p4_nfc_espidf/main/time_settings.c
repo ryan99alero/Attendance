@@ -26,18 +26,25 @@ typedef struct {
 } tz_entry_t;
 
 static const tz_entry_t k_tz_list[] = {
-    // US Mainland
-    { "America/New_York (ET)", "EST5EDT,M3.2.0/2,M11.1.0/2" },   // UTC-5, DST
-    { "America/Chicago (CT)",  "CST6CDT,M3.2.0/2,M11.1.0/2" },   // UTC-6, DST
-    { "America/Denver (MT)",   "MST7MDT,M3.2.0/2,M11.1.0/2" },   // UTC-7, DST
-    { "America/Los_Angeles (PT)","PST8PDT,M3.2.0/2,M11.1.0/2" }, // UTC-8, DST
-    // Non-DST examples
-    { "America/Phoenix (MST no DST)", "MST7" },                  // UTC-7, no DST
-    { "America/Anchorage (AKT)", "AKST9AKDT,M3.2.0/2,M11.1.0/2" },// UTC-9, DST
-    { "Pacific/Honolulu (HST no DST)", "HST10" },                // UTC-10, no DST
-    // UTC options
-    { "UTC", "UTC0" },
-    // Add more regions as needed (Europe, Asia, etc.) with proper POSIX rules.
+    // Sorted alphabetically by display name to match Filament admin panel
+    // Index 0: Alaska Time
+    { "America/Anchorage (AKST/AKDT)", "AKST9AKDT,M3.2.0/2,M11.1.0/2" },  // UTC-9, DST
+    // Index 1: Atlantic Time
+    { "America/Puerto_Rico (AST)", "AST4" },                              // UTC-4, no DST
+    // Index 2: Central Time
+    { "America/Chicago (CST/CDT)", "CST6CDT,M3.2.0/2,M11.1.0/2" },        // UTC-6, DST
+    // Index 3: Chamorro Time
+    { "Pacific/Guam (ChST)", "ChST-10" },                                 // UTC+10, no DST
+    // Index 4: Eastern Time
+    { "America/New_York (EST/EDT)", "EST5EDT,M3.2.0/2,M11.1.0/2" },       // UTC-5, DST
+    // Index 5: Hawaii-Aleutian Time
+    { "America/Adak (HST/HDT)", "HAST10HADT,M3.2.0/2,M11.1.0/2" },        // UTC-10, DST
+    // Index 6: Mountain Time
+    { "America/Denver (MST/MDT)", "MST7MDT,M3.2.0/2,M11.1.0/2" },         // UTC-7, DST
+    // Index 7: Pacific Time
+    { "America/Los_Angeles (PST/PDT)", "PST8PDT,M3.2.0/2,M11.1.0/2" },    // UTC-8, DST
+    // Index 8: Samoa Time
+    { "Pacific/Pago_Pago (SST)", "SST11" },                               // UTC-11, no DST
 };
 static const size_t k_tz_count = sizeof(k_tz_list) / sizeof(k_tz_list[0]);
 

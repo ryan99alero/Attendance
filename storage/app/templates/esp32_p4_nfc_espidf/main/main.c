@@ -100,7 +100,7 @@ static void validate_admin_password(const char *password, bool *is_valid) {
 
 #if API_ENABLED
 // Connectivity monitor task - checks server health every 30 seconds
-// Shows/hides "Server Offline" alert based on consecutive failures
+// Gets device status (approved/pending/suspended) and handles reboot commands
 static void connectivity_monitor_task(void *pvParameters) {
 	const TickType_t check_interval = pdMS_TO_TICKS(30000);  // 30 seconds
 	const int failure_threshold = 3;  // Show alert after 3 consecutive failures
@@ -112,29 +112,102 @@ static void connectivity_monitor_task(void *pvParameters) {
 	while (1) {
 		// Only check if network is connected
 		if (network_manager_is_connected()) {
-			esp_err_t ret = api_health_check();
+			api_config_t *cfg = api_get_config();
+			health_check_result_t health_result = {0};
 
-			if (ret == ESP_OK) {
+			esp_err_t ret = api_health_check_full(&health_result);
+
+			if (ret == ESP_OK && health_result.server_reachable) {
 				// Server is reachable
 				if (consecutive_failures > 0) {
 					ESP_LOGI(TAG, "Server back online after %d failures", consecutive_failures);
 				}
 				consecutive_failures = 0;
-				punch_queue_set_server_status(true);  // Hide alert
+
+				// Only clear server offline status, preserve authorization status
+				clock_status_t current_status = ui_get_clock_status();
+				if (current_status == CLOCK_STATUS_SERVER_OFFLINE) {
+					// Server is back - now check device status
+					if (health_result.device_found) {
+						if (health_result.is_approved) {
+							ui_set_clock_status(CLOCK_STATUS_OK, NULL);
+						} else {
+							// Not approved - show appropriate status
+							if (strcmp(health_result.registration_status, "suspended") == 0) {
+								ui_set_clock_status(CLOCK_STATUS_SUSPENDED, cfg->device_name);
+							} else {
+								ui_set_clock_status(CLOCK_STATUS_NOT_AUTHORIZED, cfg->device_name);
+							}
+						}
+					} else {
+						// Device not found on server
+						api_clear_registration();
+						ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
+					}
+				}
+
+				// If device is registered, check authorization status from health response
+				if (cfg->is_registered && health_result.device_found) {
+					// Update UI based on current authorization status
+					if (health_result.is_approved) {
+						// Device is approved - clear any non-OK status
+						if (current_status != CLOCK_STATUS_OK) {
+							ui_set_clock_status(CLOCK_STATUS_OK, NULL);
+							ESP_LOGI(TAG, "Device approved - status cleared");
+						}
+					} else {
+						// Device not approved - show status
+						if (strcmp(health_result.registration_status, "suspended") == 0) {
+							if (current_status != CLOCK_STATUS_SUSPENDED) {
+								ui_set_clock_status(CLOCK_STATUS_SUSPENDED, cfg->device_name);
+								ESP_LOGW(TAG, "Device suspended - showing status");
+							}
+						} else if (strcmp(health_result.registration_status, "rejected") == 0) {
+							if (current_status != CLOCK_STATUS_NOT_AUTHORIZED) {
+								ui_set_clock_status(CLOCK_STATUS_NOT_AUTHORIZED, cfg->device_name);
+								ESP_LOGW(TAG, "Device rejected - showing status");
+							}
+						} else {
+							// pending or other
+							if (current_status != CLOCK_STATUS_NOT_AUTHORIZED) {
+								ui_set_clock_status(CLOCK_STATUS_NOT_AUTHORIZED, cfg->device_name);
+								ESP_LOGW(TAG, "Device pending approval - showing status");
+							}
+						}
+					}
+
+					// Handle reboot command from server
+					if (health_result.reboot_requested) {
+						ESP_LOGW(TAG, "🔄 Reboot requested by server - rebooting in 3 seconds...");
+						vTaskDelay(pdMS_TO_TICKS(3000));
+						esp_restart();
+					}
+				} else if (cfg->is_registered && !health_result.device_found) {
+					// Device was deleted from server
+					ESP_LOGW(TAG, "Device deleted from server - clearing registration");
+					api_clear_registration();
+					ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
+				}
+			} else if (ret == ESP_ERR_NOT_FOUND) {
+				// Device not found on server
+				consecutive_failures = 0;  // Server is reachable
+				ESP_LOGW(TAG, "Device not found on server - clearing registration");
+				api_clear_registration();
+				ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
 			} else {
-				// Health check failed
+				// Health check failed - server unreachable
 				consecutive_failures++;
 				ESP_LOGW(TAG, "Health check failed (%d/%d)", consecutive_failures, failure_threshold);
 
 				if (consecutive_failures >= failure_threshold) {
-					punch_queue_set_server_status(false);  // Show alert
+					ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
 				}
 			}
 		} else {
 			// Network not connected
 			consecutive_failures++;
 			if (consecutive_failures >= failure_threshold) {
-				punch_queue_set_server_status(false);  // Show alert
+				ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
 			}
 		}
 
@@ -324,13 +397,47 @@ void app_main(void) {
 			printf("✅ Server is reachable\n");
 			api_config_t *cfg = api_get_config();
 			if (cfg->is_registered) {
-				printf("✅ Device is registered\n\n");
+				// Verify registration is still valid on server
+				printf("Verifying registration with server...\n");
+				esp_err_t verify_result = api_verify_registration();
+
+				if (verify_result == ESP_OK) {
+					printf("✅ Registration verified - device exists on server\n");
+					if (cfg->is_approved) {
+						printf("✅ Device is approved\n\n");
+						// Clear any previous status (device is good)
+						ui_set_clock_status(CLOCK_STATUS_OK, NULL);
+					} else {
+						printf("⚠️  Device pending approval\n\n");
+						// Show not authorized status on display
+						ui_set_clock_status(CLOCK_STATUS_NOT_AUTHORIZED, cfg->device_name);
+					}
+				} else if (verify_result == ESP_ERR_NOT_FOUND) {
+					printf("❌ Device was deleted from server - registration cleared\n");
+					printf("   Use ServerSetup screen to re-register\n\n");
+					// Show not registered status on display
+					ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
+				} else {
+					// Other error but server was reachable - keep cached
+					printf("⚠️  Could not verify registration - using cached state\n\n");
+				}
 			} else {
 				printf("Use ServerSetup screen to register device\n\n");
+				// Device not registered - show status
+				ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
 			}
 		} else {
-			printf("❌ Cannot reach server at %s:%d\n\n",
-			       API_SERVER_HOST, API_SERVER_PORT);
+			printf("❌ Cannot reach server at %s:%d\n", API_SERVER_HOST, API_SERVER_PORT);
+			api_config_t *cfg = api_get_config();
+			if (cfg->is_registered) {
+				printf("   Using cached registration (offline mode)\n\n");
+				// Server offline but we have cached registration
+				ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
+			} else {
+				printf("   Device not registered\n\n");
+				// Not registered and can't reach server
+				ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
+			}
 		}
 	}
 

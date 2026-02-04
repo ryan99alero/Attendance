@@ -73,6 +73,8 @@ class Device extends Model
         'config_version',
         // Offline alerting
         'offline_alerted_at',
+        // Remote commands
+        'reboot_requested',
     ];
 
     /**

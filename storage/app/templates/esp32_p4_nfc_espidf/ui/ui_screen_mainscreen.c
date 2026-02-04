@@ -8,6 +8,7 @@
 lv_obj_t *ui_MainScreen_Label_MainScreen_Label_SettingsButtonLabel;
 lv_obj_t *ui_MainScreen_Button_MainScreen_Button_SettingsButton;
 lv_obj_t *ui_MainScreen_Container_bottombarcontainer;
+lv_obj_t *ui_MainScreen_Textarea_ClockStatusInput;
 lv_obj_t *ui_MainScreen_Textarea_PunchInfoInput;
 lv_obj_t *ui_MainScreen_Textarea_EmployeeInfoInput;
 lv_obj_t *ui_MainScreen_Label_MainScreen_Label_datelabel;
@@ -19,7 +20,7 @@ lv_obj_t *ui_MainScreen_Label_neticonlabel;
 lv_obj_t *ui_MainScreen_Container_MainScreen_Container_groupLeftContainer;
 lv_obj_t *ui_MainScreen_Container_topbarContainer;
 lv_obj_t *ui_Screen_MainScreen;
-lv_obj_t *ui_screen_mainscreen = NULL;lv_obj_t *ui_mainscreen_container_topbarcontainer = NULL;lv_obj_t *ui_mainscreen_container_groupleftcontainer = NULL;lv_obj_t *ui_mainscreen_label_neticonlabel = NULL;lv_obj_t *ui_mainscreen_label_bluetoothiconlabel = NULL;lv_obj_t *ui_mainscreen_label_machinenamelabel = NULL;lv_obj_t *ui_mainscreen_container_grouprightcontainer = NULL;lv_obj_t *ui_mainscreen_label_timelabel = NULL;lv_obj_t *ui_mainscreen_label_datelabel = NULL;lv_obj_t *ui_mainscreen_textarea_employeeinfoinput = NULL;lv_obj_t *ui_mainscreen_textarea_punchinfoinput = NULL;lv_obj_t *ui_mainscreen_container_bottombarcontainer = NULL;lv_obj_t *ui_mainscreen_button_settingsbutton = NULL;lv_obj_t *ui_mainscreen_label_settingsbuttonlabel = NULL;
+lv_obj_t *ui_screen_mainscreen = NULL;lv_obj_t *ui_mainscreen_container_topbarcontainer = NULL;lv_obj_t *ui_mainscreen_container_groupleftcontainer = NULL;lv_obj_t *ui_mainscreen_label_neticonlabel = NULL;lv_obj_t *ui_mainscreen_label_bluetoothiconlabel = NULL;lv_obj_t *ui_mainscreen_label_machinenamelabel = NULL;lv_obj_t *ui_mainscreen_container_grouprightcontainer = NULL;lv_obj_t *ui_mainscreen_label_timelabel = NULL;lv_obj_t *ui_mainscreen_label_datelabel = NULL;lv_obj_t *ui_mainscreen_textarea_employeeinfoinput = NULL;lv_obj_t *ui_mainscreen_textarea_punchinfoinput = NULL;lv_obj_t *ui_mainscreen_textarea_clockstatusinput = NULL;lv_obj_t *ui_mainscreen_container_bottombarcontainer = NULL;lv_obj_t *ui_mainscreen_button_settingsbutton = NULL;lv_obj_t *ui_mainscreen_label_settingsbuttonlabel = NULL;
 // event funtions
 void ui_event_mainscreen_textarea_employeeinfoinput( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -30,6 +31,14 @@ if ( event_code == LV_EVENT_CLICKED) {
 }
 
 void ui_event_mainscreen_textarea_punchinfoinput( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+if ( event_code == LV_EVENT_CLICKED) {
+      PunchInfo( e );
+}
+}
+
+void ui_event_mainscreen_textarea_clockstatusinput( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
 
 if ( event_code == LV_EVENT_CLICKED) {
@@ -151,7 +160,8 @@ lv_obj_set_x( ui_mainscreen_textarea_employeeinfoinput, -9 );
 lv_obj_set_y( ui_mainscreen_textarea_employeeinfoinput, -156 );
 lv_obj_set_align( ui_mainscreen_textarea_employeeinfoinput, LV_ALIGN_CENTER );
 lv_textarea_set_placeholder_text(ui_mainscreen_textarea_employeeinfoinput,"Punch Recorded First Last");
-lv_obj_add_flag( ui_mainscreen_textarea_employeeinfoinput, LV_OBJ_FLAG_HIDDEN );   /// Hidden by default
+lv_obj_add_flag( ui_mainscreen_textarea_employeeinfoinput, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_remove_flag( ui_mainscreen_textarea_employeeinfoinput, LV_OBJ_FLAG_CLICKABLE );    /// Flags
 lv_obj_set_style_text_align(ui_mainscreen_textarea_employeeinfoinput, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_mainscreen_textarea_employeeinfoinput, &lv_font_montserrat_48, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_bg_color(ui_mainscreen_textarea_employeeinfoinput, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
@@ -167,8 +177,9 @@ lv_obj_set_height( ui_mainscreen_textarea_punchinfoinput, LV_SIZE_CONTENT);   //
 lv_obj_set_x( ui_mainscreen_textarea_punchinfoinput, -9 );
 lv_obj_set_y( ui_mainscreen_textarea_punchinfoinput, -156 );
 lv_obj_set_align( ui_mainscreen_textarea_punchinfoinput, LV_ALIGN_CENTER );
-lv_textarea_set_placeholder_text(ui_mainscreen_textarea_punchinfoinput,"01/30/2026\n10:52 AM");
-lv_obj_add_flag( ui_mainscreen_textarea_punchinfoinput, LV_OBJ_FLAG_HIDDEN );   /// Hidden by default
+lv_textarea_set_placeholder_text(ui_mainscreen_textarea_punchinfoinput,"01/30/2026\\\\n10:52 AM");
+lv_obj_add_flag( ui_mainscreen_textarea_punchinfoinput, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_remove_flag( ui_mainscreen_textarea_punchinfoinput, LV_OBJ_FLAG_CLICKABLE );    /// Flags
 lv_obj_set_style_text_align(ui_mainscreen_textarea_punchinfoinput, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_mainscreen_textarea_punchinfoinput, &lv_font_montserrat_48, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_bg_color(ui_mainscreen_textarea_punchinfoinput, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
@@ -177,6 +188,24 @@ lv_obj_set_style_border_color(ui_mainscreen_textarea_punchinfoinput, lv_color_he
 lv_obj_set_style_border_opa(ui_mainscreen_textarea_punchinfoinput, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 lv_obj_set_style_text_font(ui_mainscreen_textarea_punchinfoinput, &lv_font_montserrat_14, LV_PART_TEXTAREA_PLACEHOLDER| LV_STATE_DEFAULT);
+
+ui_mainscreen_textarea_clockstatusinput = lv_textarea_create(ui_screen_mainscreen);
+lv_obj_set_width( ui_mainscreen_textarea_clockstatusinput, 465);
+lv_obj_set_height( ui_mainscreen_textarea_clockstatusinput, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_mainscreen_textarea_clockstatusinput, -9 );
+lv_obj_set_y( ui_mainscreen_textarea_clockstatusinput, -156 );
+lv_obj_set_align( ui_mainscreen_textarea_clockstatusinput, LV_ALIGN_CENTER );
+lv_textarea_set_placeholder_text(ui_mainscreen_textarea_clockstatusinput,"Clock XYZ_Name Not Authorized");
+lv_obj_add_flag( ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_remove_flag( ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_CLICKABLE );    /// Flags
+lv_obj_set_style_text_align(ui_mainscreen_textarea_clockstatusinput, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_mainscreen_textarea_clockstatusinput, &lv_font_montserrat_48, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_bg_color(ui_mainscreen_textarea_clockstatusinput, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_mainscreen_textarea_clockstatusinput, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_border_color(ui_mainscreen_textarea_clockstatusinput, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_border_opa(ui_mainscreen_textarea_clockstatusinput, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+lv_obj_set_style_text_font(ui_mainscreen_textarea_clockstatusinput, &lv_font_montserrat_14, LV_PART_TEXTAREA_PLACEHOLDER| LV_STATE_DEFAULT);
 
 ui_mainscreen_container_bottombarcontainer = lv_obj_create(ui_screen_mainscreen);
 lv_obj_remove_style_all(ui_mainscreen_container_bottombarcontainer);
@@ -215,6 +244,7 @@ lv_obj_set_style_text_font(ui_mainscreen_label_settingsbuttonlabel, &ui_font_Ico
 
 lv_obj_add_event_cb(ui_mainscreen_textarea_employeeinfoinput, ui_event_mainscreen_textarea_employeeinfoinput, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_mainscreen_textarea_punchinfoinput, ui_event_mainscreen_textarea_punchinfoinput, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_mainscreen_textarea_clockstatusinput, ui_event_mainscreen_textarea_clockstatusinput, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_mainscreen_button_settingsbutton, ui_event_mainscreen_button_settingsbutton, LV_EVENT_ALL, NULL);
 ui_Screen_MainScreen = ui_screen_mainscreen;
 ui_MainScreen_Container_topbarContainer = ui_mainscreen_container_topbarcontainer;
@@ -227,6 +257,7 @@ ui_MainScreen_Label_MainScreen_Label_timelabel = ui_mainscreen_label_timelabel;
 ui_MainScreen_Label_MainScreen_Label_datelabel = ui_mainscreen_label_datelabel;
 ui_MainScreen_Textarea_EmployeeInfoInput = ui_mainscreen_textarea_employeeinfoinput;
 ui_MainScreen_Textarea_PunchInfoInput = ui_mainscreen_textarea_punchinfoinput;
+ui_MainScreen_Textarea_ClockStatusInput = ui_mainscreen_textarea_clockstatusinput;
 ui_MainScreen_Container_bottombarcontainer = ui_mainscreen_container_bottombarcontainer;
 ui_MainScreen_Button_MainScreen_Button_SettingsButton = ui_mainscreen_button_settingsbutton;
 ui_MainScreen_Label_MainScreen_Label_SettingsButtonLabel = ui_mainscreen_label_settingsbuttonlabel;
@@ -260,6 +291,8 @@ ui_MainScreen_Textarea_EmployeeInfoInput= NULL;
 ui_mainscreen_textarea_employeeinfoinput= NULL;
 ui_MainScreen_Textarea_PunchInfoInput= NULL;
 ui_mainscreen_textarea_punchinfoinput= NULL;
+ui_MainScreen_Textarea_ClockStatusInput= NULL;
+ui_mainscreen_textarea_clockstatusinput= NULL;
 ui_MainScreen_Container_bottombarcontainer= NULL;
 ui_mainscreen_container_bottombarcontainer= NULL;
 ui_MainScreen_Button_MainScreen_Button_SettingsButton= NULL;

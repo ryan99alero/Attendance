@@ -139,7 +139,7 @@ ui_setupconfigurations_label_systemsetuplabel = lv_label_create(ui_setupconfigur
 lv_obj_set_width( ui_setupconfigurations_label_systemsetuplabel, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_setupconfigurations_label_systemsetuplabel, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_setupconfigurations_label_systemsetuplabel, LV_ALIGN_CENTER );
-lv_label_set_text(ui_setupconfigurations_label_systemsetuplabel,"System Setup");
+lv_label_set_text(ui_setupconfigurations_label_systemsetuplabel,"Device Setup");
 
 ui_setupconfigurations_button_networksettingsbutton = lv_button_create(ui_setupconfigurations_container_menubuttonscontainer);
 lv_obj_set_width( ui_setupconfigurations_button_networksettingsbutton, 350);

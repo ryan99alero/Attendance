@@ -56,6 +56,15 @@ typedef struct {
     int timezone_offset;        // Timezone offset in hours from UTC
 } punch_data_t;
 
+// Health check result data
+typedef struct {
+    bool server_reachable;              // True if server responded
+    bool device_found;                  // True if device exists on server
+    char registration_status[16];       // "pending", "approved", "rejected", "suspended"
+    bool is_approved;                   // True if registration_status == "approved"
+    bool reboot_requested;              // True if server wants device to reboot
+} health_check_result_t;
+
 // API client functions
 
 /**
@@ -92,6 +101,21 @@ esp_err_t api_register_device(const char *mac_address, const char *device_name);
 esp_err_t api_check_status(void);
 
 /**
+ * Verify registration is still valid with server
+ * Call after loading config from NVS to ensure device wasn't deleted from server.
+ * If server returns 404 (not found) or 401 (invalid token), clears local registration.
+ * If server is unreachable, keeps cached registration (offline-first).
+ * @return ESP_OK if still registered, ESP_ERR_NOT_FOUND if deleted, ESP_ERR_TIMEOUT if unreachable
+ */
+esp_err_t api_verify_registration(void);
+
+/**
+ * Clear registration data from memory and NVS
+ * Resets device_id, api_token, is_registered, is_approved
+ */
+void api_clear_registration(void);
+
+/**
  * Send punch/time record to server
  * @param punch_data Punch data structure
  * @return ESP_OK on success
@@ -99,10 +123,17 @@ esp_err_t api_check_status(void);
 esp_err_t api_send_punch(const punch_data_t *punch_data);
 
 /**
- * Health check - verify server is reachable
+ * Health check - verify server is reachable (simple version)
  * @return ESP_OK if server is healthy
  */
 esp_err_t api_health_check(void);
+
+/**
+ * Health check with full status - gets device status and commands from server
+ * @param result Pointer to health_check_result_t structure to fill
+ * @return ESP_OK if server responded (check result->device_found for device status)
+ */
+esp_err_t api_health_check_full(health_check_result_t *result);
 
 /**
  * Get current server time (for clock synchronization)

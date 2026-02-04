@@ -5,9 +5,11 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
 use App\Models\Department;
-use App\Models\Shift; // Added for shift_id dropdown
+use App\Models\Shift;
 use Filament\Resources\Resource;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Tabs;
+use Filament\Forms\Components\Section;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
@@ -29,113 +31,220 @@ class EmployeeResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            // Basic Personal Information
-            TextInput::make('first_name')
-                ->label('First Name')
-                ->required(),
-            TextInput::make('last_name')
-                ->label('Last Name')
-                ->required(),
-            TextInput::make('email')
-                ->label('Email')
-                ->nullable(),
-            TextInput::make('phone')
-                ->label('Phone')
-                ->nullable(),
-            TextInput::make('external_id')
-                ->label('External ID')
-                ->nullable(),
+            Tabs::make('Employee')
+                ->tabs([
+                    // =====================================================
+                    // TAB 1: PERSONAL INFORMATION
+                    // =====================================================
+                    Tabs\Tab::make('Personal')
+                        ->icon('heroicon-o-user')
+                        ->schema([
+                            Section::make('Basic Information')
+                                ->description('Employee name and contact details')
+                                ->schema([
+                                    TextInput::make('first_name')
+                                        ->label('First Name')
+                                        ->required(),
+                                    TextInput::make('last_name')
+                                        ->label('Last Name')
+                                        ->required(),
+                                    TextInput::make('email')
+                                        ->label('Email')
+                                        ->email()
+                                        ->nullable(),
+                                    TextInput::make('phone')
+                                        ->label('Phone')
+                                        ->tel()
+                                        ->nullable(),
+                                    DatePicker::make('birth_date')
+                                        ->label('Date of Birth')
+                                        ->nullable(),
+                                    TextInput::make('external_id')
+                                        ->label('External ID / Payroll ID')
+                                        ->nullable()
+                                        ->helperText('External system identifier'),
+                                ])
+                                ->columns(3),
 
-            // Address Information
-            TextInput::make('address')
-                ->label('Address')
-                ->nullable(),
-            TextInput::make('city')
-                ->label('City')
-                ->nullable(),
-            TextInput::make('state')
-                ->label('State')
-                ->nullable(),
-            TextInput::make('zip')
-                ->label('ZIP Code')
-                ->nullable(),
-            TextInput::make('country')
-                ->label('Country')
-                ->nullable(),
+                            Section::make('Address')
+                                ->description('Employee mailing address')
+                                ->schema([
+                                    TextInput::make('address')
+                                        ->label('Street Address')
+                                        ->nullable()
+                                        ->columnSpan(2),
+                                    TextInput::make('address2')
+                                        ->label('Address Line 2')
+                                        ->nullable()
+                                        ->helperText('Apt, suite, unit, etc.'),
+                                    TextInput::make('city')
+                                        ->label('City')
+                                        ->nullable(),
+                                    TextInput::make('state')
+                                        ->label('State')
+                                        ->nullable(),
+                                    TextInput::make('zip')
+                                        ->label('ZIP Code')
+                                        ->nullable(),
+                                    TextInput::make('country')
+                                        ->label('Country')
+                                        ->nullable(),
+                                ])
+                                ->columns(3)
+                                ->collapsed(),
 
-            // Employment Dates
-            DatePicker::make('date_of_hire')
-                ->label('Date of Hire')
-                ->nullable(),
-            DatePicker::make('seniority_date')
-                ->label('Seniority Date')
-                ->nullable(),
-            DatePicker::make('termination_date')
-                ->label('Termination Date')
-                ->nullable(),
+                            Section::make('Emergency Contact')
+                                ->description('Emergency contact information')
+                                ->schema([
+                                    TextInput::make('emergency_contact')
+                                        ->label('Contact Name')
+                                        ->nullable(),
+                                    TextInput::make('emergency_phone')
+                                        ->label('Contact Phone')
+                                        ->tel()
+                                        ->nullable(),
+                                ])
+                                ->columns(2)
+                                ->collapsed(),
 
-            // Organizational Assignment
-            Select::make('department_id')
-                ->label('Department')
-                ->options(Department::all()->pluck('name', 'id'))
-                ->nullable()
-                ->searchable(),
-            Select::make('shift_schedule_id')
-                ->label('Shift Schedule')
-                ->options(\App\Models\ShiftSchedule::with(['shift'])
-                    ->get()
-                    ->mapWithKeys(function ($schedule) {
-                        $shiftName = $schedule->shift ? $schedule->shift->shift_name : 'No Shift';
-                        return [$schedule->id => "{$schedule->schedule_name} ({$shiftName})"];
-                    })
-                    ->toArray())
-                ->searchable()
-                ->nullable(),
-            Select::make('round_group_id')
-                ->label('Payroll Rounding')
-                ->options(\App\Models\RoundGroup::all()->pluck('group_name', 'id')) // Use the correct model and fields
-                ->nullable()
-                ->searchable(),
+                            Section::make('Notes')
+                                ->schema([
+                                    \Filament\Forms\Components\Textarea::make('notes')
+                                        ->label('Employee Notes')
+                                        ->nullable()
+                                        ->rows(3)
+                                        ->columnSpanFull(),
+                                ])
+                                ->collapsed(),
+                        ]),
 
-            // Pay Information
-            Select::make('pay_type')
-                ->label('Pay Type')
-                ->options([
-                    'hourly' => 'Hourly',
-                    'salary' => 'Salary',
-                    'contract' => 'Contract',
+                    // =====================================================
+                    // TAB 2: EMPLOYMENT
+                    // =====================================================
+                    Tabs\Tab::make('Employment')
+                        ->icon('heroicon-o-briefcase')
+                        ->schema([
+                            Section::make('Employment Dates')
+                                ->description('Key dates for employment history')
+                                ->schema([
+                                    DatePicker::make('date_of_hire')
+                                        ->label('Date of Hire')
+                                        ->nullable()
+                                        ->helperText('Original hire date'),
+                                    DatePicker::make('seniority_date')
+                                        ->label('Seniority Date')
+                                        ->nullable()
+                                        ->helperText('Date used for vacation/benefits calculations'),
+                                    DatePicker::make('termination_date')
+                                        ->label('Termination Date')
+                                        ->nullable()
+                                        ->helperText('Leave empty if currently employed'),
+                                ])
+                                ->columns(3),
+
+                            Section::make('Department & Schedule')
+                                ->description('Organizational assignment and work schedule')
+                                ->schema([
+                                    Select::make('department_id')
+                                        ->label('Department')
+                                        ->relationship('department', 'name')
+                                        ->searchable()
+                                        ->preload()
+                                        ->nullable(),
+                                    Select::make('shift_schedule_id')
+                                        ->label('Shift Schedule')
+                                        ->options(\App\Models\ShiftSchedule::with(['shift'])
+                                            ->get()
+                                            ->mapWithKeys(function ($schedule) {
+                                                $shiftName = $schedule->shift ? $schedule->shift->shift_name : 'No Shift';
+                                                return [$schedule->id => "{$schedule->schedule_name} ({$shiftName})"];
+                                            })
+                                            ->toArray())
+                                        ->searchable()
+                                        ->nullable(),
+                                ])
+                                ->columns(2),
+
+                            Section::make('Employment Status')
+                                ->schema([
+                                    Toggle::make('is_active')
+                                        ->label('Active Employee')
+                                        ->default(true)
+                                        ->helperText('Inactive employees cannot clock in'),
+                                    Toggle::make('full_time')
+                                        ->label('Full Time')
+                                        ->default(false)
+                                        ->helperText('Full-time vs part-time classification'),
+                                ])
+                                ->columns(2),
+                        ]),
+
+                    // =====================================================
+                    // TAB 3: PAY & OVERTIME
+                    // =====================================================
+                    Tabs\Tab::make('Pay & Overtime')
+                        ->icon('heroicon-o-currency-dollar')
+                        ->schema([
+                            Section::make('Pay Information')
+                                ->description('Compensation type and rate')
+                                ->schema([
+                                    Select::make('pay_type')
+                                        ->label('Pay Type')
+                                        ->options([
+                                            'hourly' => 'Hourly',
+                                            'salary' => 'Salary',
+                                            'contract' => 'Contract',
+                                        ])
+                                        ->default('hourly')
+                                        ->required(),
+                                    TextInput::make('pay_rate')
+                                        ->label('Pay Rate')
+                                        ->numeric()
+                                        ->prefix('$')
+                                        ->step(0.01)
+                                        ->nullable()
+                                        ->helperText('Hourly rate or salary amount'),
+                                ])
+                                ->columns(2),
+
+                            Section::make('Overtime Settings')
+                                ->description('Configure overtime calculation rules')
+                                ->schema([
+                                    Toggle::make('overtime_exempt')
+                                        ->label('Overtime Exempt')
+                                        ->default(false)
+                                        ->helperText('Exempt employees do not receive overtime pay')
+                                        ->columnSpanFull(),
+                                    TextInput::make('overtime_rate')
+                                        ->label('Overtime Rate Multiplier')
+                                        ->numeric()
+                                        ->step(0.001)
+                                        ->default(1.500)
+                                        ->helperText('e.g., 1.5 = time and a half'),
+                                    TextInput::make('double_time_threshold')
+                                        ->label('Double Time Threshold (Hours)')
+                                        ->numeric()
+                                        ->step(0.01)
+                                        ->nullable()
+                                        ->helperText('Hours after which double time applies'),
+                                ])
+                                ->columns(2),
+
+                            Section::make('Payroll Rounding')
+                                ->description('Time rounding rules for this employee')
+                                ->schema([
+                                    Select::make('round_group_id')
+                                        ->label('Rounding Group')
+                                        ->relationship('roundGroup', 'group_name')
+                                        ->searchable()
+                                        ->preload()
+                                        ->nullable()
+                                        ->helperText('Leave empty to use company default'),
+                                ]),
+                        ]),
                 ])
-                ->default('hourly'),
-            TextInput::make('pay_rate')
-                ->label('Pay Rate')
-                ->numeric()
-                ->step(0.01)
-                ->nullable(),
-
-            // Overtime Settings
-            TextInput::make('overtime_rate')
-                ->label('Overtime Rate Multiplier')
-                ->numeric()
-                ->step(0.001)
-                ->default(1.500),
-            TextInput::make('double_time_threshold')
-                ->label('Double Time Threshold (Hours)')
-                ->numeric()
-                ->step(0.01)
-                ->nullable(),
-
-            // Note: Vacation management is now handled through the configurable vacation system
-
-            // Status Flags
-            Toggle::make('is_active')
-                ->label('Active')
-                ->default(true),
-            Toggle::make('full_time')
-                ->label('Full Time')
-                ->default(false),
-            Toggle::make('overtime_exempt')
-                ->label('Overtime Exempt')
-                ->default(false),
+                ->columnSpanFull()
+                ->persistTabInQueryString(),
         ]);
     }
 

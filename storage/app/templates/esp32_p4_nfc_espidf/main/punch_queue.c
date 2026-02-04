@@ -463,8 +463,8 @@ static void sync_task(void *pvParameters) {
                 api_config_t *cfg = api_get_config();
                 if (cfg->is_registered && api_health_check() == ESP_OK) {
                     s_server_online = true;
-                    ui_hide_server_offline_alert();
-                    ESP_LOGI(TAG, "Server back online (health check) - alert cleared");
+                    ui_set_clock_status(CLOCK_STATUS_OK, NULL);
+                    ESP_LOGI(TAG, "Server back online (health check) - status cleared");
                 }
             }
             continue;
@@ -499,25 +499,53 @@ static void sync_task(void *pvParameters) {
                      (unsigned long)punch->id, punch->credential_value, punch->event_time);
 
             // Send to API
-            if (api_send_punch(&punch_data) == ESP_OK) {
+            esp_err_t punch_result = api_send_punch(&punch_data);
+
+            if (punch_result == ESP_OK) {
                 punch_queue_mark_synced(punch->id);
                 synced++;
 
-                // Server is reachable - hide offline alert if it was shown
+                // Server is reachable and clock is authorized - clear any status
                 if (!s_server_online) {
                     s_server_online = true;
-                    ui_hide_server_offline_alert();
-                    ESP_LOGI(TAG, "Server back online - alert cleared");
                 }
+                ui_set_clock_status(CLOCK_STATUS_OK, NULL);
+                ESP_LOGI(TAG, "Punch synced successfully - status cleared");
             } else {
                 punch_queue_mark_failed(punch->id);
                 failed++;
 
-                // Server unreachable - show offline alert
-                if (s_server_online) {
-                    s_server_online = false;
-                    ui_show_server_offline_alert();
-                    ESP_LOGW(TAG, "Server offline - alert shown");
+                // Handle different error types with specific UI messages
+                if (punch_result == ESP_ERR_TIMEOUT) {
+                    // Server completely unreachable (network error)
+                    if (s_server_online) {
+                        s_server_online = false;
+                        ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
+                        ESP_LOGW(TAG, "Server offline - showing 'Server Offline' alert");
+                    }
+                } else if (punch_result == ESP_ERR_NOT_FOUND) {
+                    // Device was deleted from server (404/401)
+                    s_server_online = true;  // Server IS reachable, just device gone
+                    api_clear_registration();
+                    ui_set_clock_status(CLOCK_STATUS_NOT_REGISTERED, NULL);
+                    ESP_LOGW(TAG, "Device deleted - showing 'Not Registered' alert");
+                    // Stop trying - device needs to re-register
+                    break;
+                } else if (punch_result == ESP_ERR_INVALID_STATE) {
+                    // Device not authorized (403 - pending/rejected/suspended)
+                    s_server_online = true;  // Server IS reachable
+                    api_config_t *cfg = api_get_config();
+                    ui_set_clock_status(CLOCK_STATUS_NOT_AUTHORIZED, cfg->device_name);
+                    ESP_LOGW(TAG, "Device not authorized - showing 'Not Authorized' alert");
+                    // Don't clear registration, just stop syncing
+                    break;
+                } else {
+                    // Generic failure - treat as server issue
+                    if (s_server_online) {
+                        s_server_online = false;
+                        ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
+                        ESP_LOGW(TAG, "Unknown error - showing 'Server Offline' alert");
+                    }
                 }
 
                 // If too many failures, back off
@@ -568,11 +596,16 @@ void punch_queue_set_server_status(bool online) {
     if (online != s_server_online) {
         s_server_online = online;
         if (online) {
-            ui_hide_server_offline_alert();
-            ESP_LOGI(TAG, "Server marked online - alert cleared");
+            // Only clear if current status is server offline
+            // Don't clear NOT_REGISTERED or NOT_AUTHORIZED statuses
+            clock_status_t current = ui_get_clock_status();
+            if (current == CLOCK_STATUS_SERVER_OFFLINE) {
+                ui_set_clock_status(CLOCK_STATUS_OK, NULL);
+                ESP_LOGI(TAG, "Server marked online - status cleared");
+            }
         } else {
-            ui_show_server_offline_alert();
-            ESP_LOGW(TAG, "Server marked offline - alert shown");
+            ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
+            ESP_LOGW(TAG, "Server marked offline - showing 'Server Offline' alert");
         }
     }
 }

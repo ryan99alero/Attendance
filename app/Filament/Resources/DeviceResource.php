@@ -66,15 +66,15 @@ class DeviceResource extends Resource
                     Select::make('timezone')
                         ->label('Timezone')
                         ->options([
-                            'America/Anchorage'    => 'Alaska Time (AKST/AKDT)',
-                            'America/Puerto_Rico'  => 'Atlantic Time (AST)',
-                            'America/Chicago'      => 'Central Time (CST/CDT)',
-                            'Pacific/Guam'         => 'Chamorro Time (ChST)',
-                            'America/New_York'     => 'Eastern Time (EST/EDT)',
-                            'America/Adak'         => 'Hawaii–Aleutian Time (HST/HDT)',
-                            'America/Denver'       => 'Mountain Time (MST/MDT)',
-                            'America/Los_Angeles'  => 'Pacific Time (PST/PDT)',
-                            'Pacific/Pago_Pago'    => 'Samoa Time (SST)',
+                            'Alaska Time (AKST/AKDT)'           => 'Alaska Time (AKST/AKDT)',
+                            'Atlantic Time (AST)'               => 'Atlantic Time (AST)',
+                            'Central Time (CST/CDT)'            => 'Central Time (CST/CDT)',
+                            'Chamorro Time (ChST)'              => 'Chamorro Time (ChST)',
+                            'Eastern Time (EST/EDT)'            => 'Eastern Time (EST/EDT)',
+                            'Hawaii-Aleutian Time (HST/HDT)'    => 'Hawaii-Aleutian Time (HST/HDT)',
+                            'Mountain Time (MST/MDT)'           => 'Mountain Time (MST/MDT)',
+                            'Pacific Time (PST/PDT)'            => 'Pacific Time (PST/PDT)',
+                            'Samoa Time (SST)'                  => 'Samoa Time (SST)',
                         ])
                         ->nullable()
                         ->helperText('Device timezone for time recording'),

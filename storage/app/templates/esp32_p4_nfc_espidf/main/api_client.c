@@ -381,6 +381,139 @@ esp_err_t api_check_status(void) {
     return ret;
 }
 
+void api_clear_registration(void) {
+    ESP_LOGW(TAG, "========== CLEARING REGISTRATION ==========");
+
+    // Clear in-memory config
+    memset(g_api_config.api_token, 0, sizeof(g_api_config.api_token));
+    memset(g_api_config.device_id, 0, sizeof(g_api_config.device_id));
+    g_api_config.is_registered = false;
+    g_api_config.is_approved = false;
+
+    // Clear from NVS
+    nvs_handle_t nvs_handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE_API, NVS_READWRITE, &nvs_handle);
+    if (ret == ESP_OK) {
+        nvs_set_str(nvs_handle, "api_token", "");
+        nvs_set_str(nvs_handle, "device_id", "");
+        nvs_set_u8(nvs_handle, "registered", 0);
+        nvs_set_u8(nvs_handle, "approved", 0);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+        ESP_LOGI(TAG, "Registration cleared from NVS");
+    } else {
+        ESP_LOGE(TAG, "Failed to open NVS for clearing: %s", esp_err_to_name(ret));
+    }
+
+    ESP_LOGW(TAG, "========== REGISTRATION CLEARED ==========");
+}
+
+esp_err_t api_verify_registration(void) {
+    // If not registered, nothing to verify
+    if (!g_api_config.is_registered || strlen(g_api_config.api_token) == 0) {
+        ESP_LOGI(TAG, "Not registered, nothing to verify");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Verifying registration with server...");
+    ESP_LOGI(TAG, "  Device ID: %s", g_api_config.device_id);
+
+    // Build URL for status check
+    char url[256];
+    snprintf(url, sizeof(url), "http://%s:%d/api/v1/timeclock/status",
+             g_api_config.server_host, g_api_config.server_port);
+
+    // Clear response buffer
+    response_buffer_len = 0;
+    response_buffer[0] = '\0';
+
+    // Configure HTTP client
+    esp_http_client_config_t config = {
+        .url = url,
+        .event_handler = http_event_handler,
+        .timeout_ms = 10000,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL) {
+        ESP_LOGE(TAG, "Failed to init HTTP client");
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Set headers - must include device ID and bearer token
+    char auth_header[512];
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", g_api_config.api_token);
+    esp_http_client_set_header(client, "Authorization", auth_header);
+    esp_http_client_set_header(client, "X-Device-ID", g_api_config.device_id);
+
+    // Perform GET request - note: ESP HTTP client may return error for non-2xx status codes
+    esp_err_t err = esp_http_client_perform(client);
+    esp_err_t ret = ESP_FAIL;
+
+    // Always check status code, even if perform returned an error
+    // (ESP HTTP client returns error for 4xx/5xx responses)
+    int status_code = esp_http_client_get_status_code(client);
+    ESP_LOGI(TAG, "Verify registration response: %d (perform err: %s)", status_code, esp_err_to_name(err));
+
+    // Handle based on status code (not perform error)
+    if (status_code == 200) {
+        // Device exists on server - parse response for approval status
+        if (response_buffer_len > 0) {
+            cJSON *response_json = cJSON_Parse(response_buffer);
+            if (response_json != NULL) {
+                cJSON *success = cJSON_GetObjectItem(response_json, "success");
+                if (success && cJSON_IsTrue(success)) {
+                    cJSON *data = cJSON_GetObjectItem(response_json, "data");
+                    if (data) {
+                        cJSON *reg_status = cJSON_GetObjectItem(data, "registration_status");
+                        cJSON *is_approved = cJSON_GetObjectItem(data, "is_approved");
+
+                        if (reg_status && cJSON_IsString(reg_status)) {
+                            ESP_LOGI(TAG, "Registration status: %s", reg_status->valuestring);
+                            if (strcmp(reg_status->valuestring, "approved") == 0) {
+                                g_api_config.is_approved = true;
+                            } else {
+                                g_api_config.is_approved = false;
+                            }
+                        }
+
+                        if (is_approved && cJSON_IsBool(is_approved)) {
+                            g_api_config.is_approved = cJSON_IsTrue(is_approved);
+                        }
+                    }
+
+                    ESP_LOGI(TAG, "✅ Registration verified - device exists on server");
+                    ret = ESP_OK;
+                    // Save updated approval status
+                    api_save_config();
+                }
+                cJSON_Delete(response_json);
+            }
+        }
+    } else if (status_code == 404 || status_code == 400) {
+        // Device not found on server - was deleted
+        ESP_LOGW(TAG, "❌ Device not found on server (status %d) - clearing registration", status_code);
+        api_clear_registration();
+        ret = ESP_ERR_NOT_FOUND;
+    } else if (status_code == 401) {
+        // Token invalid or expired - device may have been re-registered
+        ESP_LOGW(TAG, "❌ Token invalid/expired (status 401) - clearing registration");
+        api_clear_registration();
+        ret = ESP_ERR_NOT_FOUND;
+    } else if (status_code == 0 && err != ESP_OK) {
+        // No response at all - network error, keep cached registration (offline-first)
+        ESP_LOGW(TAG, "⚠️ Server unreachable (%s) - keeping cached registration", esp_err_to_name(err));
+        ret = ESP_ERR_TIMEOUT;
+    } else {
+        // Other error - keep registration but report failure
+        ESP_LOGW(TAG, "⚠️ Unexpected status %d - keeping cached registration", status_code);
+        ret = ESP_FAIL;
+    }
+
+    esp_http_client_cleanup(client);
+    return ret;
+}
+
 esp_err_t api_send_punch(const punch_data_t *punch_data) {
     if (punch_data == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -436,18 +569,33 @@ esp_err_t api_send_punch(const punch_data_t *punch_data) {
     esp_err_t err = esp_http_client_perform(client);
     esp_err_t ret = ESP_FAIL;
 
-    if (err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(client);
-        ESP_LOGI(TAG, "📥 Response status: %d", status_code);
+    // Check status code even if perform returned error (ESP HTTP returns error for 4xx/5xx)
+    int status_code = esp_http_client_get_status_code(client);
+    ESP_LOGI(TAG, "📥 Response status: %d (perform: %s)", status_code, esp_err_to_name(err));
 
-        if (status_code == 200) {
-            ESP_LOGI(TAG, "✅ Punch recorded successfully!");
-            ret = ESP_OK;
-        } else {
-            ESP_LOGE(TAG, "❌ Punch failed with status %d", status_code);
-        }
+    if (status_code == 200) {
+        ESP_LOGI(TAG, "✅ Punch recorded successfully!");
+        ret = ESP_OK;
+    } else if (status_code == 404) {
+        // Device not found on server - was deleted
+        ESP_LOGW(TAG, "❌ Device not found (404) - clock was deleted from server");
+        ret = ESP_ERR_NOT_FOUND;
+    } else if (status_code == 403) {
+        // Device not authorized (pending, rejected, or suspended)
+        ESP_LOGW(TAG, "❌ Device not authorized (403) - clock not approved");
+        ret = ESP_ERR_INVALID_STATE;
+    } else if (status_code == 401) {
+        // Token invalid/expired
+        ESP_LOGW(TAG, "❌ Token invalid (401) - re-registration required");
+        ret = ESP_ERR_NOT_FOUND;
+    } else if (status_code == 0 && err != ESP_OK) {
+        // No response - server unreachable
+        ESP_LOGE(TAG, "❌ Server unreachable - network error");
+        ret = ESP_ERR_TIMEOUT;
     } else {
-        ESP_LOGE(TAG, "❌ HTTP request failed: %s", esp_err_to_name(err));
+        // Other error
+        ESP_LOGE(TAG, "❌ Punch failed with status %d", status_code);
+        ret = ESP_FAIL;
     }
 
     esp_http_client_cleanup(client);
@@ -458,12 +606,28 @@ esp_err_t api_send_punch(const punch_data_t *punch_data) {
 }
 
 esp_err_t api_health_check(void) {
+    health_check_result_t result = {0};
+    return api_health_check_full(&result);
+}
+
+esp_err_t api_health_check_full(health_check_result_t *result) {
+    if (result == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Initialize result
+    memset(result, 0, sizeof(health_check_result_t));
+
     // Build URL
     char url[256];
     snprintf(url, sizeof(url), "http://%s:%d/api/v1/timeclock/health",
              g_api_config.server_host, g_api_config.server_port);
 
     ESP_LOGI(TAG, "Health check: %s", url);
+
+    // Clear response buffer
+    response_buffer_len = 0;
+    response_buffer[0] = '\0';
 
     // Configure HTTP client
     esp_http_client_config_t config = {
@@ -474,7 +638,7 @@ esp_err_t api_health_check(void) {
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
-    // If device is registered, include credentials so server can update last_seen_at
+    // If device is registered, include credentials so server can return device status
     if (g_api_config.is_registered && strlen(g_api_config.api_token) > 0) {
         esp_http_client_set_header(client, "X-Device-Token", g_api_config.api_token);
         esp_http_client_set_header(client, "X-Device-ID", g_api_config.device_id);
@@ -487,13 +651,55 @@ esp_err_t api_health_check(void) {
     if (err == ESP_OK) {
         int status_code = esp_http_client_get_status_code(client);
         if (status_code == 200) {
-            ESP_LOGI(TAG, "✅ Server is healthy (last_seen updated)");
+            result->server_reachable = true;
+            ESP_LOGI(TAG, "✅ Server is healthy");
+
+            // Parse response for device status
+            if (response_buffer_len > 0) {
+                cJSON *json = cJSON_Parse(response_buffer);
+                if (json != NULL) {
+                    // Check for device info in response
+                    cJSON *device = cJSON_GetObjectItem(json, "device");
+                    if (device != NULL) {
+                        result->device_found = true;
+
+                        // Get registration_status
+                        cJSON *reg_status = cJSON_GetObjectItem(device, "registration_status");
+                        if (reg_status && cJSON_IsString(reg_status)) {
+                            strncpy(result->registration_status, reg_status->valuestring,
+                                    sizeof(result->registration_status) - 1);
+                            result->is_approved = (strcmp(reg_status->valuestring, "approved") == 0);
+
+                            // Update global config
+                            g_api_config.is_approved = result->is_approved;
+
+                            ESP_LOGI(TAG, "Device status: %s (approved=%d)",
+                                     result->registration_status, result->is_approved);
+                        }
+
+                        // Check for reboot command
+                        cJSON *reboot = cJSON_GetObjectItem(device, "reboot_requested");
+                        if (reboot && cJSON_IsTrue(reboot)) {
+                            result->reboot_requested = true;
+                            ESP_LOGW(TAG, "⚠️ Server requested reboot!");
+                        }
+                    }
+                    cJSON_Delete(json);
+                }
+            }
             ret = ESP_OK;
+        } else if (status_code == 404) {
+            // Device not found on server
+            result->server_reachable = true;
+            result->device_found = false;
+            ESP_LOGW(TAG, "Device not found on server (404)");
+            ret = ESP_ERR_NOT_FOUND;
         } else {
             ESP_LOGE(TAG, "Health check failed: %d", status_code);
         }
     } else {
         ESP_LOGE(TAG, "Health check request failed: %s", esp_err_to_name(err));
+        ret = ESP_ERR_TIMEOUT;
     }
 
     esp_http_client_cleanup(client);

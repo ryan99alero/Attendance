@@ -999,34 +999,34 @@ static void populate_time_fields(void) {
         if (nvs_get_str(nvs_h, "timezone_name", timezone_name, &tz_len) == ESP_OK) {
             ESP_LOGI(TAG, "Loaded timezone from NVS: %s", timezone_name);
 
-            // Map timezone name to dropdown index
-            // Dropdown options:
-            // 0 - Alaska Time (AKST/AKDT) - America/Anchorage
-            // 1 - Atlantic Time (AST) - America/Puerto_Rico
-            // 2 - Central Time (CST/CDT) - America/Chicago
-            // 3 - Chamorro Time (ChST) - Pacific/Guam
-            // 4 - Eastern Time (EST/EDT) - America/New_York
-            // 5 - Hawaii–Aleutian Time (HST/HDT) - Pacific/Honolulu
-            // 6 - Mountain Time (MST/MDT) - America/Denver
-            // 7 - Pacific Time (PST/PDT) - America/Los_Angeles
-            // 8 - Samoa Time (SST) - Pacific/Pago_Pago
-            if (strstr(timezone_name, "Anchorage") || strstr(timezone_name, "Alaska")) {
+            // Map timezone name to dropdown index using exact string match
+            // Server and ESP32 dropdown both use same display names:
+            // 0 - Alaska Time (AKST/AKDT)
+            // 1 - Atlantic Time (AST)
+            // 2 - Central Time (CST/CDT)
+            // 3 - Chamorro Time (ChST)
+            // 4 - Eastern Time (EST/EDT)
+            // 5 - Hawaii-Aleutian Time (HST/HDT)
+            // 6 - Mountain Time (MST/MDT)
+            // 7 - Pacific Time (PST/PDT)
+            // 8 - Samoa Time (SST)
+            if (strcmp(timezone_name, "Alaska Time (AKST/AKDT)") == 0) {
                 timezone_index = 0;
-            } else if (strstr(timezone_name, "Puerto_Rico") || strstr(timezone_name, "Atlantic")) {
+            } else if (strcmp(timezone_name, "Atlantic Time (AST)") == 0) {
                 timezone_index = 1;
-            } else if (strstr(timezone_name, "Chicago") || strstr(timezone_name, "Central")) {
+            } else if (strcmp(timezone_name, "Central Time (CST/CDT)") == 0) {
                 timezone_index = 2;
-            } else if (strstr(timezone_name, "Guam") || strstr(timezone_name, "Chamorro")) {
+            } else if (strcmp(timezone_name, "Chamorro Time (ChST)") == 0) {
                 timezone_index = 3;
-            } else if (strstr(timezone_name, "New_York") || strstr(timezone_name, "Eastern")) {
+            } else if (strcmp(timezone_name, "Eastern Time (EST/EDT)") == 0) {
                 timezone_index = 4;
-            } else if (strstr(timezone_name, "Honolulu") || strstr(timezone_name, "Hawaii")) {
+            } else if (strcmp(timezone_name, "Hawaii-Aleutian Time (HST/HDT)") == 0) {
                 timezone_index = 5;
-            } else if (strstr(timezone_name, "Denver") || strstr(timezone_name, "Mountain")) {
+            } else if (strcmp(timezone_name, "Mountain Time (MST/MDT)") == 0) {
                 timezone_index = 6;
-            } else if (strstr(timezone_name, "Los_Angeles") || strstr(timezone_name, "Pacific")) {
+            } else if (strcmp(timezone_name, "Pacific Time (PST/PDT)") == 0) {
                 timezone_index = 7;
-            } else if (strstr(timezone_name, "Pago_Pago") || strstr(timezone_name, "Samoa")) {
+            } else if (strcmp(timezone_name, "Samoa Time (SST)") == 0) {
                 timezone_index = 8;
             }
             ESP_LOGI(TAG, "Mapped timezone '%s' to dropdown index %d", timezone_name, timezone_index);

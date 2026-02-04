@@ -268,51 +268,26 @@ static void time_sync_task(void *pvParameters)
                     ESP_LOGW(TAG, "SKIP: ui_timeinformation_textarea_ntpinput is NULL");
                 }
 
-                // Update timezone dropdown - log options to understand mapping
+                // Update timezone dropdown - simple A = A string matching
                 if (ui_timeinformation_dropdown_timezone) {
                     uint16_t old_tz = lv_dropdown_get_selected(ui_timeinformation_dropdown_timezone);
                     uint32_t opt_count = lv_dropdown_get_option_count(ui_timeinformation_dropdown_timezone);
-
-                    // Log all dropdown options to understand the mapping
-                    ESP_LOGI(TAG, "Timezone dropdown has %lu options:", (unsigned long)opt_count);
                     char opt_buf[64];
-                    for (uint32_t i = 0; i < opt_count && i < 15; i++) {
-                        lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, i);
-                        lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
-                        ESP_LOGI(TAG, "  [%lu] = '%s'", (unsigned long)i, opt_buf);
-                    }
 
-                    // Try to find matching timezone by exact name match
                     uint16_t tz_index = old_tz;  // Default to keeping current
                     bool found = false;
 
-                    ESP_LOGI(TAG, "Searching for timezone: '%s'", sync_data.timezone);
+                    ESP_LOGI(TAG, "Searching for timezone: '%s' in %lu options", sync_data.timezone, (unsigned long)opt_count);
 
-                    // First pass: exact match
+                    // Simple exact string match against dropdown options
                     for (uint32_t i = 0; i < opt_count; i++) {
                         lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, i);
                         lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
                         if (strcmp(opt_buf, sync_data.timezone) == 0) {
                             tz_index = i;
                             found = true;
-                            ESP_LOGI(TAG, "EXACT timezone match: '%s' at index %d", opt_buf, i);
+                            ESP_LOGI(TAG, "Timezone match found: '%s' at index %d", opt_buf, i);
                             break;
-                        }
-                    }
-
-                    // Second pass: case-insensitive or partial match
-                    if (!found) {
-                        for (uint32_t i = 0; i < opt_count; i++) {
-                            lv_dropdown_set_selected(ui_timeinformation_dropdown_timezone, i);
-                            lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, opt_buf, sizeof(opt_buf));
-                            // Check if either contains the other (partial match)
-                            if (strstr(opt_buf, sync_data.timezone) != NULL ||
-                                strstr(sync_data.timezone, opt_buf) != NULL) {
-                                tz_index = i;
-                                found = true;
-                                ESP_LOGI(TAG, "PARTIAL timezone match: '%s' at index %d", opt_buf, i);
-                                break;
-                            }
                         }
                     }
 
@@ -884,43 +859,99 @@ void ui_hide_punch_display(void)
     }
 }
 
-// Static label for server offline alert (created dynamically)
-static lv_obj_t *s_server_offline_label = NULL;
+// Current clock status (for tracking state changes)
+// clock_status_t is defined in ui_events.h
+static clock_status_t s_current_clock_status = CLOCK_STATUS_OK;
 
-// Show server offline alert on MainScreen
-void ui_show_server_offline_alert(void)
+// Set clock status message in the ClockStatusInput field
+void ui_set_clock_status(clock_status_t status, const char *device_name)
 {
-    if (lvgl_port_lock(100)) {
-        // Create alert label if it doesn't exist
-        if (s_server_offline_label == NULL && ui_screen_mainscreen != NULL) {
-            s_server_offline_label = lv_label_create(ui_screen_mainscreen);
-            lv_label_set_text(s_server_offline_label, "Server Offline\nAlert Manager");
-            lv_obj_set_style_text_color(s_server_offline_label, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(s_server_offline_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_align(s_server_offline_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_align(s_server_offline_label, LV_ALIGN_CENTER);
-            lv_obj_set_width(s_server_offline_label, LV_SIZE_CONTENT);
-            lv_obj_set_height(s_server_offline_label, LV_SIZE_CONTENT);
-            ESP_LOGW(TAG, "Server offline alert label created");
-        }
+    ESP_LOGI(TAG, "ui_set_clock_status called with status=%d, device_name=%s",
+             status, device_name ? device_name : "(null)");
 
-        // Show the alert
-        if (s_server_offline_label) {
-            lv_obj_remove_flag(s_server_offline_label, LV_OBJ_FLAG_HIDDEN);
-            ESP_LOGW(TAG, "SERVER OFFLINE ALERT SHOWN");
-        }
-        lvgl_port_unlock();
+    if (!lvgl_port_lock(100)) {
+        ESP_LOGE(TAG, "Failed to acquire LVGL lock for clock status update");
+        return;
     }
+
+    if (ui_mainscreen_textarea_clockstatusinput == NULL) {
+        ESP_LOGW(TAG, "ui_mainscreen_textarea_clockstatusinput is NULL - UI element not ready");
+        lvgl_port_unlock();
+        return;
+    }
+
+    // Element exists, proceed with update
+    char status_msg[128] = {0};
+
+    switch (status) {
+        case CLOCK_STATUS_OK:
+            // Clear the status field
+            lv_textarea_set_text(ui_mainscreen_textarea_clockstatusinput, "");
+            lv_obj_add_flag(ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGI(TAG, "Clock status cleared");
+            break;
+
+        case CLOCK_STATUS_SERVER_OFFLINE:
+            snprintf(status_msg, sizeof(status_msg), "Server Offline\nAlert Manager");
+            lv_textarea_set_text(ui_mainscreen_textarea_clockstatusinput, status_msg);
+            lv_obj_set_style_text_color(ui_mainscreen_textarea_clockstatusinput, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_remove_flag(ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGW(TAG, "Clock status: SERVER OFFLINE");
+            break;
+
+        case CLOCK_STATUS_NOT_REGISTERED:
+            snprintf(status_msg, sizeof(status_msg), "Clock Not Registered\nContact Admin");
+            lv_textarea_set_text(ui_mainscreen_textarea_clockstatusinput, status_msg);
+            lv_obj_set_style_text_color(ui_mainscreen_textarea_clockstatusinput, lv_color_hex(0xFF6600), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_remove_flag(ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGW(TAG, "Clock status: NOT REGISTERED");
+            break;
+
+        case CLOCK_STATUS_NOT_AUTHORIZED:
+            if (device_name && strlen(device_name) > 0) {
+                snprintf(status_msg, sizeof(status_msg), "Clock %s\nNot Authorized\nAlert Manager", device_name);
+            } else {
+                snprintf(status_msg, sizeof(status_msg), "Clock Not Authorized\nAlert Manager");
+            }
+            lv_textarea_set_text(ui_mainscreen_textarea_clockstatusinput, status_msg);
+            lv_obj_set_style_text_color(ui_mainscreen_textarea_clockstatusinput, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_remove_flag(ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGW(TAG, "Clock status: NOT AUTHORIZED");
+            break;
+
+        case CLOCK_STATUS_SUSPENDED:
+            if (device_name && strlen(device_name) > 0) {
+                snprintf(status_msg, sizeof(status_msg), "Clock %s\nSuspended\nContact Admin", device_name);
+            } else {
+                snprintf(status_msg, sizeof(status_msg), "Clock Suspended\nContact Admin");
+            }
+            lv_textarea_set_text(ui_mainscreen_textarea_clockstatusinput, status_msg);
+            lv_obj_set_style_text_color(ui_mainscreen_textarea_clockstatusinput, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_remove_flag(ui_mainscreen_textarea_clockstatusinput, LV_OBJ_FLAG_HIDDEN);
+            ESP_LOGW(TAG, "Clock status: SUSPENDED");
+            break;
+    }
+
+    s_current_clock_status = status;
+    lvgl_port_unlock();
 }
 
-// Hide server offline alert
+// Get current clock status
+clock_status_t ui_get_clock_status(void)
+{
+    return s_current_clock_status;
+}
+
+// Legacy functions - now use the ClockStatusInput field
+void ui_show_server_offline_alert(void)
+{
+    ui_set_clock_status(CLOCK_STATUS_SERVER_OFFLINE, NULL);
+}
+
 void ui_hide_server_offline_alert(void)
 {
-    if (lvgl_port_lock(100)) {
-        if (s_server_offline_label) {
-            lv_obj_add_flag(s_server_offline_label, LV_OBJ_FLAG_HIDDEN);
-            ESP_LOGI(TAG, "Server offline alert hidden");
-        }
-        lvgl_port_unlock();
+    // Only hide if current status is server offline
+    if (s_current_clock_status == CLOCK_STATUS_SERVER_OFFLINE) {
+        ui_set_clock_status(CLOCK_STATUS_OK, NULL);
     }
 }

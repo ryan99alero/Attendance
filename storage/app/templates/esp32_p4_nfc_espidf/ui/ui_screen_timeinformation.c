@@ -201,7 +201,7 @@ lv_obj_set_flex_align(ui_timeinformation_container_timezonecontainer, LV_FLEX_AL
 lv_obj_remove_flag( ui_timeinformation_container_timezonecontainer, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_timeinformation_dropdown_timezone = lv_dropdown_create(ui_timeinformation_container_timezonecontainer);
-lv_dropdown_set_options( ui_timeinformation_dropdown_timezone, "Alaska Time (AKST/AKDT)\nAtlantic Time (AST)\nCentral Time (CST/CDT)\nChamorro Time (ChST)'\nEastern Time (EST/EDT)\nHawaii–Aleutian Time (HST/HDT)\nMountain Time (MST/MDT)\nPacific Time (PST/PDT)\nSamoa Time (SST)" );
+lv_dropdown_set_options( ui_timeinformation_dropdown_timezone, "Alaska Time (AKST/AKDT)\nAtlantic Time (AST)\nCentral Time (CST/CDT)\nChamorro Time (ChST)\nEastern Time (EST/EDT)\nHawaii-Aleutian Time (HST/HDT)\nMountain Time (MST/MDT)\nPacific Time (PST/PDT)\nSamoa Time (SST)" );
 lv_obj_set_width( ui_timeinformation_dropdown_timezone, 267);
 lv_obj_set_height( ui_timeinformation_dropdown_timezone, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_x( ui_timeinformation_dropdown_timezone, 17 );

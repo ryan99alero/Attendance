@@ -84,11 +84,16 @@ class Employee extends Model
         'last_name',
         'email',
         'address',
+        'address2',
         'city',
         'state',
         'zip',
         'country',
         'phone',
+        'birth_date',
+        'emergency_contact',
+        'emergency_phone',
+        'notes',
         'external_id',
         'external_department_id',
         'department_id',
@@ -114,6 +119,7 @@ class Employee extends Model
 
     protected $casts = [
         'termination_date' => 'date',
+        'birth_date' => 'date',
         'is_active' => 'boolean',
         'full_time' => 'boolean',
         // Employment field casts
