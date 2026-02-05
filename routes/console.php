@@ -79,6 +79,17 @@ Schedule::command('holidays:create-upcoming')
     ->emailOutputOnFailure(env('ADMIN_EMAIL'));
 
 // =====================================================
+// INTEGRATION SYNCS
+// =====================================================
+
+// Scheduled Integration Syncs - Every minute (command self-checks intervals)
+Schedule::command('integration:run-scheduled-syncs')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/integration-syncs.log'));
+
+// =====================================================
 // DEVICE MONITORING
 // =====================================================
 

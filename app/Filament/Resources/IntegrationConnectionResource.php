@@ -241,6 +241,44 @@ class IntegrationConnectionResource extends Resource
                                     ])
                                     ->columns(3),
 
+                                Forms\Components\Section::make('Sync Schedule')
+                                    ->description('Configure automatic sync polling')
+                                    ->schema([
+                                        Forms\Components\TextInput::make('sync_interval_minutes')
+                                            ->label('Sync Interval (Minutes)')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->minValue(0)
+                                            ->maxValue(1440)
+                                            ->required()
+                                            ->live()
+                                            ->helperText('0 = push/webhook mode (no polling). Set a value to poll on a schedule.'),
+
+                                        Forms\Components\Placeholder::make('sync_mode_display')
+                                            ->label('Current Mode')
+                                            ->content(function (Forms\Get $get): string {
+                                                $interval = (int) $get('sync_interval_minutes');
+                                                if ($interval <= 0) {
+                                                    return 'Push Mode — syncs are triggered manually or via webhook.';
+                                                }
+                                                if ($interval >= 60) {
+                                                    $hours = floor($interval / 60);
+                                                    $mins = $interval % 60;
+                                                    $label = $hours . 'h' . ($mins > 0 ? " {$mins}m" : '');
+                                                } else {
+                                                    $label = $interval . 'm';
+                                                }
+                                                return "Poll Mode — automatically syncs every {$label}.";
+                                            }),
+
+                                        Forms\Components\Placeholder::make('last_synced_at_display')
+                                            ->label('Last Synced')
+                                            ->content(fn (?IntegrationConnection $record): string =>
+                                                $record?->last_synced_at?->diffForHumans() ?? 'Never synced')
+                                            ->visible(fn (?IntegrationConnection $record): bool => $record !== null),
+                                    ])
+                                    ->columns(3),
+
                                 Forms\Components\Section::make('Pace-Specific Settings')
                                     ->description('Settings specific to Pace/ePace integration')
                                     ->schema([
@@ -326,6 +364,18 @@ class IntegrationConnectionResource extends Resource
                     ->trueIcon('heroicon-o-exclamation-triangle')
                     ->falseIcon('')
                     ->trueColor('danger'),
+
+                Tables\Columns\TextColumn::make('sync_interval_minutes')
+                    ->label('Sync')
+                    ->badge()
+                    ->formatStateUsing(fn (int $state): string => $state > 0 ? "Every {$state}m" : 'Push')
+                    ->color(fn (int $state): string => $state > 0 ? 'info' : 'gray'),
+
+                Tables\Columns\TextColumn::make('last_synced_at')
+                    ->label('Last Synced')
+                    ->dateTime()
+                    ->since()
+                    ->placeholder('Never'),
 
                 Tables\Columns\TextColumn::make('objects_count')
                     ->label('Objects')

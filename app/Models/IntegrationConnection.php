@@ -26,6 +26,8 @@ class IntegrationConnection extends Model
         'last_connected_at',
         'last_error_at',
         'last_error_message',
+        'sync_interval_minutes',
+        'last_synced_at',
         'created_by',
         'updated_by',
     ];
@@ -37,6 +39,8 @@ class IntegrationConnection extends Model
         'timeout_seconds' => 'integer',
         'retry_attempts' => 'integer',
         'rate_limit_per_minute' => 'integer',
+        'sync_interval_minutes' => 'integer',
+        'last_synced_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -104,6 +108,36 @@ class IntegrationConnection extends Model
     public function hasRecentErrors(int $minutesThreshold = 60): bool
     {
         return $this->last_error_at && $this->last_error_at->diffInMinutes(now()) < $minutesThreshold;
+    }
+
+    // Sync scheduling
+
+    public function isPollingEnabled(): bool
+    {
+        return $this->is_active && $this->sync_interval_minutes > 0;
+    }
+
+    public function isDueForSync(): bool
+    {
+        if (!$this->isPollingEnabled()) {
+            return false;
+        }
+
+        if ($this->last_synced_at === null) {
+            return true;
+        }
+
+        return $this->last_synced_at->addMinutes($this->sync_interval_minutes)->isPast();
+    }
+
+    public function markSynced(): void
+    {
+        $this->update(['last_synced_at' => now()]);
+    }
+
+    public function scopePollingEnabled($query)
+    {
+        return $query->where('is_active', true)->where('sync_interval_minutes', '>', 0);
     }
 
     // Relationships

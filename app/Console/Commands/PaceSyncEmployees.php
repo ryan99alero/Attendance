@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Credential;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\IntegrationConnection;
@@ -58,7 +57,7 @@ class PaceSyncEmployees extends Command
             ['name' => 'city',                'xpath' => '@city'],
             ['name' => 'state',               'xpath' => '@state'],
             ['name' => 'zip',                 'xpath' => '@zip'],
-            ['name' => 'country',             'xpath' => '@country'],
+            ['name' => 'country',             'xpath' => '/country/@isoCountry'],
             ['name' => 'department_code',     'xpath' => '@department'],
             ['name' => 'pay_rate',            'xpath' => '@payRate01'],
             ['name' => 'date_of_hire',        'xpath' => '@startDate'],
@@ -69,7 +68,6 @@ class PaceSyncEmployees extends Command
             ['name' => 'emergency_phone',     'xpath' => '@emergencyPhone'],
             ['name' => 'notes',               'xpath' => '@notes'],
             ['name' => 'default_shift',       'xpath' => '@defaultShift'],
-            ['name' => 'secure_id',           'xpath' => '@secureId'],
             ['name' => 'is_supervisor',       'xpath' => '@isSupervisor'],
         ];
     }
@@ -153,6 +151,8 @@ class PaceSyncEmployees extends Command
         } else {
             $syncLog->markSuccess($stats);
         }
+
+        $connection->markSynced();
 
         return $this->errors > 0 ? 1 : 0;
     }
@@ -324,8 +324,27 @@ class PaceSyncEmployees extends Command
             $employee = Employee::where('external_id', $externalId)->first();
 
             if ($employee) {
-                $employee->update($attributes);
-                $this->updated++;
+                // Only update if fields actually changed
+                // Skip full_names - it's derived from first/last and collation is case-insensitive
+                $compareAttributes = collect($attributes)->except(['full_names']);
+                $hasChanges = false;
+                foreach ($compareAttributes as $key => $value) {
+                    $current = $employee->getAttribute($key);
+                    // Normalize for comparison (cast both to string, treat null consistently)
+                    $currentStr = $current instanceof Carbon ? $current->toDateString() : (string) ($current ?? '');
+                    $newStr = (string) ($value ?? '');
+                    if ($currentStr !== $newStr) {
+                        $hasChanges = true;
+                        break;
+                    }
+                }
+
+                if ($hasChanges) {
+                    $employee->update($attributes);
+                    $this->updated++;
+                } else {
+                    $this->skipped++;
+                }
             } else {
                 $attributes['external_id'] = $externalId;
                 $employee = Employee::create($attributes);
@@ -333,7 +352,6 @@ class PaceSyncEmployees extends Command
             }
 
             // Handle related data
-            $this->syncCredential($employee, $data['secure_id'] ?? null);
             $this->syncSupervisorFlag($employee, $data['is_supervisor'] ?? null);
 
         } catch (\Exception $e) {
@@ -419,35 +437,6 @@ class PaceSyncEmployees extends Command
         }
 
         return null;
-    }
-
-    /**
-     * Sync badge/card credential from Pace secureId
-     */
-    protected function syncCredential(Employee $employee, $secureId): void
-    {
-        if ($secureId === null || $secureId === '') {
-            return;
-        }
-
-        $secureId = (string) $secureId;
-
-        // Check if this credential already exists for this employee
-        $existing = Credential::where('employee_id', $employee->id)
-            ->where('kind', 'card_uid')
-            ->where('identifier', $secureId)
-            ->first();
-
-        if (!$existing) {
-            Credential::createWithHash([
-                'employee_id' => $employee->id,
-                'kind' => 'card_uid',
-                'identifier' => $secureId,
-                'label' => 'Pace Badge',
-                'is_active' => true,
-                'issued_at' => now(),
-            ]);
-        }
     }
 
     /**

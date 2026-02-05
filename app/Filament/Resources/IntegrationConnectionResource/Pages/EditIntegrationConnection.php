@@ -7,6 +7,7 @@ use App\Services\Integrations\PaceApiClient;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 
 class EditIntegrationConnection extends EditRecord
@@ -82,6 +83,47 @@ class EditIntegrationConnection extends EditRecord
                         ->body('Object discovery not yet implemented. Coming soon.')
                         ->warning()
                         ->send();
+                })
+                ->visible(fn () => $this->record->driver === 'pace'),
+
+            Actions\Action::make('force_sync')
+                ->label('Force Sync')
+                ->icon('heroicon-o-arrow-path')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Force Sync Now')
+                ->modalDescription('This will immediately run a full sync for this connection. Continue?')
+                ->action(function () {
+                    try {
+                        $exitCode = Artisan::call('pace:sync-employees', [
+                            '--connection' => $this->record->id,
+                        ]);
+
+                        $this->record->markSynced();
+
+                        if ($exitCode === 0) {
+                            Notification::make()
+                                ->title('Sync Completed')
+                                ->body('Employee sync finished successfully.')
+                                ->success()
+                                ->duration(10000)
+                                ->send();
+                        } else {
+                            Notification::make()
+                                ->title('Sync Completed with Errors')
+                                ->body('Sync ran but returned errors. Check sync logs for details.')
+                                ->warning()
+                                ->persistent()
+                                ->send();
+                        }
+                    } catch (\Exception $e) {
+                        Notification::make()
+                            ->title('Sync Failed')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->persistent()
+                            ->send();
+                    }
                 })
                 ->visible(fn () => $this->record->driver === 'pace'),
 
