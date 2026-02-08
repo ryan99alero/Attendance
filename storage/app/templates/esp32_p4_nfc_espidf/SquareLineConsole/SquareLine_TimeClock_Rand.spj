@@ -34197,7 +34197,7 @@
   },
   "animations": [],
   "selected_theme": "Default",
-  "selected_screen": "GUID27418035-622484S3404295",
+  "selected_screen": "GUID54792067-136858S3694299",
   "info": {
     "name": "SquareLine_TimeClock_Rand.spj",
     "depth": 1,
@@ -34225,7 +34225,7 @@
     "custom_variable_prefix": "ui",
     "separate_screen_save": false,
     "hierarchy_state_save": false,
-    "backup_cnt": 261,
+    "backup_cnt": 262,
     "autosave_cnt": 0,
     "group_color_cnt": 3,
     "imagebytearrayprefix": "",

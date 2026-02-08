@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
 
 class VacationTransaction extends Model
@@ -80,10 +81,15 @@ class VacationTransaction extends Model
         return $query->where('accrual_period', $period);
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     /**
      * Get the pay period this transaction belongs to
      */
-    public function payPeriod()
+    public function payPeriod(): BelongsTo
     {
         return $this->belongsTo(PayPeriod::class);
     }

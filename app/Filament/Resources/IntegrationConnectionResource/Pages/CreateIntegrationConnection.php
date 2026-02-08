@@ -19,6 +19,7 @@ class CreateIntegrationConnection extends CreateRecord
         }
 
         $data['created_by'] = auth()->id();
+        $data['webhook_token'] = bin2hex(random_bytes(32));
 
         return $data;
     }

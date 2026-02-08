@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\IntegrationConnectionResource\Pages;
 
 use App\Filament\Resources\IntegrationConnectionResource;
+use App\Services\Integrations\IntegrationSyncEngine;
 use App\Services\Integrations\PaceApiClient;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -75,16 +76,76 @@ class EditIntegrationConnection extends EditRecord
                 ->color('warning')
                 ->requiresConfirmation()
                 ->modalHeading('Discover API Objects')
-                ->modalDescription('This will query the API to discover available objects and their fields. Existing object definitions will be updated.')
+                ->modalDescription('This will query the API to validate configured objects and their field mappings against the live API.')
                 ->action(function () {
-                    // TODO: Implement object discovery
-                    Notification::make()
-                        ->title('Object Discovery')
-                        ->body('Object discovery not yet implemented. Coming soon.')
-                        ->warning()
-                        ->send();
+                    $objects = $this->record->objects()->get();
+
+                    if ($objects->isEmpty()) {
+                        Notification::make()
+                            ->title('No Objects Configured')
+                            ->body('Add integration objects first, then use Discover to validate them against the API.')
+                            ->warning()
+                            ->send();
+                        return;
+                    }
+
+                    $client = new PaceApiClient($this->record);
+                    $engine = new IntegrationSyncEngine($client);
+
+                    $results = [];
+                    foreach ($objects as $object) {
+                        $results[] = $engine->discoverObject($object);
+                    }
+
+                    $statusLines = [];
+                    $allSuccess = true;
+                    foreach ($results as $r) {
+                        if ($r['success']) {
+                            $statusLines[] = "{$r['object_name']}: {$r['fields_found']} fields with data, {$r['fields_null']} empty ({$r['total_records']} total records)";
+                        } else {
+                            $statusLines[] = "{$r['object_name']}: FAILED — {$r['error']}";
+                            $allSuccess = false;
+                        }
+                    }
+
+                    $body = implode("\n", $statusLines);
+
+                    if ($allSuccess) {
+                        Notification::make()
+                            ->title('Discovery Complete')
+                            ->body($body)
+                            ->success()
+                            ->duration(15000)
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->title('Discovery Completed with Errors')
+                            ->body($body)
+                            ->warning()
+                            ->persistent()
+                            ->send();
+                    }
                 })
                 ->visible(fn () => $this->record->driver === 'pace'),
+
+            Actions\Action::make('regenerate_webhook_token')
+                ->label('Regenerate Webhook Token')
+                ->icon('heroicon-o-key')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Regenerate Webhook Token')
+                ->modalDescription('This will invalidate the current webhook URL and generate a new one. Any external systems using the old URL will stop working. Continue?')
+                ->action(function () {
+                    $this->record->generateWebhookToken();
+
+                    Notification::make()
+                        ->title('Webhook Token Regenerated')
+                        ->body('A new webhook token has been generated. Update any external systems with the new URL.')
+                        ->success()
+                        ->duration(10000)
+                        ->send();
+                })
+                ->visible(fn () => $this->record->isPushMode()),
 
             Actions\Action::make('force_sync')
                 ->label('Force Sync')
@@ -133,10 +194,12 @@ class EditIntegrationConnection extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Decrypt credentials for editing
-        if (!empty($data['auth_credentials'])) {
+        // $hidden strips auth_credentials from toArray(), so read directly from the model
+        $encrypted = $this->record->getAttributes()['auth_credentials'] ?? null;
+
+        if (!empty($encrypted)) {
             try {
-                $data['credentials'] = json_decode(Crypt::decryptString($data['auth_credentials']), true);
+                $data['credentials'] = json_decode(Crypt::decryptString($encrypted), true);
             } catch (\Exception $e) {
                 $data['credentials'] = [];
             }

@@ -90,7 +90,7 @@ class MockQueryBuilder extends Builder
         return $this->mockData;
     }
 
-    public function paginate($perPage = 15, $columns = ['*'], $pageName = 'page', $page = null)
+    public function paginate($perPage = null, $columns = ['*'], $pageName = 'page', $page = null, $total = null)
     {
         return $this->mockData;
     }

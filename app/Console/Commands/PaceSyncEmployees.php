@@ -5,9 +5,12 @@ namespace App\Console\Commands;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\IntegrationConnection;
+use App\Models\IntegrationObject;
 use App\Models\IntegrationSyncLog;
 use App\Models\User;
+use App\Services\Integrations\IntegrationSyncEngine;
 use App\Services\Integrations\PaceApiClient;
+use App\Services\Integrations\SyncResult;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -94,15 +97,47 @@ class PaceSyncEmployees extends Command
 
         $this->newLine();
 
-        // Build department lookup cache
-        $this->buildDepartmentMap();
+        // Check for config-driven IntegrationObject
+        $integrationObject = IntegrationObject::where('connection_id', $connection->id)
+            ->where('object_name', 'Employee')
+            ->where('sync_enabled', true)
+            ->first();
 
         try {
-            if ($this->option('employee')) {
-                $this->syncSingleEmployee($client);
-            } else {
-                $this->syncActiveEmployees($client);
+            if ($integrationObject && !$this->option('employee') && !$this->option('dry-run')) {
+                // Config-driven path via IntegrationSyncEngine
+                $this->info('Using config-driven sync engine');
+                $this->newLine();
+
+                $result = $this->syncViaEngine($client, $integrationObject);
+
+                $this->created = $result->created;
+                $this->updated = $result->updated;
+                $this->skipped = $result->skipped;
+                $this->errors = $result->errors;
+                $this->errorMessages = $result->errorMessages;
+                $this->syncedExternalIds = $result->syncedIdentifiers;
+
+                // Post-processing: deactivate missing employees
                 $this->deactivateMissingEmployees();
+
+                // Post-processing: sync supervisor flags from parsed records
+                $this->syncSupervisorFlags($result);
+            } else {
+                // Legacy fallback path (also used for --employee and --dry-run)
+                if (!$integrationObject) {
+                    $this->info('No config-driven Employee object found, using legacy sync');
+                }
+                $this->newLine();
+
+                $this->buildDepartmentMap();
+
+                if ($this->option('employee')) {
+                    $this->syncSingleEmployee($client);
+                } else {
+                    $this->syncActiveEmployees($client);
+                    $this->deactivateMissingEmployees();
+                }
             }
         } catch (\Exception $e) {
             $this->error('Sync failed: ' . $e->getMessage());
@@ -145,9 +180,9 @@ class PaceSyncEmployees extends Command
         ];
 
         if ($this->errors > 0 && ($this->created + $this->updated) > 0) {
-            $syncLog->markPartial($stats, $this->errors . ' errors during sync');
+            $syncLog->markPartial($stats, $this->errors . ' errors during sync', $this->errorMessages);
         } elseif ($this->errors > 0) {
-            $syncLog->markFailed('All records failed', ['errors' => $this->errorMessages]);
+            $syncLog->markFailed('All records failed', ['errors' => $this->errorMessages], $this->errorMessages);
         } else {
             $syncLog->markSuccess($stats);
         }
@@ -155,6 +190,52 @@ class PaceSyncEmployees extends Command
         $connection->markSynced();
 
         return $this->errors > 0 ? 1 : 0;
+    }
+
+    /**
+     * Run sync via the config-driven IntegrationSyncEngine
+     */
+    protected function syncViaEngine(PaceApiClient $client, IntegrationObject $object): SyncResult
+    {
+        $engine = new IntegrationSyncEngine($client);
+
+        $enrichCallback = function (array &$attributes, array $parsedRecord) {
+            // Set is_active = true (all records from the filtered query are active)
+            $attributes['is_active'] = true;
+
+            // Compute full_names from first_name + last_name
+            $firstName = $attributes['first_name'] ?? $parsedRecord['first_name'] ?? '';
+            $lastName = $attributes['last_name'] ?? $parsedRecord['last_name'] ?? '';
+            $attributes['full_names'] = trim($firstName . ' ' . $lastName);
+        };
+
+        $this->info('Fetching employees via sync engine...');
+
+        $result = $engine->sync($object, enrichCallback: $enrichCallback);
+
+        $this->info("Records processed: {$result->total()}");
+
+        return $result;
+    }
+
+    /**
+     * Sync supervisor flags from parsed records returned by the engine
+     */
+    protected function syncSupervisorFlags(SyncResult $result): void
+    {
+        foreach ($result->parsedRecords as $parsed) {
+            $externalId = $parsed['external_id'] ?? null;
+            $isSupervisor = $parsed['is_supervisor'] ?? null;
+
+            if ($externalId === null || $isSupervisor === null) {
+                continue;
+            }
+
+            $employee = Employee::where('external_id', $externalId)->first();
+            if ($employee) {
+                $this->syncSupervisorFlag($employee, $isSupervisor);
+            }
+        }
     }
 
     /**

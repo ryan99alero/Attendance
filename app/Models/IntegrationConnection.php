@@ -28,6 +28,7 @@ class IntegrationConnection extends Model
         'last_error_message',
         'sync_interval_minutes',
         'last_synced_at',
+        'webhook_token',
         'created_by',
         'updated_by',
     ];
@@ -45,6 +46,7 @@ class IntegrationConnection extends Model
 
     protected $hidden = [
         'auth_credentials',
+        'webhook_token',
     ];
 
     /**
@@ -133,6 +135,35 @@ class IntegrationConnection extends Model
     public function markSynced(): void
     {
         $this->update(['last_synced_at' => now()]);
+    }
+
+    public function isPushMode(): bool
+    {
+        return $this->sync_interval_minutes <= 0;
+    }
+
+    public function generateWebhookToken(): string
+    {
+        $token = bin2hex(random_bytes(32));
+        $this->update(['webhook_token' => $token]);
+        return $token;
+    }
+
+    public function getOrCreateWebhookToken(): string
+    {
+        if (!empty($this->webhook_token)) {
+            return $this->webhook_token;
+        }
+
+        return $this->generateWebhookToken();
+    }
+
+    public function getWebhookUrl(?string $objectName = null): string
+    {
+        $token = $this->getOrCreateWebhookToken();
+        $base = url("/api/webhooks/sync/{$token}");
+
+        return $objectName ? "{$base}/{$objectName}" : $base;
     }
 
     public function scopePollingEnabled($query)

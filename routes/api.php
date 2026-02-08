@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\TimeClockController;
+use App\Http\Controllers\Api\WebhookSyncController;
 
 /*
 |--------------------------------------------------------------------------
@@ -100,6 +101,19 @@ Route::middleware('web')->post('/web-keep-alive', function (Request $request) {
 | Base URL: /api/v1/timeclock
 |
 */
+
+/*
+|--------------------------------------------------------------------------
+| Integration Webhook Routes
+|--------------------------------------------------------------------------
+|
+| Token-authenticated webhook endpoint for triggering integration syncs.
+| No auth middleware — the token in the URL serves as authentication.
+|
+*/
+
+Route::post('/webhooks/sync/{token}/{object?}', [WebhookSyncController::class, 'trigger'])
+    ->name('webhooks.sync');
 
 Route::prefix('v1/timeclock')->group(function () {
 

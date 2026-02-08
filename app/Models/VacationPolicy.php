@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class VacationPolicy extends Model
 {
@@ -43,6 +44,16 @@ class VacationPolicy extends Model
         return $this->belongsToMany(Employee::class, 'employee_vacation_assignments')
             ->withPivot('effective_date', 'end_date', 'override_settings', 'is_active')
             ->withTimestamps();
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**

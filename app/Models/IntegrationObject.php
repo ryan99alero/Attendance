@@ -20,10 +20,12 @@ class IntegrationObject extends Model
         'primary_key_type',
         'available_fields',
         'available_children',
+        'default_filter',
         'local_model',
         'local_table',
         'sync_enabled',
         'sync_direction',
+        'api_method',
         'sync_frequency',
         'last_synced_at',
     ];

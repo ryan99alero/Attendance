@@ -13,6 +13,7 @@ class IntegrationFieldMapping extends Model
 
     protected $fillable = [
         'object_id',
+        'local_table',
         'external_field',
         'external_xpath',
         'external_type',
@@ -52,6 +53,7 @@ class IntegrationFieldMapping extends Model
             'trim' => trim($value),
             'uppercase' => strtoupper($value),
             'lowercase' => strtolower($value),
+            'fk_lookup' => $this->foreignKeyLookup($value),
             default => $value,
         };
     }
@@ -79,10 +81,39 @@ class IntegrationFieldMapping extends Model
 
     /**
      * Convert milliseconds timestamp to Carbon
+     * Handles receiving a Carbon instance (PaceApiClient parseValueObject already converts Date fields)
      */
-    protected function dateMillisecondsToCarbon($milliseconds): Carbon
+    protected function dateMillisecondsToCarbon($value): Carbon
     {
-        return Carbon::createFromTimestampMs($milliseconds);
+        if ($value instanceof Carbon) {
+            return $value;
+        }
+
+        return Carbon::createFromTimestampMs($value);
+    }
+
+    /**
+     * Look up a foreign key value using transform_options config
+     *
+     * Expected transform_options format:
+     * {"model": "App\\Models\\Department", "match_column": "external_department_id", "return_column": "id"}
+     */
+    protected function foreignKeyLookup($value)
+    {
+        $options = $this->transform_options;
+
+        if (empty($options['model']) || empty($options['match_column']) || empty($options['return_column'])) {
+            return $value;
+        }
+
+        $modelClass = $options['model'];
+
+        if (!class_exists($modelClass)) {
+            return null;
+        }
+
+        return $modelClass::where($options['match_column'], $value)
+            ->value($options['return_column']);
     }
 
     /**
@@ -94,6 +125,15 @@ class IntegrationFieldMapping extends Model
             return $value->getTimestampMs();
         }
         return Carbon::parse($value)->getTimestampMs();
+    }
+
+    /**
+     * Get the effective table for this mapping.
+     * Returns local_table if set, otherwise falls back to the object's local_table.
+     */
+    public function getEffectiveTable(): ?string
+    {
+        return $this->local_table ?? $this->object?->local_table;
     }
 
     // Relationships

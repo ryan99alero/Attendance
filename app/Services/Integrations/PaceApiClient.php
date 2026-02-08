@@ -227,24 +227,58 @@ class PaceApiClient
     }
 
     /**
-     * Get available object types from Pace
-     * Note: This requires knowledge of Pace's object model
+     * Get available object types from the Pace swagger.json.
+     * Parses the swagger file and extracts unique object names from API paths.
+     * Results are cached in memory for the request lifecycle.
      */
     public function getCommonObjectTypes(): array
     {
-        return [
-            'Job' => 'Jobs/Work Orders',
-            'JobPart' => 'Job Parts',
-            'JobShipment' => 'Job Shipments',
-            'JobMaterial' => 'Job Materials',
-            'Customer' => 'Customers',
-            'Contact' => 'Contacts',
-            'Employee' => 'Employees',
-            'Vendor' => 'Vendors',
-            'PurchaseOrder' => 'Purchase Orders',
-            'Invoice' => 'Invoices',
-            'GLAccount' => 'GL Accounts',
-        ];
+        static $cache = null;
+
+        if ($cache !== null) {
+            return $cache;
+        }
+
+        $swaggerPath = base_path('docs/Pace RestFul/swagger.json');
+
+        if (!file_exists($swaggerPath)) {
+            // Fallback if swagger file is missing
+            $cache = [
+                'Customer' => 'Customer',
+                'Contact' => 'Contact',
+                'Department' => 'Department',
+                'Employee' => 'Employee',
+                'Invoice' => 'Invoice',
+                'Job' => 'Job',
+                'JobPart' => 'JobPart',
+                'PurchaseOrder' => 'PurchaseOrder',
+                'Vendor' => 'Vendor',
+            ];
+            return $cache;
+        }
+
+        $swagger = json_decode(file_get_contents($swaggerPath), true);
+        $paths = array_keys($swagger['paths'] ?? []);
+
+        $objectNames = [];
+        foreach ($paths as $path) {
+            // Match patterns like /LoadValueObjects/loadEmployee, /CreateObject/createEmployee
+            if (preg_match('#^/LoadValueObjects/load(\w+)$#', $path, $m)) {
+                $objectNames[$m[1]] = true;
+            } elseif (preg_match('#^/CreateObject/create(\w+)$#', $path, $m)) {
+                $objectNames[$m[1]] = true;
+            }
+        }
+
+        ksort($objectNames);
+
+        // Format: ObjectName => ObjectName (keep it simple — CamelCase is readable enough)
+        $cache = [];
+        foreach (array_keys($objectNames) as $name) {
+            $cache[$name] = $name;
+        }
+
+        return $cache;
     }
 
     /**

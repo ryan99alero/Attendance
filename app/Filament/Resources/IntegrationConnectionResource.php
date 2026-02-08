@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\IntegrationConnectionResource\Pages;
+use App\Filament\Resources\IntegrationConnectionResource\RelationManagers;
 use App\Models\IntegrationConnection;
 use App\Services\Integrations\PaceApiClient;
 use Filament\Resources\Resource;
@@ -279,6 +280,30 @@ class IntegrationConnectionResource extends Resource
                                     ])
                                     ->columns(3),
 
+                                Forms\Components\Section::make('Push Webhook')
+                                    ->description('Use this URL to trigger syncs from external systems or schedulers.')
+                                    ->schema([
+                                        Forms\Components\Placeholder::make('webhook_url_display')
+                                            ->label('Webhook URL (all objects)')
+                                            ->content(fn (?IntegrationConnection $record): string =>
+                                                $record ? $record->getWebhookUrl() : 'Save the connection first to generate a webhook URL.'
+                                            ),
+
+                                        Forms\Components\Placeholder::make('webhook_url_pattern')
+                                            ->label('Per-Object URL Pattern')
+                                            ->content(fn (?IntegrationConnection $record): string =>
+                                                $record ? $record->getWebhookUrl('{ObjectName}') : '—'
+                                            ),
+
+                                        Forms\Components\Placeholder::make('webhook_usage')
+                                            ->content('Send a POST request to the webhook URL to trigger a sync. Use the per-object URL to sync a specific object type (e.g., /Employee). No request body is required.')
+                                            ->columnSpanFull(),
+                                    ])
+                                    ->visible(fn (Forms\Get $get, ?IntegrationConnection $record): bool =>
+                                        (int) $get('sync_interval_minutes') <= 0 && $record !== null
+                                    )
+                                    ->columns(2),
+
                                 Forms\Components\Section::make('Pace-Specific Settings')
                                     ->description('Settings specific to Pace/ePace integration')
                                     ->schema([
@@ -448,7 +473,7 @@ class IntegrationConnectionResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // Will add relation managers for Objects, Templates, Logs
+            RelationManagers\IntegrationObjectsRelationManager::class,
         ];
     }
 
