@@ -2,6 +2,11 @@
 
 namespace App\Imports;
 
+use Exception;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\ShiftSchedule;
@@ -122,7 +127,7 @@ class DataImport implements ToCollection, WithHeadingRow
                 Log::info("Row {$index} - UpdateOrCreate result ID: {$result->id}, was recently created: " . ($result->wasRecentlyCreated ? 'yes' : 'no'));
 
                 Log::info("Successfully imported/updated row {$index}");
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $rowNumber = $index + 1;
                 
                 // Add the error to failed records for export
@@ -150,10 +155,10 @@ class DataImport implements ToCollection, WithHeadingRow
         // Handle Excel serial date format (numeric values)
         if (is_numeric($value)) {
             try {
-                return Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value))
+                return Carbon::instance(Date::excelToDateTimeObject($value))
                     ->format('Y-m-d H:i:s'); // Standardize format
-            } catch (\Exception $e) {
-                throw new \Exception("Failed to parse Excel serial date format: {$value}");
+            } catch (Exception $e) {
+                throw new Exception("Failed to parse Excel serial date format: {$value}");
             }
         }
 
@@ -211,7 +216,7 @@ class DataImport implements ToCollection, WithHeadingRow
             try {
                 $date = Carbon::createFromFormat($format, $value);
                 return $date->format('Y-m-d H:i:s'); // Standardize format
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Continue to next format
             }
         }
@@ -220,11 +225,11 @@ class DataImport implements ToCollection, WithHeadingRow
         try {
             $date = Carbon::parse($value);
             return $date->format('Y-m-d H:i:s'); // Standardize format
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Final fallback for common patterns
         }
 
-        throw new \Exception("Invalid date format: {$value}");
+        throw new Exception("Invalid date format: {$value}");
     }
 
     /**
@@ -239,7 +244,7 @@ class DataImport implements ToCollection, WithHeadingRow
             $filePath = Storage::disk('public')->path($fileName);
             Log::info("Resolved file path: {$filePath}");
             return $filePath;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to resolve file path for {$fileName}. Error: " . $e->getMessage());
             throw $e;
         }
@@ -262,13 +267,13 @@ class DataImport implements ToCollection, WithHeadingRow
         // Handle ShiftSchedule time fields
         if ($this->modelClass === 'App\Models\ShiftSchedule') {
             $timeFields = ['start_time', 'end_time', 'lunch_start_time', 'lunch_stop_time'];
-            
+
             foreach ($timeFields as $field) {
                 if (isset($row[$field]) && !empty($row[$field])) {
                     try {
                         $row[$field] = $this->parseTimeOnly($row[$field]);
                         Log::info("Standardized {$field}: {$row[$field]}");
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Failed to parse {$field} '{$row[$field]}': " . $e->getMessage());
                         // Don't fail the entire import, just skip this field
                         unset($row[$field]);
@@ -296,7 +301,7 @@ class DataImport implements ToCollection, WithHeadingRow
                 try {
                     $row[$field] = $this->parseDateTime($row[$field]);
                     Log::info("Standardized {$field}: {$row[$field]}");
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error("Failed to parse {$field} '{$row[$field]}': " . $e->getMessage());
                     // For optional fields like termination_date, we can skip
                     if ($field === 'termination_date') {
@@ -328,7 +333,7 @@ class DataImport implements ToCollection, WithHeadingRow
                     $originalValue = $data[$field];
                     $data[$field] = $this->parseDateTime($data[$field]);
                     Log::info("Row {$index} - Standardized {$field}: '{$originalValue}' -> '{$data[$field]}'");
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error("Row {$index} - Failed to parse {$field} '{$data[$field]}': " . $e->getMessage());
                     // For optional fields like termination_date, we can skip
                     if ($field === 'termination_date') {
@@ -362,7 +367,7 @@ class DataImport implements ToCollection, WithHeadingRow
                 $minutes = floor(($value * 24 - $hours) * 60);
                 $seconds = floor((($value * 24 - $hours) * 60 - $minutes) * 60);
                 return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("Failed to parse Excel serial time: {$value}");
             }
         }
@@ -386,7 +391,7 @@ class DataImport implements ToCollection, WithHeadingRow
             try {
                 $parsedTime = Carbon::createFromFormat($format, $timeString);
                 return $parsedTime->format('H:i:s');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Continue to next format
                 continue;
             }
@@ -396,7 +401,7 @@ class DataImport implements ToCollection, WithHeadingRow
         try {
             $parsedDateTime = Carbon::parse($timeString);
             return $parsedDateTime->format('H:i:s');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Last resort: try to extract time pattern from string
             if (preg_match('/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i', $timeString, $matches)) {
                 $hours = (int)$matches[1];
@@ -416,7 +421,7 @@ class DataImport implements ToCollection, WithHeadingRow
         }
 
         Log::error("Could not parse time value: {$timeString}");
-        throw new \Exception("Invalid time format: {$timeString}");
+        throw new Exception("Invalid time format: {$timeString}");
     }
 
     /**
@@ -533,14 +538,14 @@ class DataImport implements ToCollection, WithHeadingRow
     /**
      * Export failed records as an Excel file.
      *
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return BinaryFileResponse
      */
-    public function exportFailedRecords(): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function exportFailedRecords(): BinaryFileResponse
     {
         $tableName = (new $this->modelClass())->getTable();
         $fileName = "{$tableName}_import_errors.xlsx";
 
-        return Excel::download(new class($this->failedRecords) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
+        return Excel::download(new class($this->failedRecords) implements FromCollection, WithHeadings {
             private $data;
 
             public function __construct(array $data)

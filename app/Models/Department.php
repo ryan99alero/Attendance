@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $name Department name
@@ -24,18 +27,18 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, ShiftSchedule> $schedules
  * @property-read int|null $schedules_count
  * @property-read User|null $updater
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereManagerId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereUpdatedBy($value)
+ * @method static Builder<static>|Department newModelQuery()
+ * @method static Builder<static>|Department newQuery()
+ * @method static Builder<static>|Department query()
+ * @method static Builder<static>|Department whereCreatedAt($value)
+ * @method static Builder<static>|Department whereCreatedBy($value)
+ * @method static Builder<static>|Department whereId($value)
+ * @method static Builder<static>|Department whereManagerId($value)
+ * @method static Builder<static>|Department whereName($value)
+ * @method static Builder<static>|Department whereUpdatedAt($value)
+ * @method static Builder<static>|Department whereUpdatedBy($value)
  * @property string|null $external_department_id ID from external Department systems
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Department whereExternalDepartmentId($value)
+ * @method static Builder<static>|Department whereExternalDepartmentId($value)
  * @mixin \Eloquent
  */
 class Department extends Model
@@ -58,7 +61,7 @@ class Department extends Model
     /**
      * Get the manager of the department.
      */
-    public function manager(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function manager(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'manager_id');
     }
@@ -66,7 +69,7 @@ class Department extends Model
     /**
      * Get the user who created the department.
      */
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
@@ -74,7 +77,7 @@ class Department extends Model
     /**
      * Get the user who last updated the department.
      */
-    public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
@@ -82,7 +85,7 @@ class Department extends Model
     /**
      * Get the employees that belong to the department.
      */
-    public function employees(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function employees(): HasMany
     {
         return $this->hasMany(Employee::class, 'department_id');
     }

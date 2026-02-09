@@ -2,6 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\EditAction;
+use App\Filament\Resources\RoundGroupResource\Pages\ListRoundGroups;
+use App\Filament\Resources\RoundGroupResource\Pages\CreateRoundGroup;
+use App\Filament\Resources\RoundGroupResource\Pages\EditRoundGroup;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\RoundGroupResource\Pages;
 use App\Models\RoundGroup;
 use Filament\Forms;
@@ -16,15 +24,15 @@ class RoundGroupResource extends Resource
     protected static ?string $model = RoundGroup::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Payroll & Overtime';
+    protected static string | \UnitEnum | null $navigationGroup = 'Payroll & Overtime';
     protected static ?string $navigationLabel = 'Round Groups';
-    protected static ?string $navigationIcon = 'heroicon-o-calculator';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calculator';
     protected static ?int $navigationSort = 30;
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('group_name')
                     ->label('Group Name')
                     ->required()
@@ -32,7 +40,7 @@ class RoundGroupResource extends Resource
             ]);
     }
 
-    public static function table(Tables\Table $table): Tables\Table
+    public static function table(Table $table): Table
     {
         return $table
             ->columns([
@@ -48,8 +56,8 @@ class RoundGroupResource extends Resource
             ->filters([
                 // Add filters if needed
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ]);
     }
 
@@ -63,9 +71,9 @@ class RoundGroupResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListRoundGroups::route('/'),
-            'create' => Pages\CreateRoundGroup::route('/create'),
-            'edit' => Pages\EditRoundGroup::route('/{record}/edit'),
+            'index' => ListRoundGroups::route('/'),
+            'create' => CreateRoundGroup::route('/create'),
+            'edit' => EditRoundGroup::route('/{record}/edit'),
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\IntegrationConnection;
@@ -139,7 +140,7 @@ class PaceSyncEmployees extends Command
                     $this->deactivateMissingEmployees();
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Sync failed: ' . $e->getMessage());
             $syncLog->markFailed($e->getMessage());
             return 1;
@@ -435,7 +436,7 @@ class PaceSyncEmployees extends Command
             // Handle related data
             $this->syncSupervisorFlag($employee, $data['is_supervisor'] ?? null);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->errors++;
             $this->errorMessages[] = "Employee {$externalId}: " . $e->getMessage();
         }

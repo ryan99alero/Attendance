@@ -2,10 +2,37 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Components\Grid;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Utilities\Get;
+use Exception;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\HolidayTemplateResource\Pages\ListHolidayTemplates;
+use App\Filament\Resources\HolidayTemplateResource\Pages\CreateHolidayTemplate;
+use App\Filament\Resources\HolidayTemplateResource\Pages\EditHolidayTemplate;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\HolidayTemplateResource\Pages;
 use App\Models\HolidayTemplate;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,42 +41,42 @@ class HolidayTemplateResource extends Resource
 {
     protected static ?string $model = HolidayTemplate::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Holidays';
-    protected static ?string $navigationGroup = 'Time Off Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
     protected static ?int $navigationSort = 30;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Basic Information')
+        return $schema
+            ->components([
+                Section::make('Basic Information')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->label('Holiday Name')
                             ->required()
                             ->maxLength(255)
                             ->placeholder('e.g., Christmas Day, New Year\'s Day'),
 
-                        Forms\Components\Textarea::make('description')
+                        Textarea::make('description')
                             ->label('Description')
                             ->maxLength(500)
                             ->placeholder('Brief description of the holiday')
                             ->helperText('Optional description explaining the holiday'),
 
-                        Forms\Components\Grid::make(3)
+                        Grid::make(3)
                             ->schema([
-                                Forms\Components\Toggle::make('is_active')
+                                Toggle::make('is_active')
                                     ->label('Active')
                                     ->default(true)
                                     ->helperText('Enable/disable this holiday template'),
 
-                                Forms\Components\Toggle::make('applies_to_all_employees')
+                                Toggle::make('applies_to_all_employees')
                                     ->label('All Eligible Employees')
                                     ->default(true)
                                     ->helperText('Apply to all holiday-eligible employees (salary + full-time hourly)'),
 
-                                Forms\Components\TextInput::make('auto_create_days_ahead')
+                                TextInput::make('auto_create_days_ahead')
                                     ->label('Auto-Create Days Ahead')
                                     ->numeric()
                                     ->default(365)
@@ -58,10 +85,10 @@ class HolidayTemplateResource extends Resource
                             ]),
                     ]),
 
-                Forms\Components\Section::make('Employee Eligibility')
+                Section::make('Employee Eligibility')
                     ->description('Define which employees are eligible for this holiday')
                     ->schema([
-                        Forms\Components\CheckboxList::make('eligible_pay_types')
+                        CheckboxList::make('eligible_pay_types')
                             ->label('Eligible Pay Types')
                             ->options([
                                 'salary' => 'Salary Employees',
@@ -79,15 +106,15 @@ class HolidayTemplateResource extends Resource
                             ->columns(2)
                             ->helperText('Select which employee types should receive this holiday'),
 
-                        Forms\Components\Placeholder::make('eligibility_note')
+                        Placeholder::make('eligibility_note')
                             ->label('Current Setup')
                             ->content('Based on your employee data: Salary employees and Full-Time Hourly employees are typically eligible for holiday pay, while Part-Time Hourly (temps) and Contract employees are not.')
                             ->extraAttributes(['class' => 'text-sm text-gray-600']),
                     ]),
 
-                Forms\Components\Section::make('Date Calculation')
+                Section::make('Date Calculation')
                     ->schema([
-                        Forms\Components\Select::make('type')
+                        Select::make('type')
                             ->label('Holiday Type')
                             ->options([
                                 'fixed_date' => 'Fixed Date (e.g., Christmas - Dec 25)',
@@ -96,11 +123,11 @@ class HolidayTemplateResource extends Resource
                             ])
                             ->required()
                             ->live()
-                            ->afterStateUpdated(fn (Forms\Set $set) => $set('calculation_rule', null)),
+                            ->afterStateUpdated(fn (Set $set) => $set('calculation_rule', null)),
 
                         // Fixed Date Configuration
-                        Forms\Components\Group::make([
-                            Forms\Components\Select::make('calculation_rule.month')
+                        Group::make([
+                            Select::make('calculation_rule.month')
                                 ->label('Month')
                                 ->options([
                                     1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
@@ -109,17 +136,17 @@ class HolidayTemplateResource extends Resource
                                 ])
                                 ->required(),
 
-                            Forms\Components\Select::make('calculation_rule.day')
+                            Select::make('calculation_rule.day')
                                 ->label('Day')
                                 ->options(array_combine(range(1, 31), range(1, 31)))
                                 ->required(),
                         ])
                         ->columns(2)
-                        ->visible(fn (Forms\Get $get) => $get('type') === 'fixed_date'),
+                        ->visible(fn (Get $get) => $get('type') === 'fixed_date'),
 
                         // Relative Date Configuration
-                        Forms\Components\Group::make([
-                            Forms\Components\Select::make('calculation_rule.month')
+                        Group::make([
+                            Select::make('calculation_rule.month')
                                 ->label('Month')
                                 ->options([
                                     1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
@@ -128,7 +155,7 @@ class HolidayTemplateResource extends Resource
                                 ])
                                 ->required(),
 
-                            Forms\Components\Select::make('calculation_rule.day_of_week')
+                            Select::make('calculation_rule.day_of_week')
                                 ->label('Day of Week')
                                 ->options([
                                     0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
@@ -136,7 +163,7 @@ class HolidayTemplateResource extends Resource
                                 ])
                                 ->required(),
 
-                            Forms\Components\Select::make('calculation_rule.occurrence')
+                            Select::make('calculation_rule.occurrence')
                                 ->label('Occurrence')
                                 ->options([
                                     1 => '1st (First)', 2 => '2nd (Second)', 3 => '3rd (Third)',
@@ -146,32 +173,32 @@ class HolidayTemplateResource extends Resource
                                 ->helperText('e.g., "4th" Thursday for Thanksgiving'),
                         ])
                         ->columns(3)
-                        ->visible(fn (Forms\Get $get) => $get('type') === 'relative'),
+                        ->visible(fn (Get $get) => $get('type') === 'relative'),
 
                         // Custom Date Configuration
-                        Forms\Components\Group::make([
-                            Forms\Components\Select::make('calculation_rule.base')
+                        Group::make([
+                            Select::make('calculation_rule.base')
                                 ->label('Base Holiday')
                                 ->options([
                                     'easter' => 'Easter Sunday',
                                 ])
                                 ->required(),
 
-                            Forms\Components\TextInput::make('calculation_rule.offset_days')
+                            TextInput::make('calculation_rule.offset_days')
                                 ->label('Offset Days')
                                 ->numeric()
                                 ->default(0)
                                 ->helperText('Days before (-) or after (+) the base holiday'),
                         ])
                         ->columns(2)
-                        ->visible(fn (Forms\Get $get) => $get('type') === 'custom'),
+                        ->visible(fn (Get $get) => $get('type') === 'custom'),
                     ]),
 
-                Forms\Components\Section::make('Preview')
+                Section::make('Preview')
                     ->schema([
-                        Forms\Components\Placeholder::make('preview')
+                        Placeholder::make('preview')
                             ->label('Holiday Dates Preview')
-                            ->content(function (Forms\Get $get): string {
+                            ->content(function (Get $get): string {
                                 $type = $get('type');
                                 $rule = $get('calculation_rule');
 
@@ -192,7 +219,7 @@ class HolidayTemplateResource extends Resource
                                     }
 
                                     return implode("\n", $dates);
-                                } catch (\Exception $e) {
+                                } catch (Exception $e) {
                                     return "Error calculating dates: " . $e->getMessage();
                                 }
                             })
@@ -206,12 +233,12 @@ class HolidayTemplateResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Holiday Name')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('type')
+                TextColumn::make('type')
                     ->label('Type')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -221,7 +248,7 @@ class HolidayTemplateResource extends Resource
                         default => 'gray',
                     }),
 
-                Tables\Columns\TextColumn::make('next_date')
+                TextColumn::make('next_date')
                     ->label('Next Date')
                     ->getStateUsing(function (HolidayTemplate $record): string {
                         try {
@@ -230,37 +257,37 @@ class HolidayTemplateResource extends Resource
                                 $date = $record->calculateDateForYear(now()->year + 1);
                             }
                             return $date->format('M j, Y');
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             return 'Error';
                         }
                     })
                     ->sortable(),
 
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),
 
-                Tables\Columns\IconColumn::make('applies_to_all_employees')
+                IconColumn::make('applies_to_all_employees')
                     ->label('All Employees')
                     ->boolean(),
 
-                Tables\Columns\TextColumn::make('created_entries')
+                TextColumn::make('created_entries')
                     ->label('Created Entries')
                     ->default('0'),
 
-                Tables\Columns\TextColumn::make('auto_create_days_ahead')
+                TextColumn::make('auto_create_days_ahead')
                     ->label('Days Ahead')
                     ->suffix(' days')
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Active Status')
                     ->placeholder('All templates')
                     ->trueLabel('Active only')
                     ->falseLabel('Inactive only'),
 
-                Tables\Filters\SelectFilter::make('type')
+                SelectFilter::make('type')
                     ->label('Holiday Type')
                     ->options([
                         'fixed_date' => 'Fixed Date',
@@ -268,8 +295,8 @@ class HolidayTemplateResource extends Resource
                         'custom' => 'Custom',
                     ]),
             ])
-            ->actions([
-                Tables\Actions\Action::make('preview')
+            ->recordActions([
+                Action::make('preview')
                     ->label('Preview Dates')
                     ->icon('heroicon-o-calendar')
                     ->color('info')
@@ -282,17 +309,17 @@ class HolidayTemplateResource extends Resource
                                 $dates[] = "{$year}: {$date->format('l, F j, Y')}";
                             }
                             return view('filament.components.holiday-preview', ['dates' => $dates]);
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             return view('filament.components.holiday-preview', ['error' => $e->getMessage()]);
                         }
                     }),
 
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -300,9 +327,9 @@ class HolidayTemplateResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListHolidayTemplates::route('/'),
-            'create' => Pages\CreateHolidayTemplate::route('/create'),
-            'edit' => Pages\EditHolidayTemplate::route('/{record}/edit'),
+            'index' => ListHolidayTemplates::route('/'),
+            'create' => CreateHolidayTemplate::route('/create'),
+            'edit' => EditHolidayTemplate::route('/{record}/edit'),
         ];
     }
 }

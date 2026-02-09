@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Support\Collection;
 use Illuminate\Console\Command;
 use App\Models\PayPeriod;
 use App\Models\Punch;
@@ -87,7 +88,7 @@ class FixPayPeriods extends Command
         );
     }
 
-    private function detectOverlappingPeriods(): \Illuminate\Support\Collection
+    private function detectOverlappingPeriods(): Collection
     {
         $payPeriods = PayPeriod::orderBy('start_date')->get();
         $overlapping = collect();

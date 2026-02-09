@@ -2,13 +2,15 @@
 
 namespace App\Filament\Widgets;
 
+use Exception;
+use Log;
 use Filament\Widgets\Widget;
 use App\Reports\ADPExportReport;
 use Carbon\Carbon;
 
 class KoolReportWidget extends Widget
 {
-    protected static string $view = 'filament.widgets.kool-report-widget';
+    protected string $view = 'filament.widgets.kool-report-widget';
 
     protected static ?int $sort = 4;
 
@@ -31,8 +33,8 @@ class KoolReportWidget extends Widget
             // Return only first 10 records for widget display
             return array_slice($summaryData, 0, 10);
 
-        } catch (\Exception $e) {
-            \Log::error('KoolReport Widget Error: ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('KoolReport Widget Error: ' . $e->getMessage());
             return [];
         }
     }
@@ -53,8 +55,8 @@ class KoolReportWidget extends Widget
                 'employee_count' => count($summaryData)
             ];
 
-        } catch (\Exception $e) {
-            \Log::error('Weekly Totals Error: ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('Weekly Totals Error: ' . $e->getMessage());
             return [
                 'total_hours' => 0,
                 'total_gross_pay' => '0.00',

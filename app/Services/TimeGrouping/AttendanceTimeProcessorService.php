@@ -2,6 +2,7 @@
 
 namespace App\Services\TimeGrouping;
 
+use DB;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use App\Models\CompanySetup;
@@ -106,7 +107,7 @@ class AttendanceTimeProcessorService
 
             // ✅ Check if ML mode needs training data first
             if ($debugMode === 'ml') {
-                $trainingDataCount = \DB::table('attendances')
+                $trainingDataCount = DB::table('attendances')
                     ->whereNotNull('punch_type_id')
                     ->where('status', 'Complete')
                     ->count();

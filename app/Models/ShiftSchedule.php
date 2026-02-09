@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,44 +16,44 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $employee_id Foreign key to Employees
  * @property int|null $department_id Foreign key to Departments
  * @property string $schedule_name Name of the schedule
- * @property \Illuminate\Support\Carbon|null $lunch_start_time
- * @property \Illuminate\Support\Carbon|null $lunch_stop_time
- * @property \Illuminate\Support\Carbon|null $start_time
+ * @property Carbon|null $lunch_start_time
+ * @property Carbon|null $lunch_stop_time
+ * @property Carbon|null $start_time
  * @property int $lunch_duration Lunch duration in minutes
  * @property int $daily_hours
- * @property \Illuminate\Support\Carbon|null $end_time
+ * @property Carbon|null $end_time
  * @property int $grace_period Allowed grace period in minutes for lateness
  * @property int|null $shift_id Reference to the shift
  * @property bool $is_active Indicates if the schedule is active
  * @property string|null $notes Additional notes for the schedule
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Department|null $department
- * @property-read \App\Models\Employee|null $employee
- * @property-read \App\Models\Shift|null $shift
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule active()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereDailyHours($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereDepartmentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereEmployeeId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereEndTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereGracePeriod($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereIsActive($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereLunchDuration($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereLunchStartTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereNotes($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereScheduleName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereShiftId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereStartTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|ShiftSchedule whereUpdatedBy($value)
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read Department|null $department
+ * @property-read Employee|null $employee
+ * @property-read Shift|null $shift
+ * @method static Builder<static>|ShiftSchedule active()
+ * @method static Builder<static>|ShiftSchedule newModelQuery()
+ * @method static Builder<static>|ShiftSchedule newQuery()
+ * @method static Builder<static>|ShiftSchedule query()
+ * @method static Builder<static>|ShiftSchedule whereCreatedAt($value)
+ * @method static Builder<static>|ShiftSchedule whereCreatedBy($value)
+ * @method static Builder<static>|ShiftSchedule whereDailyHours($value)
+ * @method static Builder<static>|ShiftSchedule whereDepartmentId($value)
+ * @method static Builder<static>|ShiftSchedule whereEmployeeId($value)
+ * @method static Builder<static>|ShiftSchedule whereEndTime($value)
+ * @method static Builder<static>|ShiftSchedule whereGracePeriod($value)
+ * @method static Builder<static>|ShiftSchedule whereId($value)
+ * @method static Builder<static>|ShiftSchedule whereIsActive($value)
+ * @method static Builder<static>|ShiftSchedule whereLunchDuration($value)
+ * @method static Builder<static>|ShiftSchedule whereLunchStartTime($value)
+ * @method static Builder<static>|ShiftSchedule whereNotes($value)
+ * @method static Builder<static>|ShiftSchedule whereScheduleName($value)
+ * @method static Builder<static>|ShiftSchedule whereShiftId($value)
+ * @method static Builder<static>|ShiftSchedule whereStartTime($value)
+ * @method static Builder<static>|ShiftSchedule whereUpdatedAt($value)
+ * @method static Builder<static>|ShiftSchedule whereUpdatedBy($value)
  * @mixin \Eloquent
  */
 class ShiftSchedule extends Model
@@ -120,8 +122,8 @@ class ShiftSchedule extends Model
     /**
      * Scope to get active schedules.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param Builder $query
+     * @return Builder
      */
     public function scopeActive($query)
     {

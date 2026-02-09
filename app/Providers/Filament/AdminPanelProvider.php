@@ -2,6 +2,13 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Pages\Dashboard;
+use Filament\Widgets\AccountWidget;
+use Filament\Widgets\FilamentInfoWidget;
+use App\Filament\Widgets\AttendanceStatsWidget;
+use App\Filament\Widgets\AttendanceChartWidget;
+use App\Filament\Widgets\DepartmentBreakdownWidget;
+use App\Filament\Widgets\KoolReportWidget;
 use Filament\Http\Middleware\Authenticate;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -83,16 +90,16 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
-                \App\Filament\Widgets\AttendanceStatsWidget::class,
-                \App\Filament\Widgets\AttendanceChartWidget::class,
-                \App\Filament\Widgets\DepartmentBreakdownWidget::class,
-                \App\Filament\Widgets\KoolReportWidget::class,
+                AccountWidget::class,
+                FilamentInfoWidget::class,
+                AttendanceStatsWidget::class,
+                AttendanceChartWidget::class,
+                DepartmentBreakdownWidget::class,
+                KoolReportWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

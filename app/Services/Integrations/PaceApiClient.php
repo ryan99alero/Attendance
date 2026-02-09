@@ -2,6 +2,8 @@
 
 namespace App\Services\Integrations;
 
+use InvalidArgumentException;
+use Exception;
 use App\Models\IntegrationConnection;
 use App\Models\IntegrationSyncLog;
 use App\Models\IntegrationQueryTemplate;
@@ -27,7 +29,7 @@ class PaceApiClient
     public function __construct(IntegrationConnection $connection)
     {
         if ($connection->driver !== 'pace') {
-            throw new \InvalidArgumentException('Connection must be a Pace integration');
+            throw new InvalidArgumentException('Connection must be a Pace integration');
         }
 
         $this->connection = $connection;
@@ -62,7 +64,7 @@ class PaceApiClient
                 'message' => 'Connection successful',
                 'version' => $version,
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->connection->markError($e->getMessage());
 
             return [
@@ -339,7 +341,7 @@ class PaceApiClient
 
         if ($response->failed()) {
             $this->connection->markError($response->body());
-            throw new \Exception('Pace API Error: ' . $response->body());
+            throw new Exception('Pace API Error: ' . $response->body());
         }
 
         $this->connection->markConnected();
@@ -365,7 +367,7 @@ class PaceApiClient
 
         if ($response->failed()) {
             $this->connection->markError($response->body());
-            throw new \Exception('Pace API Error: ' . $response->body());
+            throw new Exception('Pace API Error: ' . $response->body());
         }
 
         $this->connection->markConnected();

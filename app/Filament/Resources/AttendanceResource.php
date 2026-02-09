@@ -2,6 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\DatePicker;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\AttendanceResource\Pages\ListAttendances;
+use App\Filament\Resources\AttendanceResource\Pages\CreateAttendance;
+use App\Filament\Resources\AttendanceResource\Pages\EditAttendance;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\AttendanceResource\Pages;
 use App\Models\Attendance;
 use App\Models\PunchType;
@@ -19,7 +34,6 @@ use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Tables;
 use Filament\Forms;
@@ -30,14 +44,14 @@ class AttendanceResource extends Resource
     protected static ?string $model = Attendance::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Time Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Attendances';
-    protected static ?string $navigationIcon = 'heroicon-o-finger-print';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-finger-print';
     protected static ?int $navigationSort = -100;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Select::make('employee_id')
                 ->label('Employee')
                 ->options(Employee::orderBy('last_name')->orderBy('first_name')
@@ -153,7 +167,7 @@ class AttendanceResource extends Resource
                         }
                     };
 
-                    $disagreementDates = \App\Models\Attendance::where('status', 'Discrepancy')
+                    $disagreementDates = Attendance::where('status', 'Discrepancy')
                         ->where($dateRangeCondition)
                         ->get()
                         ->map(fn($record) => $record->punch_time->format('Y-m-d'))
@@ -162,7 +176,7 @@ class AttendanceResource extends Resource
                     // Show all records from those dates
                     if ($disagreementDates->isNotEmpty()) {
                         $query->whereIn(
-                            \Illuminate\Support\Facades\DB::raw('DATE(punch_time)'),
+                            DB::raw('DATE(punch_time)'),
                             $disagreementDates
                         );
                     } else {
@@ -243,49 +257,49 @@ class AttendanceResource extends Resource
                     ]),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('device_id')
+                SelectFilter::make('device_id')
                     ->label('Device')
                     ->relationship('device', 'device_name')
                     ->preload(),
 
-                Tables\Filters\SelectFilter::make('employee_id')
+                SelectFilter::make('employee_id')
                     ->label('Employee')
                     ->relationship('employee', 'full_names'),
 
-                Tables\Filters\SelectFilter::make('punch_type_id')
+                SelectFilter::make('punch_type_id')
                     ->label('Punch Type')
                     ->relationship('punchType', 'name')
                     ->preload(),
 
-                Tables\Filters\SelectFilter::make('classification_id')
+                SelectFilter::make('classification_id')
                     ->label('Classification')
                     ->relationship('classification', 'name')
                     ->preload(),
 
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Status')
                     ->options(fn () => Attendance::getStatusOptions())
                     ->multiple(),
 
-                Tables\Filters\TernaryFilter::make('is_manual')
+                TernaryFilter::make('is_manual')
                     ->label('Manual Entry')
                     ->boolean()
                     ->trueLabel('Manual Only')
                     ->falseLabel('Automatic Only')
                     ->placeholder('All Entries'),
 
-                Tables\Filters\TernaryFilter::make('is_migrated')
+                TernaryFilter::make('is_migrated')
                     ->label('Migration Status')
                     ->boolean()
                     ->trueLabel('Migrated Only')
                     ->falseLabel('Not Migrated Only')
                     ->placeholder('All Records'),
 
-                Tables\Filters\Filter::make('punch_time')
-                    ->form([
-                        Forms\Components\DatePicker::make('from')
+                Filter::make('punch_time')
+                    ->schema([
+                        DatePicker::make('from')
                             ->label('From Date'),
-                        Forms\Components\DatePicker::make('until')
+                        DatePicker::make('until')
                             ->label('Until Date'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -300,9 +314,9 @@ class AttendanceResource extends Resource
                             );
                     }),
 
-                Tables\Filters\Filter::make('pay_period')
-                    ->form([
-                        Forms\Components\Select::make('pay_period_id')
+                Filter::make('pay_period')
+                    ->schema([
+                        Select::make('pay_period_id')
                             ->label('Pay Period')
                             ->options(function () {
                                 return PayPeriod::orderBy('start_date', 'desc')
@@ -331,23 +345,23 @@ class AttendanceResource extends Resource
                         );
                     }),
 
-                Tables\Filters\Filter::make('issues_only')
+                Filter::make('issues_only')
                     ->toggle()
                     ->label('Issues Only')
                     ->query(fn (Builder $query): Builder => $query->whereIn('status', ['NeedsReview', 'Incomplete', 'Discrepancy'])),
 
-                Tables\Filters\Filter::make('consensus_review')
+                Filter::make('consensus_review')
                     ->toggle()
                     ->label('Consensus Review Required')
                     ->query(fn (Builder $query): Builder => $query->where('status', 'Discrepancy')),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('punch_time', 'desc');
@@ -356,9 +370,9 @@ class AttendanceResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListAttendances::route('/'),
-            'create' => Pages\CreateAttendance::route('/create'),
-            'edit' => Pages\EditAttendance::route('/{record}/edit'),
+            'index' => ListAttendances::route('/'),
+            'create' => CreateAttendance::route('/create'),
+            'edit' => EditAttendance::route('/{record}/edit'),
         ];
     }
 }

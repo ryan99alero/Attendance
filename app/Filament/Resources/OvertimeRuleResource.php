@@ -2,11 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\OvertimeRuleResource\Pages\ListOvertimeRules;
+use App\Filament\Resources\OvertimeRuleResource\Pages\CreateOvertimeRule;
+use App\Filament\Resources\OvertimeRuleResource\Pages\EditOvertimeRule;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\OvertimeRuleResource\Pages;
 use App\Models\OvertimeRule;
 use App\Models\Shift;
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
@@ -19,14 +25,14 @@ class OvertimeRuleResource extends Resource
     protected static ?string $model = OvertimeRule::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Payroll & Overtime';
+    protected static string | \UnitEnum | null $navigationGroup = 'Payroll & Overtime';
     protected static ?string $navigationLabel = 'Overtime Rules';
-    protected static ?string $navigationIcon = 'heroicon-o-briefcase';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-briefcase';
     protected static ?int $navigationSort = 40;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             TextInput::make('rule_name')
                 ->label('Rule Name')
                 ->required(),
@@ -76,9 +82,9 @@ class OvertimeRuleResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListOvertimeRules::route('/'),
-            'create' => Pages\CreateOvertimeRule::route('/create'),
-            'edit' => Pages\EditOvertimeRule::route('/{record}/edit'),
+            'index' => ListOvertimeRules::route('/'),
+            'create' => CreateOvertimeRule::route('/create'),
+            'edit' => EditOvertimeRule::route('/{record}/edit'),
         ];
     }
 }

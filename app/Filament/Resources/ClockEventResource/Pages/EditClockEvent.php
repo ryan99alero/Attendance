@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ClockEventResource\Pages;
 
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\ClockEventResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -13,7 +14,7 @@ class EditClockEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 }

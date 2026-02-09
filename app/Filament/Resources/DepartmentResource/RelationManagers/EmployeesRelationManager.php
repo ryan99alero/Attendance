@@ -2,6 +2,13 @@
 
 namespace App\Filament\Resources\DepartmentResource\RelationManagers;
 
+use Filament\Actions\CreateAction;
+use Filament\Forms\Components\Select;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -36,10 +43,10 @@ class EmployeesRelationManager extends RelationManager
                     ->searchable(),
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make()
+                CreateAction::make()
                     ->label('Add Existing Employee')
-                    ->form([
-                        Forms\Components\Select::make('employee_id')
+                    ->schema([
+                        Select::make('employee_id')
                             ->label('Employee')
                             ->options(function () {
                                 return Employee::whereNull('department_id')
@@ -57,9 +64,9 @@ class EmployeesRelationManager extends RelationManager
                         $employee->save();
                     }),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('remove')
+            ->recordActions([
+                EditAction::make(),
+                Action::make('remove')
                     ->label('Remove')
                     ->icon('heroicon-o-user-minus')
                     ->action(function ($record) {
@@ -70,8 +77,8 @@ class EmployeesRelationManager extends RelationManager
                     ->requiresConfirmation()
                     ->color('warning'),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkAction::make('bulkRemove')
+            ->toolbarActions([
+                BulkAction::make('bulkRemove')
                     ->label('Remove from Department')
                     ->icon('heroicon-o-user-minus')
                     ->action(function ($records) {
@@ -86,16 +93,16 @@ class EmployeesRelationManager extends RelationManager
             ]);
     }
 
-    public function form(Forms\Form $form): Forms\Form
+    public function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\TextInput::make('first_name')
+        return $schema->components([
+            TextInput::make('first_name')
                 ->label('First Name')
                 ->required(),
-            Forms\Components\TextInput::make('last_name')
+            TextInput::make('last_name')
                 ->label('Last Name')
                 ->required(),
-            Forms\Components\TextInput::make('email')
+            TextInput::make('email')
                 ->label('eMail')
                 ->email(),
         ]);

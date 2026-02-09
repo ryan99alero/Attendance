@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Exception;
 use Illuminate\Routing\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
@@ -128,7 +129,7 @@ class TimeClockController extends Controller
                 ]
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Authentication failed", [
                 'device_id' => $request->device_id,
                 'error' => $e->getMessage()
@@ -378,7 +379,7 @@ class TimeClockController extends Controller
                 'display_message' => 'Credential not recognized. Please contact HR.'
             ], 404);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Clock event recording failed", [
                 'device_id' => $request->device_id,
                 'credential_kind' => $request->credential_kind,
@@ -500,7 +501,7 @@ class TimeClockController extends Controller
                 ]
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Employee info fetch failed", [
                 'credential_value' => $credentialValue,
                 'credential_kind' => $credentialKind ?? 'unknown',
@@ -724,7 +725,7 @@ class TimeClockController extends Controller
 
             return response()->json($responseData);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Time sync failed", [
                 'mac_address' => $request->mac_address ?? 'none',
                 'error' => $e->getMessage()
@@ -876,7 +877,7 @@ class TimeClockController extends Controller
                 ]
             ], 201);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Device registration failed", [
                 'device_name' => $request->device_name,
                 'mac_address' => $request->mac_address,
@@ -967,7 +968,7 @@ class TimeClockController extends Controller
                 'timezone_abbr' => $deviceTime->format('T'), // e.g., "CDT", "CST"
                 'device_time' => $deviceTime->format('Y-m-d H:i:s'),
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Fallback to Central Time if timezone parsing fails
             return [
                 'timezone_name' => 'America/Chicago',
@@ -1040,7 +1041,7 @@ class TimeClockController extends Controller
                 ]
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Config fetch failed", [
                 'mac_address' => $request->mac_address,
                 'error' => $e->getMessage()
@@ -1101,7 +1102,7 @@ class TimeClockController extends Controller
                 'config_version' => $device->config_version,
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[TimeClockAPI] Config update failed", [
                 'device_id' => $deviceId,
                 'error' => $e->getMessage()

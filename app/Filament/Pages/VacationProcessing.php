@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use Exception;
 use App\Models\Employee;
 use App\Models\VacationTransaction;
 use Carbon\Carbon;
@@ -22,11 +23,11 @@ class VacationProcessing extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationGroup = 'Time Off Management';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
     protected static ?string $navigationLabel = 'Vacation Processing';
     protected static ?int $navigationSort = 40;
-    protected static string $view = 'filament.pages.vacation-processing';
+    protected string $view = 'filament.pages.vacation-processing';
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -57,7 +58,7 @@ class VacationProcessing extends Page implements HasTable
                 ->label('Process Vacation Accruals')
                 ->icon('heroicon-o-play')
                 ->color('success')
-                ->form([
+                ->schema([
                     DatePicker::make('processDate')
                         ->label('Process Date')
                         ->default(Carbon::now())
@@ -150,7 +151,7 @@ class VacationProcessing extends Page implements HasTable
             // Store the output for display
             session(['vacation_processing_output' => $output]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->title('Processing Error')
                 ->body('Error: ' . $e->getMessage())

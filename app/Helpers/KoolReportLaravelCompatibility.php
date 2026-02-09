@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use Log;
 use Illuminate\Support\Collection;
 
 /**
@@ -35,6 +36,6 @@ class KoolReportLaravelCompatibility
         }
 
         // Debug: Log that our compatibility is loaded
-        \Log::debug('KoolReport Laravel 11 compatibility macros loaded');
+        Log::debug('KoolReport Laravel 11 compatibility macros loaded');
     }
 }

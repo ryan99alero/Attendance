@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Throwable;
+use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Schema;
@@ -155,12 +157,12 @@ class ModelDiscoveryService
                             'type' => $type,
                         ];
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     // Method threw — not a relationship or requires dependencies
                     continue;
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Reflection failed
         }
 
@@ -348,7 +350,7 @@ class ModelDiscoveryService
                     $fields[$methodName] = $label;
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Ignore errors in reflection
         }
 

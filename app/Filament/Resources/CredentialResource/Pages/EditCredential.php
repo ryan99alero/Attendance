@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CredentialResource\Pages;
 
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\CredentialResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -13,7 +14,7 @@ class EditCredential extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 }

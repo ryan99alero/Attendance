@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\RoundGroupResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
+use Exception;
 use App\Filament\Resources\RoundGroupResource;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
@@ -30,8 +32,8 @@ class ListRoundGroups extends ListRecords
             Action::make('Import Round Groups')
                 ->label('Import')
                 ->color('primary')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
@@ -59,7 +61,7 @@ class ListRoundGroups extends ListRecords
                             ->body('Round Groups imported successfully!')
                             ->success()
                             ->send();
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Import failed: {$e->getMessage()}");
 
                         Notification::make()
@@ -78,7 +80,7 @@ class ListRoundGroups extends ListRecords
                 ->action(function () {
                     try {
                         return Excel::download(new DataExport(RoundGroupResource::getModel()), 'round_groups.xlsx');
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Export failed: {$e->getMessage()}");
 
                         Notification::make()

@@ -2,6 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\PunchResource\Pages\ListPunches;
+use App\Filament\Resources\PunchResource\Pages\CreatePunch;
+use App\Filament\Resources\PunchResource\Pages\EditPunch;
+use Exception;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\PunchResource\Pages;
 use App\Models\Punch;
 use Filament\Resources\Resource;
@@ -12,7 +20,6 @@ use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Filters\Filter;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 
 class PunchResource extends Resource
@@ -20,15 +27,15 @@ class PunchResource extends Resource
     protected static ?string $model = Punch::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Time Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Punches';
-    protected static ?string $navigationIcon = 'heroicon-o-finger-print';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-finger-print';
     protected static ?int $navigationSort = -90;
 
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
@@ -50,7 +57,7 @@ class PunchResource extends Resource
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     public static function table(Table $table): Table
     {
@@ -97,9 +104,9 @@ class PunchResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPunches::route('/'),
-            'create' => Pages\CreatePunch::route('/create'),
-            'edit' => Pages\EditPunch::route('/{record}/edit'),
+            'index' => ListPunches::route('/'),
+            'create' => CreatePunch::route('/create'),
+            'edit' => EditPunch::route('/{record}/edit'),
         ];
     }
 }

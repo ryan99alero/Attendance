@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
@@ -57,7 +58,7 @@ class HolidayTemplate extends Model
                 return $this->calculateCustomDate($year, $rule);
 
             default:
-                throw new \InvalidArgumentException("Unknown holiday type: {$this->type}");
+                throw new InvalidArgumentException("Unknown holiday type: {$this->type}");
         }
     }
 
@@ -102,7 +103,7 @@ class HolidayTemplate extends Model
                 return $easter->addDays($rule['offset_days'] ?? 0);
 
             default:
-                throw new \InvalidArgumentException("Unknown custom rule base: {$rule['base']}");
+                throw new InvalidArgumentException("Unknown custom rule base: {$rule['base']}");
         }
     }
 

@@ -2,15 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\EditAction;
+use App\Filament\Resources\DepartmentResource\Pages\ListDepartments;
+use App\Filament\Resources\DepartmentResource\Pages\CreateDepartment;
+use App\Filament\Resources\DepartmentResource\Pages\EditDepartment;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\DepartmentResource\Pages;
 use App\Filament\Resources\DepartmentResource\RelationManagers\EmployeesRelationManager;
 use App\Models\Department;
 use App\Models\Employee; // Import Employee model
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Log;
@@ -20,15 +26,15 @@ class DepartmentResource extends Resource
     protected static ?string $model = Department::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Employee Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Employee Management';
     protected static ?string $navigationLabel = 'Departments';
-    protected static ?string $navigationIcon = 'heroicon-o-building-office';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-building-office';
     protected static ?int $navigationSort = 30;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
 
-        return $form->schema([
+        return $schema->components([
             TextInput::make('name')
                 ->label('Department Name')
                 ->required()
@@ -91,7 +97,7 @@ class DepartmentResource extends Resource
             ->label('Manager Name') // Display the related manager's name
             ->sortable()
                 ->searchable(),
-        ])->actions([
+        ])->recordActions([
             EditAction::make()
                 ->after(function ($record) {
                 }),
@@ -109,9 +115,9 @@ class DepartmentResource extends Resource
     {
 
         return [
-            'index' => Pages\ListDepartments::route('/'),
-            'create' => Pages\CreateDepartment::route('/create'),
-            'edit' => Pages\EditDepartment::route('/{record}/edit'),
+            'index' => ListDepartments::route('/'),
+            'create' => CreateDepartment::route('/create'),
+            'edit' => EditDepartment::route('/{record}/edit'),
         ];
     }
 }

@@ -2,11 +2,27 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\VacationPolicyResource\Pages\ListVacationPolicies;
+use App\Filament\Resources\VacationPolicyResource\Pages\CreateVacationPolicy;
+use App\Filament\Resources\VacationPolicyResource\Pages\EditVacationPolicy;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\VacationPolicyResource\Pages;
 use App\Filament\Resources\VacationPolicyResource\RelationManagers;
 use App\Models\VacationPolicy;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,9 +33,9 @@ class VacationPolicyResource extends Resource
 {
     protected static ?string $model = VacationPolicy::class;
 
-    protected static ?string $navigationGroup = 'Time Off Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
     protected static ?string $navigationLabel = 'Vacation Policies';
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?int $navigationSort = 30;
 
     public static function shouldRegisterNavigation(): bool
@@ -58,24 +74,24 @@ class VacationPolicyResource extends Resource
         return $user?->hasRole('super_admin') || $user?->can('delete_vacation::policy') ?? false;
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Policy Information')
+        return $schema
+            ->components([
+                Section::make('Policy Information')
                     ->schema([
-                        Forms\Components\TextInput::make('policy_name')
+                        TextInput::make('policy_name')
                             ->label('Policy Name')
                             ->required()
                             ->placeholder('e.g., Years 1-5, Year 6, etc.')
                             ->helperText('Descriptive name for this vacation tier'),
 
-                        Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Active')
                             ->default(true)
                             ->helperText('Whether this policy is currently active'),
 
-                        Forms\Components\TextInput::make('sort_order')
+                        TextInput::make('sort_order')
                             ->label('Sort Order')
                             ->numeric()
                             ->default(0)
@@ -83,16 +99,16 @@ class VacationPolicyResource extends Resource
                     ])
                     ->columns(3),
 
-                Forms\Components\Section::make('Tenure Requirements')
+                Section::make('Tenure Requirements')
                     ->schema([
-                        Forms\Components\TextInput::make('min_tenure_years')
+                        TextInput::make('min_tenure_years')
                             ->label('Minimum Years of Service')
                             ->numeric()
                             ->required()
                             ->default(0)
                             ->helperText('Minimum years of service to qualify for this policy'),
 
-                        Forms\Components\TextInput::make('max_tenure_years')
+                        TextInput::make('max_tenure_years')
                             ->label('Maximum Years of Service')
                             ->numeric()
                             ->nullable()
@@ -100,16 +116,16 @@ class VacationPolicyResource extends Resource
                     ])
                     ->columns(2),
 
-                Forms\Components\Section::make('Vacation Entitlement')
+                Section::make('Vacation Entitlement')
                     ->schema([
-                        Forms\Components\TextInput::make('vacation_days_per_year')
+                        TextInput::make('vacation_days_per_year')
                             ->label('Vacation Days Per Year')
                             ->numeric()
                             ->step(0.01)
                             ->required()
                             ->helperText('Number of vacation days earned annually'),
 
-                        Forms\Components\TextInput::make('vacation_hours_per_year')
+                        TextInput::make('vacation_hours_per_year')
                             ->label('Vacation Hours Per Year')
                             ->numeric()
                             ->step(0.01)
@@ -124,59 +140,59 @@ class VacationPolicyResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('policy_name')
+                TextColumn::make('policy_name')
                     ->label('Policy Name')
                     ->sortable()
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('min_tenure_years')
+                TextColumn::make('min_tenure_years')
                     ->label('Min Years')
                     ->sortable()
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('max_tenure_years')
+                TextColumn::make('max_tenure_years')
                     ->label('Max Years')
                     ->placeholder('No limit')
                     ->sortable()
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('vacation_days_per_year')
+                TextColumn::make('vacation_days_per_year')
                     ->label('Days/Year')
                     ->numeric(decimalPlaces: 1)
                     ->sortable()
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('vacation_hours_per_year')
+                TextColumn::make('vacation_hours_per_year')
                     ->label('Hours/Year')
                     ->numeric(decimalPlaces: 1)
                     ->sortable()
                     ->alignCenter(),
 
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('sort_order')
+                TextColumn::make('sort_order')
                     ->label('Order')
                     ->sortable()
                     ->alignCenter(),
             ])
             ->defaultSort('sort_order')
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Active Status')
                     ->placeholder('All policies')
                     ->trueLabel('Active only')
                     ->falseLabel('Inactive only'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -191,9 +207,9 @@ class VacationPolicyResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVacationPolicies::route('/'),
-            'create' => Pages\CreateVacationPolicy::route('/create'),
-            'edit' => Pages\EditVacationPolicy::route('/{record}/edit'),
+            'index' => ListVacationPolicies::route('/'),
+            'create' => CreateVacationPolicy::route('/create'),
+            'edit' => EditVacationPolicy::route('/{record}/edit'),
         ];
     }
 }

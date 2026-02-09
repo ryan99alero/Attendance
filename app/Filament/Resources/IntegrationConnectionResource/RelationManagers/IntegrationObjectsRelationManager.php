@@ -2,10 +2,27 @@
 
 namespace App\Filament\Resources\IntegrationConnectionResource\RelationManagers;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Hidden;
+use Filament\Schemas\Components\Utilities\Get;
+use App\Models\IntegrationFieldMapping;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Actions\CreateAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use App\Services\Integrations\PaceApiClient;
 use App\Services\ModelDiscoveryService;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -16,18 +33,18 @@ class IntegrationObjectsRelationManager extends RelationManager
 
     protected static ?string $title = 'Objects';
 
-    protected static ?string $icon = 'heroicon-o-cube';
+    protected static string | \BackedEnum | null $icon = 'heroicon-o-cube';
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
         $discoveryService = new ModelDiscoveryService();
 
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 // Section 1: Object Definition
-                Forms\Components\Section::make('Object Definition')
+                Section::make('Object Definition')
                     ->schema([
-                        Forms\Components\Select::make('object_name')
+                        Select::make('object_name')
                             ->label('Object Name')
                             ->options(fn () => (new PaceApiClient(
                                 $this->getOwnerRecord()
@@ -36,23 +53,23 @@ class IntegrationObjectsRelationManager extends RelationManager
                             ->required()
                             ->helperText('Select a Pace object type or enter a custom name'),
 
-                        Forms\Components\TextInput::make('display_name')
+                        TextInput::make('display_name')
                             ->label('Display Name')
                             ->required()
                             ->maxLength(100),
 
-                        Forms\Components\Textarea::make('description')
+                        Textarea::make('description')
                             ->label('Description')
                             ->rows(2)
                             ->columnSpanFull(),
 
-                        Forms\Components\TextInput::make('primary_key_field')
+                        TextInput::make('primary_key_field')
                             ->label('API Primary Key XPath')
                             ->default('@id')
                             ->required()
                             ->helperText('XPath to the source API\'s primary key (e.g. @id). Used when fetching a single record.'),
 
-                        Forms\Components\Select::make('primary_key_type')
+                        Select::make('primary_key_type')
                             ->label('API Primary Key Type')
                             ->options([
                                 'String' => 'String',
@@ -62,24 +79,24 @@ class IntegrationObjectsRelationManager extends RelationManager
                             ->required()
                             ->helperText('Data type as returned by the source API'),
 
-                        Forms\Components\Select::make('local_model')
+                        Select::make('local_model')
                             ->label('Local Model')
                             ->options(fn () => $discoveryService->getModelOptionsForSelect())
                             ->searchable()
                             ->reactive()
-                            ->afterStateUpdated(function (Forms\Set $set, ?string $state) {
+                            ->afterStateUpdated(function (Set $set, ?string $state) {
                                 if ($state && class_exists($state)) {
                                     $model = new $state;
                                     $set('local_table', $model->getTable());
                                 }
                             }),
 
-                        Forms\Components\TextInput::make('local_table')
+                        TextInput::make('local_table')
                             ->label('Local Table')
                             ->disabled()
                             ->dehydrated(),
 
-                        Forms\Components\TextInput::make('default_filter')
+                        TextInput::make('default_filter')
                             ->label('Default Filter')
                             ->placeholder("@status = 'A'")
                             ->helperText('Default XPath filter expression for syncs')
@@ -88,13 +105,13 @@ class IntegrationObjectsRelationManager extends RelationManager
                     ->columns(2),
 
                 // Section 2: Sync Settings
-                Forms\Components\Section::make('Sync Settings')
+                Section::make('Sync Settings')
                     ->schema([
-                        Forms\Components\Toggle::make('sync_enabled')
+                        Toggle::make('sync_enabled')
                             ->label('Sync Enabled')
                             ->default(false),
 
-                        Forms\Components\Select::make('sync_direction')
+                        Select::make('sync_direction')
                             ->label('Sync Direction')
                             ->options([
                                 'pull' => 'Pull (API → Local)',
@@ -104,7 +121,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                             ->default('pull')
                             ->required(),
 
-                        Forms\Components\Select::make('api_method')
+                        Select::make('api_method')
                             ->label('API Method')
                             ->options([
                                 'loadValueObjects' => 'Load Value Objects (bulk read)',
@@ -116,7 +133,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                             ->required()
                             ->helperText('Pace API method to use for this object'),
 
-                        Forms\Components\Select::make('sync_frequency')
+                        Select::make('sync_frequency')
                             ->label('Sync Frequency')
                             ->options([
                                 'manual' => 'Manual',
@@ -129,9 +146,9 @@ class IntegrationObjectsRelationManager extends RelationManager
                     ->columns(4),
 
                 // Section 3: Field Mappings (Repeater)
-                Forms\Components\Section::make('Field Mappings')
+                Section::make('Field Mappings')
                     ->schema([
-                        Forms\Components\Repeater::make('fieldMappings')
+                        Repeater::make('fieldMappings')
                             ->relationship()
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
                                 // Auto-derive external_field from local_field (or xpath basename)
@@ -150,16 +167,16 @@ class IntegrationObjectsRelationManager extends RelationManager
                                 return $data;
                             })
                             ->schema([
-                                Forms\Components\TextInput::make('external_xpath')
+                                TextInput::make('external_xpath')
                                     ->label('API Field (XPath)')
                                     ->placeholder('@firstName')
                                     ->required()
                                     ->maxLength(255)
                                     ->helperText('Pace field path (e.g. @firstName, /country/@isoCountry)'),
 
-                                Forms\Components\Hidden::make('external_field'),
+                                Hidden::make('external_field'),
 
-                                Forms\Components\Select::make('external_type')
+                                Select::make('external_type')
                                     ->label('External Type')
                                     ->options([
                                         'String' => 'String',
@@ -172,13 +189,13 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->default('String')
                                     ->required(),
 
-                                Forms\Components\Select::make('local_table')
+                                Select::make('local_table')
                                     ->label('Local Table')
-                                    ->options(function (Forms\Get $get, $record) use ($discoveryService) {
+                                    ->options(function (Get $get, $record) use ($discoveryService) {
                                         $localModel = $get('../../local_model');
 
                                         // Fallback: read from the DB record when $get can't traverse the repeater boundary
-                                        if (empty($localModel) && $record instanceof \App\Models\IntegrationFieldMapping) {
+                                        if (empty($localModel) && $record instanceof IntegrationFieldMapping) {
                                             $localModel = $record->object?->local_model;
                                         }
 
@@ -191,14 +208,14 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->placeholder('Primary table')
                                     ->helperText('Leave empty for primary table'),
 
-                                Forms\Components\Select::make('local_field')
+                                Select::make('local_field')
                                     ->label('Local Field')
-                                    ->options(function (Forms\Get $get, $record) use ($discoveryService) {
+                                    ->options(function (Get $get, $record) use ($discoveryService) {
                                         $selectedTable = $get('local_table');
                                         $localModel = $get('../../local_model');
 
                                         // Fallback: read from the DB record when $get can't traverse the repeater boundary
-                                        if (empty($localModel) && $record instanceof \App\Models\IntegrationFieldMapping) {
+                                        if (empty($localModel) && $record instanceof IntegrationFieldMapping) {
                                             $localModel = $record->object?->local_model;
                                         }
 
@@ -218,7 +235,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->dehydrateStateUsing(fn ($state) => $state ?? '')
                                     ->helperText('Leave empty for fetch-only fields'),
 
-                                Forms\Components\Select::make('local_type')
+                                Select::make('local_type')
                                     ->label('Local Type')
                                     ->options([
                                         'string' => 'String',
@@ -231,7 +248,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->default('string')
                                     ->required(),
 
-                                Forms\Components\Select::make('transform')
+                                Select::make('transform')
                                     ->label('Transform')
                                     ->options([
                                         'date_ms_to_carbon' => 'Date (ms) → Carbon',
@@ -250,12 +267,12 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->dehydrateStateUsing(fn ($state) => $state ?: null)
                                     ->nullable(),
 
-                                Forms\Components\Toggle::make('sync_on_pull')
+                                Toggle::make('sync_on_pull')
                                     ->label('Pull')
                                     ->default(true)
                                     ->inline(false),
 
-                                Forms\Components\Toggle::make('is_identifier')
+                                Toggle::make('is_identifier')
                                     ->label('Identifier')
                                     ->default(false)
                                     ->inline(false),
@@ -290,26 +307,26 @@ class IntegrationObjectsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('display_name')
             ->columns([
-                Tables\Columns\TextColumn::make('object_name')
+                TextColumn::make('object_name')
                     ->label('Object')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('display_name')
+                TextColumn::make('display_name')
                     ->label('Display Name')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('local_model')
+                TextColumn::make('local_model')
                     ->label('Local Model')
                     ->formatStateUsing(fn (?string $state): string =>
                         $state ? class_basename($state) : '—'
                     ),
 
-                Tables\Columns\IconColumn::make('sync_enabled')
+                IconColumn::make('sync_enabled')
                     ->label('Enabled')
                     ->boolean(),
 
-                Tables\Columns\TextColumn::make('sync_direction')
+                TextColumn::make('sync_direction')
                     ->label('Direction')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -319,13 +336,13 @@ class IntegrationObjectsRelationManager extends RelationManager
                         default => 'gray',
                     }),
 
-                Tables\Columns\TextColumn::make('field_mappings_count')
+                TextColumn::make('field_mappings_count')
                     ->label('Fields')
                     ->counts('fieldMappings')
                     ->badge()
                     ->color('gray'),
 
-                Tables\Columns\TextColumn::make('last_synced_at')
+                TextColumn::make('last_synced_at')
                     ->label('Last Synced')
                     ->since()
                     ->placeholder('Never'),
@@ -334,19 +351,19 @@ class IntegrationObjectsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make()
+                CreateAction::make()
                     ->slideOver()
                     ->modalWidth('7xl'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make()
+            ->recordActions([
+                EditAction::make()
                     ->slideOver()
                     ->modalWidth('7xl'),
-                Tables\Actions\DeleteAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

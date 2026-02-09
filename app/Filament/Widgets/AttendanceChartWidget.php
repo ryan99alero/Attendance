@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class AttendanceChartWidget extends ChartWidget
 {
-    protected static ?string $heading = 'Daily Attendance Trends';
+    protected ?string $heading = 'Daily Attendance Trends';
 
     protected static ?int $sort = 2;
 

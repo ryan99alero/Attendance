@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use DateTime;
+use Log;
 use App\Models\RoundGroup;
 use App\Models\RoundingRule;
 
@@ -10,18 +12,18 @@ class RoundingRuleService
     /**
      * Calculate rounded punch time.
      *
-     * @param \DateTime $originalTime
+     * @param DateTime $originalTime
      * @param int $roundGroupId
-     * @return \DateTime
+     * @return DateTime
      */
-    public function getRoundedTime(\DateTime $originalTime, int $roundGroupId): \DateTime
+    public function getRoundedTime(DateTime $originalTime, int $roundGroupId): DateTime
     {
-        \Log::info("Original Time: {$originalTime->format('Y-m-d H:i:s')}, Round Group ID: {$roundGroupId}");
+        Log::info("Original Time: {$originalTime->format('Y-m-d H:i:s')}, Round Group ID: {$roundGroupId}");
 
         $roundingRules = RoundingRule::where('round_group_id', $roundGroupId)->get();
 
         if ($roundingRules->isEmpty()) {
-            \Log::info("No rounding rules found for Round Group ID: {$roundGroupId}");
+            Log::info("No rounding rules found for Round Group ID: {$roundGroupId}");
             return $originalTime;
         }
 
@@ -36,12 +38,12 @@ class RoundingRuleService
                     $roundedMinute,
                     0
                 );
-                \Log::info("Rounded Time: {$roundedTime->format('Y-m-d H:i:s')}");
+                Log::info("Rounded Time: {$roundedTime->format('Y-m-d H:i:s')}");
                 return $roundedTime;
             }
         }
 
-        \Log::info("No matching rounding rule for Minute: {$minute}");
+        Log::info("No matching rounding rule for Minute: {$minute}");
         return $originalTime;
     }
 }

@@ -2,6 +2,24 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\ScheduleResource\Pages\ListSchedules;
+use App\Filament\Resources\ScheduleResource\Pages\CreateSchedule;
+use App\Filament\Resources\ScheduleResource\Pages\EditSchedule;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\ScheduleResource\Pages;
 use App\Models\ShiftSchedule;
 use Filament\Forms;
@@ -13,128 +31,128 @@ class ShiftScheduleResource extends Resource
     protected static ?string $model = ShiftSchedule::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Scheduling & Shifts';
+    protected static string | \UnitEnum | null $navigationGroup = 'Scheduling & Shifts';
     protected static ?string $navigationLabel = 'Shift Schedules';
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?int $navigationSort = 20;
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             // General Information
-            Forms\Components\TextInput::make('schedule_name')
+            TextInput::make('schedule_name')
                 ->label('ShiftSchedule Name')
                 ->required()
                 ->maxLength(255),
 
             // Time-Related Fields
-            Forms\Components\TimePicker::make('start_time')
+            TimePicker::make('start_time')
                 ->label('Start Time')
                 ->required()
                 ->seconds(false),
-            Forms\Components\TimePicker::make('lunch_start_time')
+            TimePicker::make('lunch_start_time')
                 ->label('Lunch Start Time')
                 ->nullable()
                 ->seconds(false),
-            Forms\Components\TimePicker::make('lunch_stop_time')
+            TimePicker::make('lunch_stop_time')
                 ->label('Lunch Stop Time')
                 ->nullable()
                 ->seconds(false),
-            Forms\Components\TextInput::make('lunch_duration')
+            TextInput::make('lunch_duration')
                 ->label('Lunch Duration (Minutes)')
                 ->numeric()
                 ->default(60),
-            Forms\Components\TimePicker::make('end_time')
+            TimePicker::make('end_time')
                 ->label('End Time')
                 ->required()
                 ->seconds(false),
-            Forms\Components\TextInput::make('daily_hours')
+            TextInput::make('daily_hours')
                 ->label('Estimated Daily Hours')
                 ->numeric()
                 ->default(8),
 
             // Grace Period
-            Forms\Components\TextInput::make('grace_period')
+            TextInput::make('grace_period')
                 ->label('Grace Period (Minutes)')
                 ->numeric()
                 ->default(0),
 
             // Relational Fields
-            Forms\Components\Select::make('shift_id')
+            Select::make('shift_id')
                 ->label('Shift')
                 ->relationship('shift', 'shift_name')
                 ->nullable(),
             // employee_id removed - employees now reference shift_schedule_id instead
 
             // Miscellaneous
-            Forms\Components\Textarea::make('notes')
+            Textarea::make('notes')
                 ->label('Notes')
                 ->nullable(),
-            Forms\Components\Toggle::make('is_active')
+            Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
         ]);
     }
 
-    public static function table(Tables\Table $table): Tables\Table
+    public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('schedule_name')
+            TextColumn::make('schedule_name')
                 ->label('Name')
                 ->searchable()
                 ->sortable(),
-            Tables\Columns\TextColumn::make('start_time')
+            TextColumn::make('start_time')
                 ->label('Start Time')
                 ->dateTime('H:i')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('lunch_start_time')
+            TextColumn::make('lunch_start_time')
                 ->label('Lunch Start Time')
                 ->dateTime('H:i')
                 ->placeholder('N/A')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('lunch_stop_time')
+            TextColumn::make('lunch_stop_time')
                 ->label('Lunch Stop Time')
                 ->dateTime('H:i')
                 ->placeholder('N/A')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('end_time')
+            TextColumn::make('end_time')
                 ->label('End Time')
                 ->dateTime('H:i')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('daily_hours')
+            TextColumn::make('daily_hours')
                 ->label('Hours')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('grace_period')
+            TextColumn::make('grace_period')
                 ->label('Grace Period (Minutes)')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('shift.shift_name')
+            TextColumn::make('shift.shift_name')
                 ->label('Shift')
                 ->sortable(),
-            Tables\Columns\TextColumn::make('employees')
+            TextColumn::make('employees')
                 ->label('Employees')
                 ->getStateUsing(fn ($record) => $record->employees ? $record->employees->pluck('full_names')->join(', ') : 'N/A'),
-            Tables\Columns\IconColumn::make('is_active')
+            IconColumn::make('is_active')
                 ->label('Active')
                 ->sortable(),
         ])
             ->filters([
-                Tables\Filters\Filter::make('is_active')
+                Filter::make('is_active')
                     ->toggle(),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                DeleteBulkAction::make(),
             ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListSchedules::route('/'),
-            'create' => Pages\CreateSchedule::route('/create'),
-            'edit' => Pages\EditSchedule::route('/{record}/edit'),
+            'index' => ListSchedules::route('/'),
+            'create' => CreateSchedule::route('/create'),
+            'edit' => EditSchedule::route('/{record}/edit'),
         ];
     }
 }

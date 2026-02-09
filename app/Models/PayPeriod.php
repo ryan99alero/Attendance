@@ -2,6 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use App\Services\ClockEventProcessing\ClockEventProcessingService;
+use Log;
+use App\Services\AttendanceProcessing\AttendanceProcessingService;
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,33 +17,33 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Class PayPeriod
  *
  * @property int $id
- * @property \Illuminate\Support\Carbon $start_date Start date of the pay period
- * @property \Illuminate\Support\Carbon $end_date End date of the pay period
+ * @property Carbon $start_date Start date of the pay period
+ * @property Carbon $end_date End date of the pay period
  * @property bool $is_processed Indicates if the pay period has been processed
  * @property int|null $processed_by Foreign key to Users for processor
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User|null $creator
- * @property-read \App\Models\User|null $processor
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Punch> $punches
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read User|null $creator
+ * @property-read User|null $processor
+ * @property-read Collection<int, Punch> $punches
  * @property-read int|null $punches_count
- * @property-read \App\Models\User|null $updater
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod query()
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereEndDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereIsProcessed($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereProcessedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereStartDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PayPeriod whereUpdatedBy($value)
+ * @property-read User|null $updater
+ * @method static Builder|PayPeriod newModelQuery()
+ * @method static Builder|PayPeriod newQuery()
+ * @method static Builder|PayPeriod query()
+ * @method static Builder|PayPeriod whereCreatedAt($value)
+ * @method static Builder|PayPeriod whereCreatedBy($value)
+ * @method static Builder|PayPeriod whereEndDate($value)
+ * @method static Builder|PayPeriod whereId($value)
+ * @method static Builder|PayPeriod whereIsProcessed($value)
+ * @method static Builder|PayPeriod whereProcessedBy($value)
+ * @method static Builder|PayPeriod whereStartDate($value)
+ * @method static Builder|PayPeriod whereUpdatedAt($value)
+ * @method static Builder|PayPeriod whereUpdatedBy($value)
  * @property int $is_posted Indicates if the pay period has been processed
- * @method static \Illuminate\Database\Eloquent\Builder<static>|PayPeriod whereIsPosted($value)
+ * @method static Builder<static>|PayPeriod whereIsPosted($value)
  * @mixin \Eloquent
  */
 class PayPeriod extends Model
@@ -81,7 +87,7 @@ class PayPeriod extends Model
     {
         return $this->hasMany(Punch::class, 'pay_period_id');
     }
-    public function attendanceIssues(): \Illuminate\Database\Eloquent\Builder
+    public function attendanceIssues(): Builder
     {
         return Attendance::query()
             ->whereBetween('punch_time', [
@@ -131,10 +137,10 @@ class PayPeriod extends Model
     public function processAttendance(): int
     {
         // Step 1: Process any unprocessed ClockEvents for this pay period first
-        $clockEventService = app(\App\Services\ClockEventProcessing\ClockEventProcessingService::class);
+        $clockEventService = app(ClockEventProcessingService::class);
 
         // Get ClockEvents within this pay period that are ready for processing
-        $clockEventsInPeriod = \App\Models\ClockEvent::readyForProcessing()
+        $clockEventsInPeriod = ClockEvent::readyForProcessing()
             ->whereBetween('event_time', [
                 $this->start_date->startOfDay(),
                 $this->end_date->endOfDay()
@@ -142,13 +148,13 @@ class PayPeriod extends Model
             ->count();
 
         if ($clockEventsInPeriod > 0) {
-            \Log::info("[PayPeriod] Processing {$clockEventsInPeriod} ClockEvents for PayPeriod {$this->id}");
+            Log::info("[PayPeriod] Processing {$clockEventsInPeriod} ClockEvents for PayPeriod {$this->id}");
             $clockEventResult = $clockEventService->processUnprocessedEvents(500); // Process all events
-            \Log::info("[PayPeriod] ClockEvent processing result", $clockEventResult);
+            Log::info("[PayPeriod] ClockEvent processing result", $clockEventResult);
         }
 
         // Step 2: Process Attendance records (assign punch types, ML analysis, etc.)
-        $attendanceService = app(\App\Services\AttendanceProcessing\AttendanceProcessingService::class);
+        $attendanceService = app(AttendanceProcessingService::class);
         $attendanceService->processAll($this);
 
         return $clockEventsInPeriod;

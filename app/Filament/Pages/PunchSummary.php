@@ -2,6 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use App\Models\PayPeriod;
 use App\Models\Punch;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms;
@@ -11,8 +14,8 @@ use Illuminate\Support\Collection;
 class PunchSummary extends Page
 {
     protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-table';
-    protected static string $view = 'filament.pages.punch-summary';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table';
+    protected string $view = 'filament.pages.punch-summary';
     protected static ?string $navigationLabel = 'Punch Summary';
 
     public $payPeriodId; // Bound to the select dropdown
@@ -28,13 +31,13 @@ class PunchSummary extends Page
     protected function getFormSchema(): array
     {
         return [
-            Forms\Components\Select::make('payPeriodId')
+            Select::make('payPeriodId')
                 ->label('Select Pay Period')
                 ->options($this->getPayPeriods()) // Options for the dropdown
                 ->reactive()
                 ->afterStateUpdated(fn () => $this->updatePunches()) // Refresh data on selection
                 ->placeholder('All Pay Periods'),
-            Forms\Components\TextInput::make('search')
+            TextInput::make('search')
                 ->label('Search by Name or Payroll ID')
                 ->placeholder('Enter employee name or payroll ID')
                 ->reactive()
@@ -44,7 +47,7 @@ class PunchSummary extends Page
 
     protected function getPayPeriods(): array
     {
-        return \App\Models\PayPeriod::query()
+        return PayPeriod::query()
             ->select('id', 'start_date', 'end_date')
             ->get()
             ->pluck('start_date', 'id')

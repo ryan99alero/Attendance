@@ -2,6 +2,9 @@
 
 namespace App\Services\AttendanceProcessing;
 
+use DB;
+use Filament\Notifications\Notification;
+use Exception;
 use App\Models\PayPeriod;
 use App\Models\Attendance;
 use Illuminate\Support\Facades\Log;
@@ -49,16 +52,16 @@ class AttendanceProcessingService
         Log::info("[AttendanceProcessing] 🚀 Starting attendance processing for PayPeriod ID: {$payPeriod->id}");
 
         // Check if vacation records exist before processing
-        $vacationRecordsBefore = \App\Models\Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
-            ->where('classification_id', \DB::table('classifications')->where('code', 'VACATION')->value('id'))
+        $vacationRecordsBefore = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+            ->where('classification_id', DB::table('classifications')->where('code', 'VACATION')->value('id'))
             ->where('status', 'Complete')
             ->count();
 
         $this->runProcessingSteps($payPeriod);
 
         // Check if new vacation records were created during processing
-        $vacationRecordsAfter = \App\Models\Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
-            ->where('classification_id', \DB::table('classifications')->where('code', 'VACATION')->value('id'))
+        $vacationRecordsAfter = Attendance::whereBetween('punch_time', [$payPeriod->start_date, $payPeriod->end_date])
+            ->where('classification_id', DB::table('classifications')->where('code', 'VACATION')->value('id'))
             ->where('status', 'Complete')
             ->count();
 
@@ -67,7 +70,7 @@ class AttendanceProcessingService
             $newVacationCount = $vacationRecordsAfter - $vacationRecordsBefore;
             Log::info("[AttendanceProcessing] 🔄 {$newVacationCount} new vacation records detected, running second processing pass...");
 
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->info()
                 ->title('Vacation Records Detected')
                 ->body("Found {$newVacationCount} vacation records - automatically running second pass to ensure proper migration...")
@@ -79,7 +82,7 @@ class AttendanceProcessingService
             // Final confirmation
             Log::info("[AttendanceProcessing] ✅ Second pass completed - vacation records should now be properly migrated");
 
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->success()
                 ->title('Vacation Processing Complete')
                 ->body("Vacation records have been processed and migrated successfully!")
@@ -140,7 +143,7 @@ class AttendanceProcessingService
         $totalSteps = count($steps);
 
         // Show single progress notification instead of per-step notifications
-        \Filament\Notifications\Notification::make()
+        Notification::make()
             ->info()
             ->title('Processing Started')
             ->body("Processing {$totalSteps} steps for attendance records...")
@@ -156,11 +159,11 @@ class AttendanceProcessingService
             try {
                 $step['action']();
                 Log::info("[AttendanceProcessing] ✅ Step {$stepNumber}: {$stepName} completed.");
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("[AttendanceProcessing] ❌ Step {$stepNumber}: {$stepName} failed: " . $e->getMessage());
 
                 // Send error notification and re-throw
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->danger()
                     ->title("Processing Failed at Step {$stepNumber}")
                     ->body("Error in {$stepName}: " . substr($e->getMessage(), 0, 100) . "...")

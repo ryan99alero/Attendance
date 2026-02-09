@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\VacationBalanceResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
+use Exception;
 use App\Filament\Resources\VacationBalanceResource;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
@@ -30,8 +32,8 @@ class ListVacationBalances extends ListRecords
                 ->label('Import')
                 ->color('primary')
                 ->icon('heroicon-o-arrow-up-on-square')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
@@ -59,7 +61,7 @@ class ListVacationBalances extends ListRecords
                             ->body('Vacation balances imported successfully!')
                             ->success()
                             ->send();
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error("Import failed: {$e->getMessage()}");
 
                         Notification::make()

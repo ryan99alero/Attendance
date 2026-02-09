@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PayrollFrequencyResource\Pages;
 
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\PayrollFrequencyResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -13,7 +14,7 @@ class EditPayrollFrequency extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 }

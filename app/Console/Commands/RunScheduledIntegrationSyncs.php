@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use App\Models\IntegrationConnection;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -57,7 +58,7 @@ class RunScheduledIntegrationSyncs extends Command
                 } else {
                     $this->warn("  [{$connection->name}] Sync completed with errors (exit code {$exitCode}).");
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->error("  [{$connection->name}] Sync failed: {$e->getMessage()}");
             }
         }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Consensus;
 
+use DB;
 use App\Services\Heuristic\HeuristicPunchTypeAssignmentService;
 use App\Services\ML\MLPunchTypePredictorService;
 use Illuminate\Support\Facades\Log;
@@ -157,6 +158,6 @@ class PunchTypeConsensusService
             return null;
         }
 
-        return \DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+        return DB::table('punch_types')->where('id', $punchTypeId)->value('name');
     }
 }

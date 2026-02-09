@@ -2,9 +2,11 @@
 
 namespace App\Traits;
 
+use Illuminate\Database\Eloquent\Builder;
+
 trait HasEmployeeDataFiltering
 {
-    protected function getTableQuery(): ?\Illuminate\Database\Eloquent\Builder
+    protected function getTableQuery(): ?Builder
     {
         $query = parent::getTableQuery();
 

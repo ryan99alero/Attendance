@@ -2,13 +2,28 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\DatePicker;
+use Filament\Schemas\Components\Grid;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use App\Filament\Resources\VacationCalendarResource\Pages\ListVacationCalendars;
+use App\Filament\Resources\VacationCalendarResource\Pages\CreateVacationCalendar;
+use App\Filament\Resources\VacationCalendarResource\Pages\EditVacationCalendar;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\VacationCalendarResource\Pages;
 use App\Models\VacationCalendar;
 use App\Models\Employee;
 use App\Models\Department;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -16,9 +31,9 @@ use Filament\Tables\Table;
 class VacationCalendarResource extends Resource
 {
     protected static ?string $model = VacationCalendar::class;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar';
     protected static ?string $navigationLabel = 'Vacation Calendars';
-    protected static ?string $navigationGroup = 'Time Off Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
     protected static ?int $navigationSort = 10;
 
     public static function shouldRegisterNavigation(): bool
@@ -100,12 +115,12 @@ class VacationCalendarResource extends Resource
         return $query->whereRaw('1 = 0');
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\Section::make('Vacation Request')
+        return $schema->components([
+            Section::make('Vacation Request')
                 ->schema([
-                    Forms\Components\Select::make('employee_id')
+                    Select::make('employee_id')
                         ->relationship('employee', 'first_name', function (Builder $query) {
                             $user = auth()->user();
 
@@ -147,17 +162,17 @@ class VacationCalendarResource extends Resource
                         ->searchable()
                         ->getOptionLabelFromRecordUsing(fn ($record) => $record->full_names),
 
-                    Forms\Components\DatePicker::make('vacation_date')
+                    DatePicker::make('vacation_date')
                         ->label('Vacation Date')
                         ->required(),
 
-                    Forms\Components\Grid::make(2)
+                    Grid::make(2)
                         ->schema([
-                            Forms\Components\Toggle::make('is_half_day')
+                            Toggle::make('is_half_day')
                                 ->label('Half Day')
                                 ->default(false),
 
-                            Forms\Components\Toggle::make('is_active')
+                            Toggle::make('is_active')
                                 ->label('Active')
                                 ->default(true),
                         ]),
@@ -168,25 +183,25 @@ class VacationCalendarResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('employee.full_names')
+            TextColumn::make('employee.full_names')
                 ->label('Employee')
                 ->sortable()
                 ->searchable(),
 
-            Tables\Columns\TextColumn::make('vacation_date')
+            TextColumn::make('vacation_date')
                 ->label('Vacation Date')
                 ->date()
                 ->sortable(),
 
-            Tables\Columns\IconColumn::make('is_half_day')
+            IconColumn::make('is_half_day')
                 ->label('Half Day')
                 ->boolean(),
 
-            Tables\Columns\IconColumn::make('is_active')
+            IconColumn::make('is_active')
                 ->label('Active')
                 ->boolean(),
 
-            Tables\Columns\TextColumn::make('created_at')
+            TextColumn::make('created_at')
                 ->label('Created')
                 ->dateTime()
                 ->sortable()
@@ -194,18 +209,18 @@ class VacationCalendarResource extends Resource
         ])
         ->defaultSort('vacation_date', 'desc')
         ->filters([
-            Tables\Filters\SelectFilter::make('employee_id')
+            SelectFilter::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->searchable()
                 ->preload(),
 
-            Tables\Filters\TernaryFilter::make('is_half_day')
+            TernaryFilter::make('is_half_day')
                 ->label('Half Day')
                 ->placeholder('All entries')
                 ->trueLabel('Half days only')
                 ->falseLabel('Full days only'),
 
-            Tables\Filters\TernaryFilter::make('is_active')
+            TernaryFilter::make('is_active')
                 ->label('Active Status')
                 ->placeholder('All entries')
                 ->trueLabel('Active only')
@@ -216,9 +231,9 @@ class VacationCalendarResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVacationCalendars::route('/'),
-            'create' => Pages\CreateVacationCalendar::route('/create'),
-            'edit' => Pages\EditVacationCalendar::route('/{record}/edit'),
+            'index' => ListVacationCalendars::route('/'),
+            'create' => CreateVacationCalendar::route('/create'),
+            'edit' => EditVacationCalendar::route('/{record}/edit'),
         ];
     }
 }

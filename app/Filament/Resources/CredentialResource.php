@@ -2,10 +2,29 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\BooleanColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\CredentialResource\Pages\ListCredentials;
+use App\Filament\Resources\CredentialResource\Pages\CreateCredential;
+use App\Filament\Resources\CredentialResource\Pages\EditCredential;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\CredentialResource\Pages;
 use App\Models\Credential;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,23 +36,23 @@ class CredentialResource extends Resource
     protected static ?string $model = Credential::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Employee Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Employee Management';
     protected static ?string $navigationLabel = 'Employee Credentials';
-    protected static ?string $navigationIcon = 'heroicon-o-key';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-key';
     protected static ?int $navigationSort = 40;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Select::make('employee_id')
+        return $schema
+            ->components([
+                Select::make('employee_id')
                     ->label('Employee')
                     ->relationship('employee', 'full_names')
                     ->searchable()
                     ->preload()
                     ->required(),
 
-                Forms\Components\Select::make('kind')
+                Select::make('kind')
                     ->label('Credential Type')
                     ->options([
                         'rfid' => 'RFID',
@@ -48,26 +67,26 @@ class CredentialResource extends Resource
                     ])
                     ->required(),
 
-                Forms\Components\TextInput::make('identifier')
+                TextInput::make('identifier')
                     ->label('Credential Value')
                     ->required()
                     ->maxLength(255)
                     ->helperText('The actual credential value (card number, PIN, etc.)'),
 
-                Forms\Components\TextInput::make('label')
+                TextInput::make('label')
                     ->label('Label')
                     ->maxLength(255)
                     ->helperText('Optional descriptive label for this credential'),
 
-                Forms\Components\Toggle::make('is_active')
+                Toggle::make('is_active')
                     ->label('Active')
                     ->default(true),
 
-                Forms\Components\DateTimePicker::make('issued_at')
+                DateTimePicker::make('issued_at')
                     ->label('Issued At')
                     ->default(now()),
 
-                Forms\Components\DateTimePicker::make('revoked_at')
+                DateTimePicker::make('revoked_at')
                     ->label('Revoked At')
                     ->nullable(),
             ]);
@@ -77,12 +96,12 @@ class CredentialResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('employee.full_names')
+                TextColumn::make('employee.full_names')
                     ->label('Employee')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\BadgeColumn::make('kind')
+                BadgeColumn::make('kind')
                     ->label('Type')
                     ->colors([
                         'primary' => 'rfid',
@@ -92,37 +111,37 @@ class CredentialResource extends Resource
                         'secondary' => 'mobile',
                     ]),
 
-                Tables\Columns\TextColumn::make('identifier')
+                TextColumn::make('identifier')
                     ->label('Credential Value')
                     ->searchable()
                     ->copyable()
                     ->copyMessage('Credential copied to clipboard'),
 
-                Tables\Columns\TextColumn::make('label')
+                TextColumn::make('label')
                     ->label('Label')
                     ->searchable(),
 
-                Tables\Columns\BooleanColumn::make('is_active')
+                BooleanColumn::make('is_active')
                     ->label('Active'),
 
-                Tables\Columns\TextColumn::make('last_used_at')
+                TextColumn::make('last_used_at')
                     ->label('Last Used')
                     ->dateTime()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('issued_at')
+                TextColumn::make('issued_at')
                     ->label('Issued')
                     ->dateTime()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('kind')
+                SelectFilter::make('kind')
                     ->options([
                         'rfid' => 'RFID',
                         'nfc' => 'NFC',
@@ -135,16 +154,16 @@ class CredentialResource extends Resource
                         'mobile' => 'Mobile App',
                     ]),
 
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Active Status'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -160,9 +179,9 @@ class CredentialResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListCredentials::route('/'),
-            'create' => Pages\CreateCredential::route('/create'),
-            'edit' => Pages\EditCredential::route('/{record}/edit'),
+            'index' => ListCredentials::route('/'),
+            'create' => CreateCredential::route('/create'),
+            'edit' => EditCredential::route('/{record}/edit'),
         ];
     }
 }

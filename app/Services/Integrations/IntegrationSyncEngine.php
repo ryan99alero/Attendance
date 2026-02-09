@@ -2,6 +2,7 @@
 
 namespace App\Services\Integrations;
 
+use Exception;
 use App\Models\IntegrationFieldMapping;
 use App\Models\IntegrationObject;
 use App\Services\ModelDiscoveryService;
@@ -153,7 +154,7 @@ class IntegrationSyncEngine
                 foreach ($relatedMappingsByTable as $table => $tableMappings) {
                     $this->syncRelatedTable($primaryRecord, $table, $tableMappings, $parsed, $relationshipMap);
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $identifierDisplay = $identifierConditions[$identifierMappings->first()?->local_field ?? 'id'] ?? 'unknown';
                 $result->addError("{$object->object_name} {$identifierDisplay}: " . $e->getMessage());
             }
@@ -371,7 +372,7 @@ class IntegrationSyncEngine
                 'total_records' => $response['totalRecords'] ?? 0,
                 'error' => null,
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [
                 'success' => false,
                 'object_name' => $object->object_name,

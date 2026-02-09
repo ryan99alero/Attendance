@@ -2,32 +2,38 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Actions\EditAction;
+use App\Filament\Resources\DeviceResource\Pages\ListDevices;
+use App\Filament\Resources\DeviceResource\Pages\CreateDevice;
+use App\Filament\Resources\DeviceResource\Pages\EditDevice;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\DeviceResource\Pages;
 use App\Models\Device;
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Section;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Actions\EditAction;
 
 class DeviceResource extends Resource
 {
     protected static ?string $model = Device::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'System & Hardware';
+    protected static string | \UnitEnum | null $navigationGroup = 'System & Hardware';
     protected static ?string $navigationLabel = 'Devices';
-    protected static ?string $navigationIcon = 'heroicon-o-device-phone-mobile';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-device-phone-mobile';
     protected static ?int $navigationSort = 10;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Section::make('Basic Device Information')
                 ->schema([
                     TextInput::make('device_name')
@@ -218,7 +224,7 @@ class DeviceResource extends Resource
                 ->placeholder('Unknown'),
         ])
         ->defaultSort('device_name')
-        ->actions([
+        ->recordActions([
             EditAction::make(),
         ]);
     }
@@ -226,9 +232,9 @@ class DeviceResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDevices::route('/'),
-            'create' => Pages\CreateDevice::route('/create'),
-            'edit' => Pages\EditDevice::route('/{record}/edit'),
+            'index' => ListDevices::route('/'),
+            'create' => CreateDevice::route('/create'),
+            'edit' => EditDevice::route('/{record}/edit'),
         ];
     }
 }

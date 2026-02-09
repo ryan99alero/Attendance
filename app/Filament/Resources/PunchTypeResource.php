@@ -2,10 +2,22 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use App\Filament\Resources\PunchTypeResource\Pages\ListPunchTypes;
+use App\Filament\Resources\PunchTypeResource\Pages\CreatePunchType;
+use App\Filament\Resources\PunchTypeResource\Pages\EditPunchType;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\PunchTypeResource\Pages;
 use App\Models\PunchType;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -15,21 +27,21 @@ class PunchTypeResource extends Resource
     protected static ?string $model = PunchType::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Time Tracking';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
     protected static ?string $navigationLabel = 'Punch Types';
-    protected static ?string $navigationIcon = 'heroicon-o-tag';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-tag';
     protected static ?int $navigationSort = -80;
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\TextInput::make('name')
+        return $schema->components([
+            TextInput::make('name')
                 ->label('Punch Type Name')
                 ->required(),
-            Forms\Components\Textarea::make('description')
+            Textarea::make('description')
                 ->label('Description')
                 ->nullable(),
-            Forms\Components\Select::make('schedule_reference')
+            Select::make('schedule_reference')
                 ->label('Schedule')
                 ->options([
                     'start_time' => 'Start Time',
@@ -41,7 +53,7 @@ class PunchTypeResource extends Resource
                 ])
                 ->nullable()
                 ->searchable(),
-            Forms\Components\Toggle::make('is_active')
+            Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
         ]);
@@ -50,9 +62,9 @@ class PunchTypeResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('name')->label('Punch Type Name'),
-            Tables\Columns\TextColumn::make('description')->label('Description'),
-            Tables\Columns\TextColumn::make('schedule_reference')
+            TextColumn::make('name')->label('Punch Type Name'),
+            TextColumn::make('description')->label('Description'),
+            TextColumn::make('schedule_reference')
                 ->label('Schedule')
                 ->formatStateUsing(function ($state) {
                     return match ($state) {
@@ -65,16 +77,16 @@ class PunchTypeResource extends Resource
                         default => 'None',
                     };
                 }),
-            Tables\Columns\IconColumn::make('is_active')->label('Active'),
+            IconColumn::make('is_active')->label('Active'),
         ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPunchTypes::route('/'),
-            'create' => Pages\CreatePunchType::route('/create'),
-            'edit' => Pages\EditPunchType::route('/{record}/edit'),
+            'index' => ListPunchTypes::route('/'),
+            'create' => CreatePunchType::route('/create'),
+            'edit' => EditPunchType::route('/{record}/edit'),
         ];
     }
 }

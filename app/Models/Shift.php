@@ -2,39 +2,44 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ *
  *
  * @property int $id
  * @property string $shift_name Name of the shift
- * @property \Illuminate\Support\Carbon $start_time Scheduled start time of the shift
- * @property \Illuminate\Support\Carbon $end_time Scheduled end time of the shift
+ * @property Carbon $start_time Scheduled start time of the shift
+ * @property Carbon $end_time Scheduled end time of the shift
  * @property int|null $base_hours_per_period Standard hours for the shift per pay period
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User|null $creator
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ShiftSchedule> $schedules
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read User|null $creator
+ * @property-read Collection<int, ShiftSchedule> $schedules
  * @property-read int|null $schedules_count
- * @property-read \App\Models\User|null $updater
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereBaseHoursPerPeriod($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereCreatedBy($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereEndTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereShiftName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereStartTime($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereUpdatedBy($value)
+ * @property-read User|null $updater
+ * @method static Builder<static>|Shift newModelQuery()
+ * @method static Builder<static>|Shift newQuery()
+ * @method static Builder<static>|Shift query()
+ * @method static Builder<static>|Shift whereBaseHoursPerPeriod($value)
+ * @method static Builder<static>|Shift whereCreatedAt($value)
+ * @method static Builder<static>|Shift whereCreatedBy($value)
+ * @method static Builder<static>|Shift whereEndTime($value)
+ * @method static Builder<static>|Shift whereId($value)
+ * @method static Builder<static>|Shift whereShiftName($value)
+ * @method static Builder<static>|Shift whereStartTime($value)
+ * @method static Builder<static>|Shift whereUpdatedAt($value)
+ * @method static Builder<static>|Shift whereUpdatedBy($value)
  * @property int $multi_day_shift Indicates if the shift spans multiple calendar days
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Shift whereMultiDayShift($value)
+ * @method static Builder<static>|Shift whereMultiDayShift($value)
  * @mixin \Eloquent
  */
 class Shift extends Model
@@ -56,17 +61,17 @@ class Shift extends Model
         'end_time' => 'datetime:H:i:s',
     ];
 
-    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function schedules(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function schedules(): HasMany
     {
         return $this->hasMany(ShiftSchedule::class);
     }
 
-    public function updater(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }

@@ -2,6 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use App\Filament\Resources\ShiftResource\Pages\ListShifts;
+use App\Filament\Resources\ShiftResource\Pages\CreateShift;
+use App\Filament\Resources\ShiftResource\Pages\EditShift;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
 use Filament\Forms\Components\TextInput;
@@ -11,7 +18,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BooleanColumn;
-use Filament\Forms\Form;
 use Filament\Tables\Table;
 
 class ShiftResource extends Resource
@@ -19,20 +25,20 @@ class ShiftResource extends Resource
     protected static ?string $model = Shift::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Scheduling & Shifts';
+    protected static string | \UnitEnum | null $navigationGroup = 'Scheduling & Shifts';
     protected static ?string $navigationLabel = 'Shifts';
-    protected static ?string $navigationIcon = 'heroicon-o-clock';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clock';
     protected static ?int $navigationSort = 10;
 
     /**
      * Define the form schema for creating/editing records.
      *
-     * @param Form $form
-     * @return Form
+     * @param Schema $schema
+     * @return Schema
      */
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             TextInput::make('shift_name')
                 ->label('Shift Name')
                 ->required()
@@ -98,9 +104,9 @@ class ShiftResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListShifts::route('/'),
-            'create' => Pages\CreateShift::route('/create'),
-            'edit' => Pages\EditShift::route('/{record}/edit'),
+            'index' => ListShifts::route('/'),
+            'create' => CreateShift::route('/create'),
+            'edit' => EditShift::route('/{record}/edit'),
         ];
     }
 }

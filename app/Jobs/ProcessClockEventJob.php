@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use Exception;
+use Throwable;
 use App\Models\ClockEvent;
 use App\Models\Attendance;
 use App\Models\CompanySetup;
@@ -107,7 +109,7 @@ class ProcessClockEventJob implements ShouldQueue
                 'batch_id' => $batchId
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->markEventAsError($e->getMessage());
 
             Log::error("[QueueClockEventProcessing] Failed to process clock event", [
@@ -126,7 +128,7 @@ class ProcessClockEventJob implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::error("[QueueClockEventProcessing] Job failed after all retries", [
             'clock_event_id' => $this->clockEvent->id,

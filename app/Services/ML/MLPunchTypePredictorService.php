@@ -2,6 +2,7 @@
 
 namespace App\Services\ML;
 
+use Exception;
 use App\Models\Attendance;
 use Phpml\Classification\KNearestNeighbors;
 use Phpml\ModelManager;
@@ -181,7 +182,7 @@ class MLPunchTypePredictorService
             Log::info("🤖 [ML] Prediction: Employee ID: {$employeeId}, Punch Time: {$punchTime}, Shift Date: {$shiftDate}, Group: {$externalGroupId} -> Predicted Type ID: " . ($predicted ?? 'NULL'));
 
             return is_numeric($predicted) ? (int) $predicted : null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[ML] Prediction failed. Error: " . $e->getMessage());
             return null;
         }

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class DepartmentBreakdownWidget extends ChartWidget
 {
-    protected static ?string $heading = 'Today\'s Attendance by Department';
+    protected ?string $heading = 'Today\'s Attendance by Department';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -98,5 +98,5 @@ class DepartmentBreakdownWidget extends ChartWidget
     /**
      * Refresh interval in seconds
      */
-    protected static ?string $pollingInterval = '120s';
+    protected ?string $pollingInterval = '120s';
 }

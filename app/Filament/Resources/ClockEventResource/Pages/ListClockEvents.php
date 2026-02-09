@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\ClockEventResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
 use App\Filament\Resources\ClockEventResource;
 use App\Services\ClockEventProcessing\ClockEventProcessingService;
 use Filament\Actions;
@@ -15,7 +17,7 @@ class ListClockEvents extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('process_batch')
+            Action::make('process_batch')
                 ->label('Process Events')
                 ->icon('heroicon-o-play')
                 ->color('success')
@@ -48,7 +50,7 @@ class ListClockEvents extends ListRecords
                     $this->redirect(request()->header('Referer'));
                 }),
 
-            Actions\Action::make('processing_stats')
+            Action::make('processing_stats')
                 ->label('Stats')
                 ->icon('heroicon-o-chart-bar')
                 ->color('info')
@@ -61,7 +63,7 @@ class ListClockEvents extends ListRecords
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Close'),
 
-            Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }

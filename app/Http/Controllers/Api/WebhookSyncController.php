@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Throwable;
 use App\Http\Controllers\Controller;
 use App\Models\IntegrationConnection;
 use App\Models\IntegrationSyncLog;
@@ -91,7 +92,7 @@ class WebhookSyncController extends Controller
                 'stats' => $aggregated,
                 'errors' => $errors,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $syncLog->markFailed($e->getMessage());
 
             return response()->json([

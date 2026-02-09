@@ -2,6 +2,7 @@
 
 namespace App\Services\Heuristic;
 
+use DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Attendance;
 use App\Services\Shift\ShiftScheduleService;
@@ -145,7 +146,7 @@ class HeuristicPunchTypeAssignmentService
         $startTypes = ['Clock In', 'Lunch Start', 'Break Start'];
         $stopTypes = ['Clock Out', 'Lunch Stop', 'Break End'];
 
-        $punchTypeName = \DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+        $punchTypeName = DB::table('punch_types')->where('id', $punchTypeId)->value('name');
 
         if (in_array($punchTypeName, $startTypes)) {
             return 'start';
@@ -158,7 +159,7 @@ class HeuristicPunchTypeAssignmentService
 
     private function getPunchTypeId(string $type): ?int
     {
-        $id = \DB::table('punch_types')->where('name', $type)->value('id');
+        $id = DB::table('punch_types')->where('name', $type)->value('id');
 
         if (!$id) {
             Log::warning("⚠️ [Heuristic] Punch Type '{$type}' not found.");

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Exception;
 use App\Models\CompanySetup;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
@@ -80,7 +81,7 @@ class DynamicMailConfigServiceProvider extends ServiceProvider
                 Config::set('mail.reply_to.name', $companySetup->smtp_from_name ?? config('app.name'));
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Silently fail - don't break the app if DB is not ready
             report($e);
         }

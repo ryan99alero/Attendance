@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PunchResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
 use App\Filament\Resources\PunchResource;
 use App\Imports\DataImport;
 use App\Exports\DataExport;
@@ -30,8 +31,8 @@ class ListPunches extends ListRecords
             Action::make('Import Punchs')
                 ->label('Import')
                 ->color('primary')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),

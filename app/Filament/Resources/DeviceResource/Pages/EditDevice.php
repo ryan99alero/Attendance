@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\DeviceResource\Pages;
 
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\DeviceResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -14,7 +16,7 @@ class EditDevice extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('reboot')
+            Action::make('reboot')
                 ->label('Reboot Device')
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
@@ -32,7 +34,7 @@ class EditDevice extends EditRecord
                         ->success()
                         ->send();
                 }),
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 

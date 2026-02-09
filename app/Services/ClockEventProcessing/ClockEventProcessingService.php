@@ -2,6 +2,7 @@
 
 namespace App\Services\ClockEventProcessing;
 
+use Exception;
 use App\Models\ClockEvent;
 use App\Models\Attendance;
 use App\Models\PunchType;
@@ -50,7 +51,7 @@ class ClockEventProcessingService
         foreach ($groupedEvents as $groupKey => $events) {
             try {
                 $this->processEventGroup($events, $batchId, $stats);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("[ClockEventProcessing] Failed to process group", [
                     'group_key' => $groupKey,
                     'batch_id' => $batchId,
@@ -115,7 +116,7 @@ class ClockEventProcessingService
                     'batch_id' => $batchId
                 ]);
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->markEventAsError($event, $e->getMessage(), $batchId);
                 $stats['errors']++;
 
@@ -223,7 +224,7 @@ class ClockEventProcessingService
         foreach ($groupedEvents as $date => $dayEvents) {
             try {
                 $this->processEventGroup($dayEvents, $batchId, $stats);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("[ClockEventProcessing] Failed to process employee events", [
                     'employee_id' => $employeeId,
                     'date' => $date,

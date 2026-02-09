@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Models\Employee;
 use App\Models\CompanySetup;
 use App\Models\VacationPolicy;
@@ -98,7 +99,7 @@ class ConfigurableVacationAccrualService
     {
         $payrollFreq = $this->companySetup->payrollFrequency;
         if (!$payrollFreq) {
-            throw new \Exception('Payroll frequency not configured for pay period vacation accrual');
+            throw new Exception('Payroll frequency not configured for pay period vacation accrual');
         }
 
         // Use configured hours per period or calculate from annual entitlement
@@ -240,7 +241,7 @@ class ConfigurableVacationAccrualService
             'calendar_year' => $this->processCalendarYearAccrual($employee, $date),
             'pay_period' => $this->processPayPeriodAccrual($employee, $date),
             'anniversary' => $this->processAnniversaryAccrual($employee, $date),
-            default => throw new \Exception("Unknown vacation accrual method: $method")
+            default => throw new Exception("Unknown vacation accrual method: $method")
         };
     }
 
@@ -365,13 +366,13 @@ class ConfigurableVacationAccrualService
     protected function processCalendarYearAccrual(Employee $employee, Carbon $date): VacationTransaction
     {
         // Implementation for calendar year processing
-        throw new \Exception('Calendar year accrual processing not yet implemented');
+        throw new Exception('Calendar year accrual processing not yet implemented');
     }
 
     protected function processPayPeriodAccrual(Employee $employee, Carbon $date): VacationTransaction
     {
         // Implementation for pay period processing
-        throw new \Exception('Pay period accrual processing not yet implemented');
+        throw new Exception('Pay period accrual processing not yet implemented');
     }
 
     protected function processAnniversaryAccrual(Employee $employee, Carbon $date): VacationTransaction

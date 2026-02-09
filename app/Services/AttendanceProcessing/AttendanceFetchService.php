@@ -3,6 +3,7 @@
 
 namespace App\Services\AttendanceProcessing;
 
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\QueryException;
@@ -56,7 +57,7 @@ class AttendanceFetchService
             Log::error("[AttendanceFetchService] ❌ SQL Error fetching {$processType}: " . $qe->getMessage());
             return [];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("[AttendanceFetchService] ❌ General Error fetching {$processType}: " . $e->getMessage());
             return [];
         }

@@ -2,14 +2,23 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Textarea;
+use App\Models\ShiftSchedule;
+use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
+use App\Filament\Resources\EmployeeResource\Pages\CreateEmployee;
+use App\Filament\Resources\EmployeeResource\Pages\EditEmployee;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Shift;
 use Filament\Resources\Resource;
-use Filament\Forms\Form;
-use Filament\Forms\Components\Tabs;
-use Filament\Forms\Components\Section;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
@@ -23,20 +32,20 @@ class EmployeeResource extends Resource
     protected static ?string $model = Employee::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Employee Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Employee Management';
     protected static ?string $navigationLabel = 'Employees';
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
     protected static ?int $navigationSort = 10;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Tabs::make('Employee')
                 ->tabs([
                     // =====================================================
                     // TAB 1: PERSONAL INFORMATION
                     // =====================================================
-                    Tabs\Tab::make('Personal')
+                    Tab::make('Personal')
                         ->icon('heroicon-o-user')
                         ->schema([
                             Section::make('Basic Information')
@@ -109,7 +118,7 @@ class EmployeeResource extends Resource
 
                             Section::make('Notes')
                                 ->schema([
-                                    \Filament\Forms\Components\Textarea::make('notes')
+                                    Textarea::make('notes')
                                         ->label('Employee Notes')
                                         ->nullable()
                                         ->rows(3)
@@ -121,7 +130,7 @@ class EmployeeResource extends Resource
                     // =====================================================
                     // TAB 2: EMPLOYMENT
                     // =====================================================
-                    Tabs\Tab::make('Employment')
+                    Tab::make('Employment')
                         ->icon('heroicon-o-briefcase')
                         ->schema([
                             Section::make('Employment Dates')
@@ -153,7 +162,7 @@ class EmployeeResource extends Resource
                                         ->nullable(),
                                     Select::make('shift_schedule_id')
                                         ->label('Shift Schedule')
-                                        ->options(\App\Models\ShiftSchedule::with(['shift'])
+                                        ->options(ShiftSchedule::with(['shift'])
                                             ->get()
                                             ->mapWithKeys(function ($schedule) {
                                                 $shiftName = $schedule->shift ? $schedule->shift->shift_name : 'No Shift';
@@ -182,7 +191,7 @@ class EmployeeResource extends Resource
                     // =====================================================
                     // TAB 3: PAY & OVERTIME
                     // =====================================================
-                    Tabs\Tab::make('Pay & Overtime')
+                    Tab::make('Pay & Overtime')
                         ->icon('heroicon-o-currency-dollar')
                         ->schema([
                             Section::make('Pay Information')
@@ -281,9 +290,9 @@ class EmployeeResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListEmployees::route('/'),
-            'create' => Pages\CreateEmployee::route('/create'),
-            'edit' => Pages\EditEmployee::route('/{record}/edit'),
+            'index' => ListEmployees::route('/'),
+            'create' => CreateEmployee::route('/create'),
+            'edit' => EditEmployee::route('/{record}/edit'),
         ];
     }
 }

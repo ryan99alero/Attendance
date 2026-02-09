@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VacationCalendarResource\Pages;
 
+use Log;
 use App\Filament\Resources\VacationCalendarResource;
 use App\Models\VacationCalendar;
 use App\Models\Employee;
@@ -14,7 +15,7 @@ class CreateVacationCalendar extends CreateRecord
 
     protected function handleRecordCreation(array $data): VacationCalendar
     {
-        \Log::info("Creating VacationCalendar with data: ", $data);
+        Log::info("Creating VacationCalendar with data: ", $data);
 
         // Simple creation for single employee, single date
         $vacationCalendar = VacationCalendar::create([
@@ -26,7 +27,7 @@ class CreateVacationCalendar extends CreateRecord
             'updated_by' => auth()->id(),
         ]);
 
-        \Log::info("VacationCalendar record created successfully: ", $vacationCalendar->toArray());
+        Log::info("VacationCalendar record created successfully: ", $vacationCalendar->toArray());
 
         return $vacationCalendar;
     }

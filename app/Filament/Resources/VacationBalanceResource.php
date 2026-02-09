@@ -2,11 +2,22 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Columns\TextColumn;
+use App\Filament\Resources\VacationBalanceResource\Pages\ListVacationBalances;
+use App\Filament\Resources\VacationBalanceResource\Pages\CreateVacationBalance;
+use App\Filament\Resources\VacationBalanceResource\Pages\EditVacationBalance;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\VacationBalanceResource\Pages;
 use App\Models\VacationBalance;
 use App\Models\CompanySetup;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,24 +25,24 @@ use Filament\Tables\Table;
 class VacationBalanceResource extends Resource
 {
     protected static ?string $model = VacationBalance::class;
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Vacation Balances';
-    protected static ?string $navigationGroup = 'Time Off Management';
+    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
     protected static ?int $navigationSort = 20;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
         $companySetup = CompanySetup::first();
         $vacationAccrualMethod = $companySetup?->vacation_accrual_method ?? 'anniversary';
 
-        return $form->schema([
-            Forms\Components\Select::make('employee_id')
+        return $schema->components([
+            Select::make('employee_id')
                 ->relationship('employee', 'first_name')
                 ->label('Employee')
                 ->required(),
 
             // Only show accrual_rate for pay_period method
-            Forms\Components\TextInput::make('accrual_rate')
+            TextInput::make('accrual_rate')
                 ->label('Accrual Rate (Hours per Pay Period)')
                 ->numeric()
                 ->step(0.0001)
@@ -39,50 +50,50 @@ class VacationBalanceResource extends Resource
                 ->visible($vacationAccrualMethod === 'pay_period')
                 ->helperText('Hours of vacation accrued each pay period'),
 
-            Forms\Components\TextInput::make('accrued_hours')
+            TextInput::make('accrued_hours')
                 ->label('Accrued Hours')
                 ->numeric()
                 ->step(0.01)
                 ->required(),
 
-            Forms\Components\TextInput::make('used_hours')
+            TextInput::make('used_hours')
                 ->label('Used Hours')
                 ->numeric()
                 ->step(0.01)
                 ->required(),
 
-            Forms\Components\TextInput::make('carry_over_hours')
+            TextInput::make('carry_over_hours')
                 ->label('Carry Over Hours')
                 ->numeric()
                 ->step(0.01)
                 ->nullable(),
 
-            Forms\Components\TextInput::make('cap_hours')
+            TextInput::make('cap_hours')
                 ->label('Cap Hours')
                 ->numeric()
                 ->step(0.01)
                 ->required(),
 
             // Anniversary-specific fields
-            Forms\Components\Section::make('Anniversary Information')
+            Section::make('Anniversary Information')
                 ->schema([
-                    Forms\Components\TextInput::make('accrual_year')
+                    TextInput::make('accrual_year')
                         ->label('Current Service Year')
                         ->numeric()
                         ->disabled()
                         ->helperText('Years of service for this employee'),
 
-                    Forms\Components\DatePicker::make('last_anniversary_date')
+                    DatePicker::make('last_anniversary_date')
                         ->label('Last Anniversary Date')
                         ->disabled()
                         ->helperText('Date of most recent anniversary accrual'),
 
-                    Forms\Components\DatePicker::make('next_anniversary_date')
+                    DatePicker::make('next_anniversary_date')
                         ->label('Next Anniversary Date')
                         ->disabled()
                         ->helperText('Date of next scheduled anniversary'),
 
-                    Forms\Components\TextInput::make('annual_days_earned')
+                    TextInput::make('annual_days_earned')
                         ->label('Annual Days Earned')
                         ->numeric()
                         ->step(0.01)
@@ -90,7 +101,7 @@ class VacationBalanceResource extends Resource
                         ->suffix('days')
                         ->helperText('Vacation days earned at last anniversary'),
 
-                    Forms\Components\TextInput::make('current_year_awarded')
+                    TextInput::make('current_year_awarded')
                         ->label('Current Year Hours Awarded')
                         ->numeric()
                         ->step(0.01)
@@ -102,9 +113,9 @@ class VacationBalanceResource extends Resource
                 ->columns(2),
 
             // Pay Period specific fields
-            Forms\Components\Section::make('Pay Period Information')
+            Section::make('Pay Period Information')
                 ->schema([
-                    Forms\Components\DatePicker::make('policy_effective_date')
+                    DatePicker::make('policy_effective_date')
                         ->label('Policy Effective Date')
                         ->helperText('Date when current accrual policy became effective'),
                 ])
@@ -119,24 +130,24 @@ class VacationBalanceResource extends Resource
         $vacationAccrualMethod = $companySetup?->vacation_accrual_method ?? 'anniversary';
 
         $columns = [
-            Tables\Columns\TextColumn::make('employee.full_names')
+            TextColumn::make('employee.full_names')
                 ->label('Employee')
                 ->sortable()
                 ->searchable(),
 
-            Tables\Columns\TextColumn::make('accrued_hours')
+            TextColumn::make('accrued_hours')
                 ->label('Accrued Hours')
                 ->numeric(decimalPlaces: 2)
                 ->suffix(' hrs')
                 ->sortable(),
 
-            Tables\Columns\TextColumn::make('used_hours')
+            TextColumn::make('used_hours')
                 ->label('Used Hours')
                 ->numeric(decimalPlaces: 2)
                 ->suffix(' hrs')
                 ->sortable(),
 
-            Tables\Columns\TextColumn::make('available_hours')
+            TextColumn::make('available_hours')
                 ->label('Available Hours')
                 ->numeric(decimalPlaces: 2)
                 ->suffix(' hrs')
@@ -144,14 +155,14 @@ class VacationBalanceResource extends Resource
                 ->sortable()
                 ->color(fn ($state) => $state < 0 ? 'danger' : 'success'),
 
-            Tables\Columns\TextColumn::make('carry_over_hours')
+            TextColumn::make('carry_over_hours')
                 ->label('Carry Over Hours')
                 ->numeric(decimalPlaces: 2)
                 ->suffix(' hrs')
                 ->placeholder('None')
                 ->sortable(),
 
-            Tables\Columns\TextColumn::make('cap_hours')
+            TextColumn::make('cap_hours')
                 ->label('Cap Hours')
                 ->numeric(decimalPlaces: 2)
                 ->suffix(' hrs')
@@ -160,7 +171,7 @@ class VacationBalanceResource extends Resource
 
         // Add method-specific columns
         if ($vacationAccrualMethod === 'pay_period') {
-            $columns[] = Tables\Columns\TextColumn::make('accrual_rate')
+            $columns[] = TextColumn::make('accrual_rate')
                 ->label('Accrual Rate')
                 ->numeric(decimalPlaces: 4)
                 ->suffix(' hrs/period')
@@ -169,24 +180,24 @@ class VacationBalanceResource extends Resource
 
         if ($vacationAccrualMethod === 'anniversary') {
             array_splice($columns, 4, 0, [
-                Tables\Columns\TextColumn::make('accrual_year')
+                TextColumn::make('accrual_year')
                     ->label('Service Year')
                     ->sortable()
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('annual_days_earned')
+                TextColumn::make('annual_days_earned')
                     ->label('Annual Days')
                     ->numeric(decimalPlaces: 1)
                     ->suffix(' days')
                     ->sortable()
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('last_anniversary_date')
+                TextColumn::make('last_anniversary_date')
                     ->label('Last Anniversary')
                     ->date()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('next_anniversary_date')
+                TextColumn::make('next_anniversary_date')
                     ->label('Next Anniversary')
                     ->date()
                     ->sortable()
@@ -200,9 +211,9 @@ class VacationBalanceResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVacationBalances::route('/'),
-            'create' => Pages\CreateVacationBalance::route('/create'),
-            'edit' => Pages\EditVacationBalance::route('/{record}/edit'),
+            'index' => ListVacationBalances::route('/'),
+            'create' => CreateVacationBalance::route('/create'),
+            'edit' => EditVacationBalance::route('/{record}/edit'),
         ];
     }
 }

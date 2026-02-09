@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Models\Employee;
 use App\Models\VacationBalance;
 use Carbon\Carbon;
@@ -66,7 +67,7 @@ class VacationAccrualService
     public function processAnniversaryAccrual(Employee $employee, Carbon $anniversaryDate = null): VacationBalance
     {
         if (!$employee->date_of_hire) {
-            throw new \Exception("Employee {$employee->id} has no hire date set.");
+            throw new Exception("Employee {$employee->id} has no hire date set.");
         }
 
         $anniversaryDate = $anniversaryDate ?? Carbon::now();

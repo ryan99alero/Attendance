@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use App\Models\Employee;
 use App\Models\CompanySetup;
 use App\Models\VacationPolicy;
@@ -94,7 +95,7 @@ class ProcessVacationAccruals extends Command
                     }
                 }
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $errors++;
                 $this->newLine();
                 $this->error("❌ {$employee->full_names}: " . $e->getMessage());

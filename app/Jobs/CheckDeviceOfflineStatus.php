@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Mail\DeviceBackOnlineAlert;
 use App\Mail\DeviceOfflineAlert;
 use App\Models\CompanySetup;
@@ -94,7 +95,7 @@ class CheckDeviceOfflineStatus implements ShouldQueue
             $device->update(['offline_alerted_at' => now()]);
 
             Log::info("CheckDeviceOfflineStatus: Sent offline alert for device {$device->id} to " . implode(', ', $recipients));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("CheckDeviceOfflineStatus: Failed to send offline alert for device {$device->id}: " . $e->getMessage());
         }
     }
@@ -125,7 +126,7 @@ class CheckDeviceOfflineStatus implements ShouldQueue
             $device->update(['offline_alerted_at' => null]);
 
             Log::info("CheckDeviceOfflineStatus: Sent back-online alert for device {$device->id} to " . implode(', ', $recipients));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("CheckDeviceOfflineStatus: Failed to send back-online alert for device {$device->id}: " . $e->getMessage());
             // Still clear the flag to prevent repeated attempts
             $device->update(['offline_alerted_at' => null]);

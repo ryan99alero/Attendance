@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use App\Services\Payroll\PayPeriodGeneratorService;
 use App\Models\CompanySetup;
 use Carbon\Carbon;
@@ -88,7 +89,7 @@ class GeneratePayPeriods extends Command
 
             return Command::SUCCESS;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error("❌ Error generating PayPeriods: {$e->getMessage()}");
             return Command::FAILURE;
         }

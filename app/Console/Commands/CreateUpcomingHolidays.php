@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use Illuminate\Console\Command;
 use App\Models\HolidayTemplate;
 use App\Models\VacationCalendar;
@@ -73,7 +74,7 @@ class CreateUpcomingHolidays extends Command
                     }
                 }
 
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $errors++;
                 $this->newLine();
                 $this->error("❌ {$template->name}: " . $e->getMessage());

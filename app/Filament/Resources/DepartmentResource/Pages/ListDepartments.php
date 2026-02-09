@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\DepartmentResource\Pages;
 
+use Filament\Forms\Components\FileUpload;
+use Exception;
 use App\Filament\Resources\DepartmentResource;
 use Illuminate\Support\Facades\Log;
 use App\Imports\DataImport;
@@ -33,8 +35,8 @@ class ListDepartments extends ListRecords
             Action::make('Import Departments')
                 ->label('Import')
                 ->color('primary')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('file')
+                ->schema([
+                    FileUpload::make('file')
                         ->label('Import File')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
@@ -53,7 +55,7 @@ class ListDepartments extends ListRecords
                         // Check if file exists
                         if (!Storage::disk('public')->exists($fileName)) {
                             Log::error("TACO3: File does not exist in public storage: {$fileName}");
-                            throw new \Exception('File does not exist.');
+                            throw new Exception('File does not exist.');
                         }
 
                         // Perform the import
@@ -66,7 +68,7 @@ class ListDepartments extends ListRecords
                             ->body('Departments imported successfully!')
                             ->success()
                             ->send();
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Log::error('TACO6: Import failed: ' . $e->getMessage());
 
                         Notification::make()

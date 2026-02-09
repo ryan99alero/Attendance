@@ -2,6 +2,10 @@
 
 namespace App\Filament\Resources\IntegrationConnectionResource\Pages;
 
+use Filament\Actions\Action;
+use Illuminate\Support\Facades\Http;
+use Exception;
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\IntegrationConnectionResource;
 use App\Services\Integrations\IntegrationSyncEngine;
 use App\Services\Integrations\PaceApiClient;
@@ -18,7 +22,7 @@ class EditIntegrationConnection extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('test_connection')
+            Action::make('test_connection')
                 ->label('Test Connection')
                 ->icon('heroicon-o-signal')
                 ->color('info')
@@ -31,7 +35,7 @@ class EditIntegrationConnection extends EditRecord
                     } else {
                         // Generic test: just try an HTTP GET to the base URL
                         try {
-                            $response = \Illuminate\Support\Facades\Http::timeout($this->record->timeout_seconds)
+                            $response = Http::timeout($this->record->timeout_seconds)
                                 ->get($this->record->base_url);
 
                             $this->record->markConnected();
@@ -39,7 +43,7 @@ class EditIntegrationConnection extends EditRecord
                                 'success' => true,
                                 'message' => 'Connection successful (HTTP ' . $response->status() . ')',
                             ];
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             $this->record->markError($e->getMessage());
                             $result = [
                                 'success' => false,
@@ -70,7 +74,7 @@ class EditIntegrationConnection extends EditRecord
                     }
                 }),
 
-            Actions\Action::make('discover_objects')
+            Action::make('discover_objects')
                 ->label('Discover Objects')
                 ->icon('heroicon-o-magnifying-glass')
                 ->color('warning')
@@ -128,7 +132,7 @@ class EditIntegrationConnection extends EditRecord
                 })
                 ->visible(fn () => $this->record->driver === 'pace'),
 
-            Actions\Action::make('regenerate_webhook_token')
+            Action::make('regenerate_webhook_token')
                 ->label('Regenerate Webhook Token')
                 ->icon('heroicon-o-key')
                 ->color('danger')
@@ -147,7 +151,7 @@ class EditIntegrationConnection extends EditRecord
                 })
                 ->visible(fn () => $this->record->isPushMode()),
 
-            Actions\Action::make('force_sync')
+            Action::make('force_sync')
                 ->label('Force Sync')
                 ->icon('heroicon-o-arrow-path')
                 ->color('success')
@@ -177,7 +181,7 @@ class EditIntegrationConnection extends EditRecord
                                 ->persistent()
                                 ->send();
                         }
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         Notification::make()
                             ->title('Sync Failed')
                             ->body($e->getMessage())
@@ -188,7 +192,7 @@ class EditIntegrationConnection extends EditRecord
                 })
                 ->visible(fn () => $this->record->driver === 'pace'),
 
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 
@@ -200,7 +204,7 @@ class EditIntegrationConnection extends EditRecord
         if (!empty($encrypted)) {
             try {
                 $data['credentials'] = json_decode(Crypt::decryptString($encrypted), true);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $data['credentials'] = [];
             }
         }

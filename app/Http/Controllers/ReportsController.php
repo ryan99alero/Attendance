@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
+use App\Models\Department;
+use App\Models\Attendance;
+use Exception;
+use Log;
 use App\Reports\ADPExportReport;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,9 +22,9 @@ class ReportsController extends Controller
     {
         // Basic dashboard with key metrics
         $metrics = [
-            'total_employees' => \App\Models\Employee::where('is_active', true)->count(),
-            'total_departments' => \App\Models\Department::count(),
-            'todays_punches' => \App\Models\Attendance::whereDate('punch_time', today())->count(),
+            'total_employees' => Employee::where('is_active', true)->count(),
+            'total_departments' => Department::count(),
+            'todays_punches' => Attendance::whereDate('punch_time', today())->count(),
             'this_week_hours' => $this->calculateWeeklyHours(),
         ];
 
@@ -122,8 +127,8 @@ class ReportsController extends Controller
                     return $this->exportToCSV($report, $startDate, $endDate);
             }
 
-        } catch (\Exception $e) {
-            \Log::error('ADP Export Error: ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('ADP Export Error: ' . $e->getMessage());
             return response()->json(['error' => 'Export generation failed'], 500);
         }
     }
@@ -173,7 +178,7 @@ class ReportsController extends Controller
 
         // This is a simplified calculation
         // In practice, you'd need more complex logic to calculate actual hours
-        $punchCount = \App\Models\Attendance::whereBetween('punch_time', [$startOfWeek, $endOfWeek])
+        $punchCount = Attendance::whereBetween('punch_time', [$startOfWeek, $endOfWeek])
             ->where('status', '!=', 'deleted')
             ->count();
 

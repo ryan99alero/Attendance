@@ -2,6 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Tables\Table;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\ClassificationResource\Pages\ListClassifications;
+use App\Filament\Resources\ClassificationResource\Pages\CreateClassification;
+use App\Filament\Resources\ClassificationResource\Pages\EditClassification;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\ClassificationResource\Pages;
 use App\Models\Classification;
 use Filament\Forms;
@@ -9,23 +19,21 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Resources\Resource;
 
 class ClassificationResource extends Resource
 {
     protected static ?string $model = Classification::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-squares-2x2';
     protected static ?string $navigationLabel = 'Classifications';
-    protected static ?string $navigationGroup = 'System & Hardware';
+    protected static string | \UnitEnum | null $navigationGroup = 'System & Hardware';
     protected static ?int $navigationSort = 30;
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('name')
                     ->label('Name')
                     ->required(),
@@ -35,7 +43,7 @@ class ClassificationResource extends Resource
             ]);
     }
 
-    public static function table(Tables\Table $table): Tables\Table
+    public static function table(Table $table): Table
     {
         return $table
             ->columns([
@@ -54,10 +62,10 @@ class ClassificationResource extends Resource
                     ->label('Updated At')
                     ->date(),
             ])
-            ->actions([
+            ->recordActions([
                 EditAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 DeleteBulkAction::make(),
             ]);
     }
@@ -65,9 +73,9 @@ class ClassificationResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListClassifications::route('/'),
-            'create' => Pages\CreateClassification::route('/create'),
-            'edit' => Pages\EditClassification::route('/{record}/edit'),
+            'index' => ListClassifications::route('/'),
+            'create' => CreateClassification::route('/create'),
+            'edit' => EditClassification::route('/{record}/edit'),
         ];
     }
 }

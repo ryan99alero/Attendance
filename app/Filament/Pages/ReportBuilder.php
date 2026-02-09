@@ -2,9 +2,21 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Components\Utilities\Get;
+use Exception;
+use Log;
 use Filament\Pages\Page;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Actions\Action;
@@ -19,11 +31,11 @@ class ReportBuilder extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
-    protected static string $view = 'filament.pages.report-builder';
+    protected string $view = 'filament.pages.report-builder';
 
-    protected static ?string $navigationGroup = 'Reports & Analytics';
+    protected static string | \UnitEnum | null $navigationGroup = 'Reports & Analytics';
 
     protected static ?string $title = 'Report Builder';
 
@@ -51,42 +63,42 @@ class ReportBuilder extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Tabs::make('Report Configuration')
+        return $schema
+            ->components([
+                Tabs::make('Report Configuration')
                     ->tabs([
-                        Forms\Components\Tabs\Tab::make('Basic Settings')
+                        Tab::make('Basic Settings')
                             ->schema([
-                                Forms\Components\Section::make('Date Range')
+                                Section::make('Date Range')
                                     ->schema([
-                                        Forms\Components\DatePicker::make('start_date')
+                                        DatePicker::make('start_date')
                                             ->label('Start Date')
                                             ->required(),
-                                        Forms\Components\DatePicker::make('end_date')
+                                        DatePicker::make('end_date')
                                             ->label('End Date')
                                             ->required(),
                                     ])
                                     ->columns(2),
 
-                                Forms\Components\Section::make('Filters')
+                                Section::make('Filters')
                                     ->schema([
-                                        Forms\Components\Select::make('employee_ids')
+                                        Select::make('employee_ids')
                                             ->label('Employees')
                                             ->multiple()
                                             ->searchable()
                                             ->options(Employee::where('is_active', true)->pluck('full_names', 'id'))
                                             ->helperText('Leave empty to include all employees'),
 
-                                        Forms\Components\Select::make('department_ids')
+                                        Select::make('department_ids')
                                             ->label('Departments')
                                             ->multiple()
                                             ->searchable()
                                             ->options(Department::pluck('name', 'id'))
                                             ->helperText('Leave empty to include all departments'),
 
-                                        Forms\Components\Select::make('export_format')
+                                        Select::make('export_format')
                                             ->label('Export Format')
                                             ->options([
                                                 'csv' => 'CSV',
@@ -99,15 +111,15 @@ class ReportBuilder extends Page implements HasForms
                                     ->columns(3),
                             ]),
 
-                        Forms\Components\Tabs\Tab::make('Field Mapping')
+                        Tab::make('Field Mapping')
                             ->schema([
-                                Forms\Components\Section::make('Standard Fields')
+                                Section::make('Standard Fields')
                                     ->description('Configure which fields to include and their display names')
                                     ->schema([
-                                        Forms\Components\Repeater::make('field_mappings')
+                                        Repeater::make('field_mappings')
                                             ->label('')
                                             ->schema([
-                                                Forms\Components\Select::make('source_table')
+                                                Select::make('source_table')
                                                     ->label('Source Table')
                                                     ->options(function () {
                                                         $discovery = new ModelDiscoveryService();
@@ -118,7 +130,7 @@ class ReportBuilder extends Page implements HasForms
                                                     ->afterStateUpdated(function (callable $set) {
                                                         $set('source_field', null); // Reset field when table changes
                                                     }),
-                                                Forms\Components\Select::make('source_field')
+                                                Select::make('source_field')
                                                     ->label('Source Field')
                                                     ->options(function (callable $get) {
                                                         $sourceTable = $get('source_table');
@@ -132,10 +144,10 @@ class ReportBuilder extends Page implements HasForms
                                                     ->required()
                                                     ->disabled(fn (callable $get) => !$get('source_table'))
                                                     ->helperText('Select a table first'),
-                                                Forms\Components\TextInput::make('display_name')
+                                                TextInput::make('display_name')
                                                     ->label('Display Name')
                                                     ->required(),
-                                                Forms\Components\Toggle::make('enabled')
+                                                Toggle::make('enabled')
                                                     ->label('Include in Export')
                                                     ->default(true),
                                             ])
@@ -145,23 +157,23 @@ class ReportBuilder extends Page implements HasForms
                                     ]),
                             ]),
 
-                        Forms\Components\Tabs\Tab::make('Static Fields')
+                        Tab::make('Static Fields')
                             ->schema([
-                                Forms\Components\Section::make('Static Value Fields')
+                                Section::make('Static Value Fields')
                                     ->description('Add fields with static values that don\'t exist in the database')
                                     ->schema([
-                                        Forms\Components\Repeater::make('static_fields')
+                                        Repeater::make('static_fields')
                                             ->label('')
                                             ->schema([
-                                                Forms\Components\TextInput::make('field_name')
+                                                TextInput::make('field_name')
                                                     ->label('Field Name')
                                                     ->required()
                                                     ->helperText('Name of the column in the export'),
-                                                Forms\Components\TextInput::make('static_value')
+                                                TextInput::make('static_value')
                                                     ->label('Static Value')
                                                     ->required()
                                                     ->helperText('Value that will be used for all records'),
-                                                Forms\Components\Textarea::make('description')
+                                                Textarea::make('description')
                                                     ->label('Description')
                                                     ->rows(2)
                                                     ->helperText('Optional description for this field'),
@@ -172,18 +184,18 @@ class ReportBuilder extends Page implements HasForms
                                     ]),
                             ]),
 
-                        Forms\Components\Tabs\Tab::make('Calculated Fields')
+                        Tab::make('Calculated Fields')
                             ->schema([
-                                Forms\Components\Section::make('Calculated Fields')
+                                Section::make('Calculated Fields')
                                     ->description('Create computed fields based on existing data')
                                     ->schema([
-                                        Forms\Components\Repeater::make('calculated_fields')
+                                        Repeater::make('calculated_fields')
                                             ->label('')
                                             ->schema([
-                                                Forms\Components\TextInput::make('field_name')
+                                                TextInput::make('field_name')
                                                     ->label('Field Name')
                                                     ->required(),
-                                                Forms\Components\Select::make('calculation_type')
+                                                Select::make('calculation_type')
                                                     ->label('Calculation Type')
                                                     ->options([
                                                         'gross_pay' => 'Gross Pay (Hours × Rate)',
@@ -192,12 +204,12 @@ class ReportBuilder extends Page implements HasForms
                                                         'custom_formula' => 'Custom Formula',
                                                     ])
                                                     ->required(),
-                                                Forms\Components\Textarea::make('formula')
+                                                Textarea::make('formula')
                                                     ->label('Custom Formula')
                                                     ->rows(2)
-                                                    ->visible(fn (Forms\Get $get) => $get('calculation_type') === 'custom_formula')
+                                                    ->visible(fn (Get $get) => $get('calculation_type') === 'custom_formula')
                                                     ->helperText('Use PHP syntax with available variables'),
-                                                Forms\Components\Textarea::make('description')
+                                                Textarea::make('description')
                                                     ->label('Description')
                                                     ->rows(2),
                                             ])
@@ -303,8 +315,8 @@ class ReportBuilder extends Page implements HasForms
                 'Content-Type' => 'text/csv',
             ])->deleteFileAfterSend();
 
-        } catch (\Exception $e) {
-            \Log::error('Custom Report Generation Error: ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('Custom Report Generation Error: ' . $e->getMessage());
 
             Notification::make()
                 ->title('Report Generation Failed')

@@ -2,13 +2,26 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
+use Exception;
+use App\Models\Attendance;
+use App\Models\VacationCalendar;
+use App\Models\VacationTransaction;
+use Illuminate\Support\Facades\Log;
+use App\Filament\Resources\PayPeriodResource\Pages\ListPayPeriods;
+use App\Filament\Resources\PayPeriodResource\Pages\CreatePayPeriod;
+use App\Filament\Resources\PayPeriodResource\Pages\EditPayPeriod;
+use UnitEnum;
+use BackedEnum;
+
 use App\Filament\Resources\PayPeriodResource\Pages;
 use App\Models\PayPeriod;
-use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
@@ -23,14 +36,14 @@ class PayPeriodResource extends Resource
     protected static ?string $model = PayPeriod::class;
 
     // Navigation Configuration
-    protected static ?string $navigationGroup = 'Payroll & Overtime';
+    protected static string | \UnitEnum | null $navigationGroup = 'Payroll & Overtime';
     protected static ?string $navigationLabel = 'Pay Periods';
-    protected static ?string $navigationIcon = 'heroicon-o-calendar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar';
     protected static ?int $navigationSort = 10;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             DatePicker::make('start_date')
                 ->label('Start Date')
                 ->required(),
@@ -122,8 +135,8 @@ class PayPeriodResource extends Resource
                     ->label('Generate PayPeriods')
                     ->icon('heroicon-o-plus-circle')
                     ->color('success')
-                    ->form([
-                        \Filament\Forms\Components\Select::make('generation_type')
+                    ->schema([
+                        Select::make('generation_type')
                             ->label('Generation Type')
                             ->options([
                                 'current_month' => 'Current Month Only',
@@ -148,14 +161,14 @@ class PayPeriodResource extends Resource
                             Artisan::call($command);
                             $output = Artisan::output();
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->success()
                                 ->title('✅ PayPeriods Generated')
                                 ->body('PayPeriods have been generated successfully. Check the output for details.')
                                 ->send();
 
-                        } catch (\Exception $e) {
-                            \Filament\Notifications\Notification::make()
+                        } catch (Exception $e) {
+                            Notification::make()
                                 ->danger()
                                 ->title('❌ Generation Failed')
                                 ->body("Error generating PayPeriods: {$e->getMessage()}")
@@ -164,7 +177,7 @@ class PayPeriodResource extends Resource
                         }
                     }),
             ])
-            ->actions([
+            ->recordActions([
                 // Process Time Button
                 Action::make('process_time')
                     ->label('Process Time')
@@ -180,15 +193,15 @@ class PayPeriodResource extends Resource
                         try {
                             $processingService->processAll($record);
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->success()
                                 ->title('✅ Processing Complete')
                                 ->body("Successfully processed all attendance records for Pay Period ID: {$record->id}")
                                 ->duration(8000)
                                 ->send();
 
-                        } catch (\Exception $e) {
-                            \Filament\Notifications\Notification::make()
+                        } catch (Exception $e) {
+                            Notification::make()
                                 ->danger()
                                 ->title('❌ Processing Failed')
                                 ->body("Error processing Pay Period ID: {$record->id}: " . substr($e->getMessage(), 0, 200))
@@ -226,7 +239,7 @@ class PayPeriodResource extends Resource
 
                         // Double-check for unresolved attendance issues (but not consensus - those are handled by modal)
                         if ($record->attendanceIssuesCount() > 0) {
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->danger()
                                 ->title('Cannot Post Time')
                                 ->body('There are ' . $record->attendanceIssuesCount() . ' unresolved attendance issues. Please resolve them first.')
@@ -234,7 +247,7 @@ class PayPeriodResource extends Resource
                             return;
                         }
 
-                        \Filament\Notifications\Notification::make()
+                        Notification::make()
                             ->info()
                             ->title('Posting Time Records')
                             ->body("Finalizing time records for Pay Period ID: {$record->id}...")
@@ -244,8 +257,8 @@ class PayPeriodResource extends Resource
                             // Archive only properly processed records (Migrated status with punch types assigned)
                             $updatedAttendanceRecords = DB::table('attendances')
                                 ->whereBetween('punch_time', [
-                                    \Carbon\Carbon::parse($record->start_date)->startOfDay(),
-                                    \Carbon\Carbon::parse($record->end_date)->endOfDay(),
+                                    Carbon::parse($record->start_date)->startOfDay(),
+                                    Carbon::parse($record->end_date)->endOfDay(),
                                 ])
                                 ->where('status', 'Migrated')
                                 ->whereNotNull('punch_type_id')
@@ -269,14 +282,14 @@ class PayPeriodResource extends Resource
                                 $successMessage .= " | Deducted vacation time for {$vacationDeductions} employees";
                             }
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->success()
                                 ->title('Time Posted Successfully')
                                 ->body($successMessage)
                                 ->send();
 
-                        } catch (\Exception $e) {
-                            \Filament\Notifications\Notification::make()
+                        } catch (Exception $e) {
+                            Notification::make()
                                 ->danger()
                                 ->title('Post Time Error')
                                 ->body("Error posting time for Pay Period ID: {$record->id}: {$e->getMessage()}")
@@ -304,9 +317,9 @@ class PayPeriodResource extends Resource
         $vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
 
         // Find all vacation attendance records that were just posted
-        $vacationRecords = \App\Models\Attendance::whereBetween('punch_time', [
-                \Carbon\Carbon::parse($payPeriod->start_date)->startOfDay(),
-                \Carbon\Carbon::parse($payPeriod->end_date)->endOfDay(),
+        $vacationRecords = Attendance::whereBetween('punch_time', [
+                Carbon::parse($payPeriod->start_date)->startOfDay(),
+                Carbon::parse($payPeriod->end_date)->endOfDay(),
             ])
             ->where('classification_id', $vacationClassificationId)
             ->where('status', 'Posted')
@@ -322,7 +335,7 @@ class PayPeriodResource extends Resource
 
         foreach ($vacationRecords as $record) {
             $employeeId = $record->employee_id;
-            $date = \Carbon\Carbon::parse($record->punch_time)->toDateString();
+            $date = Carbon::parse($record->punch_time)->toDateString();
 
             if (!isset($employeeVacationHours[$employeeId])) {
                 $employeeVacationHours[$employeeId] = [];
@@ -332,7 +345,7 @@ class PayPeriodResource extends Resource
                 // Calculate actual hours from punch times for this date
                 $vacationPunchesForDate = $vacationRecords->where('employee_id', $employeeId)
                     ->filter(function($r) use ($date) {
-                        return \Carbon\Carbon::parse($r->punch_time)->toDateString() === $date;
+                        return Carbon::parse($r->punch_time)->toDateString() === $date;
                     });
 
                 $clockInTimes = $vacationPunchesForDate->where('punch_state', 'start')->pluck('punch_time');
@@ -343,8 +356,8 @@ class PayPeriodResource extends Resource
                 // Calculate hours from paired clock in/out times
                 foreach ($clockInTimes as $index => $clockIn) {
                     if (isset($clockOutTimes[$index])) {
-                        $start = \Carbon\Carbon::parse($clockIn);
-                        $end = \Carbon\Carbon::parse($clockOutTimes[$index]);
+                        $start = Carbon::parse($clockIn);
+                        $end = Carbon::parse($clockOutTimes[$index]);
                         $totalHours += $end->diffInHours($start, true); // true for absolute value
                     }
                 }
@@ -355,7 +368,7 @@ class PayPeriodResource extends Resource
                     $dailyHours = $record->employee->shiftSchedule->daily_hours ?? 8.0;
 
                     // Check if this is a half-day vacation (from VacationCalendar)
-                    $vacationCalendar = \App\Models\VacationCalendar::where('employee_id', $employeeId)
+                    $vacationCalendar = VacationCalendar::where('employee_id', $employeeId)
                         ->whereDate('vacation_date', $date)
                         ->first();
 
@@ -382,7 +395,7 @@ class PayPeriodResource extends Resource
                         $description .= " (half day)";
                     }
 
-                    \App\Models\VacationTransaction::createUsageTransaction(
+                    VacationTransaction::createUsageTransaction(
                         $employeeId,
                         $payPeriod->id,
                         $hoursUsed,
@@ -390,7 +403,7 @@ class PayPeriodResource extends Resource
                         $description
                     );
 
-                    \Illuminate\Support\Facades\Log::info("VacationTransaction: Created usage transaction - {$hoursUsed} hours for Employee ID {$employeeId} on {$date}");
+                    Log::info("VacationTransaction: Created usage transaction - {$hoursUsed} hours for Employee ID {$employeeId} on {$date}");
                 }
             }
 
@@ -405,9 +418,9 @@ class PayPeriodResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPayPeriods::route('/'),
-            'create' => Pages\CreatePayPeriod::route('/create'),
-            'edit' => Pages\EditPayPeriod::route('/{record}/edit'),
+            'index' => ListPayPeriods::route('/'),
+            'create' => CreatePayPeriod::route('/create'),
+            'edit' => EditPayPeriod::route('/{record}/edit'),
         ];
     }
 }
