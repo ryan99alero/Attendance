@@ -28,6 +28,7 @@ class RoundingRuleResource extends Resource
     protected static ?string $navigationLabel = 'Rounding Rules';
     protected static string | \UnitEnum | null $navigationGroup = 'Payroll & Overtime';
     protected static ?int $navigationSort = 50;
+    protected static bool $shouldRegisterNavigation = false; // Access through Round Groups instead
 
     public static function form(Schema $schema): Schema
     {

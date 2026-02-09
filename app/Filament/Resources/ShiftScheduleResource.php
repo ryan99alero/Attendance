@@ -17,6 +17,7 @@ use Filament\Actions\DeleteBulkAction;
 use App\Filament\Resources\ScheduleResource\Pages\ListSchedules;
 use App\Filament\Resources\ScheduleResource\Pages\CreateSchedule;
 use App\Filament\Resources\ScheduleResource\Pages\EditSchedule;
+use App\Filament\Resources\ScheduleResource\RelationManagers\EmployeesRelationManager;
 use UnitEnum;
 use BackedEnum;
 
@@ -128,9 +129,10 @@ class ShiftScheduleResource extends Resource
             TextColumn::make('shift.shift_name')
                 ->label('Shift')
                 ->sortable(),
-            TextColumn::make('employees')
+            TextColumn::make('employees_count')
                 ->label('Employees')
-                ->getStateUsing(fn ($record) => $record->employees ? $record->employees->pluck('full_names')->join(', ') : 'N/A'),
+                ->counts('employees')
+                ->sortable(),
             IconColumn::make('is_active')
                 ->label('Active')
                 ->sortable(),
@@ -145,6 +147,13 @@ class ShiftScheduleResource extends Resource
             ->toolbarActions([
                 DeleteBulkAction::make(),
             ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            EmployeesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

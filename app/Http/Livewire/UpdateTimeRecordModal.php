@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\PunchType;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use Livewire\Attributes\On;
 use App\Services\PunchStateService;
 use Illuminate\Validation\Rule;
 
@@ -21,11 +22,6 @@ class UpdateTimeRecordModal extends Component
     public bool $isOpen = false;
     public ?string $punchState = 'unknown';
     public ?string $status = null;
-
-    protected $listeners = [
-        'open-update-modal' => 'openUpdateModal',
-        'deleteTimeRecord' => 'deleteTimeRecord',
-    ];
 
     public function getPunchTypes()
     {
@@ -91,6 +87,7 @@ class UpdateTimeRecordModal extends Component
         }
     }
 
+    #[On('open-update-modal')]
     public function openUpdateModal($attendanceId, $employeeId, $deviceId, $date, $punchType, $punchState, $existingTime, $status = null): void
     {
         Log::info('[UpdateTimeRecordModal] Opened', compact('attendanceId', 'employeeId', 'deviceId', 'date', 'punchType', 'punchState', 'existingTime', 'status'));

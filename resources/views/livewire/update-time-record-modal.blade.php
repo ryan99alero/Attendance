@@ -1,161 +1,154 @@
 <div>
     @if ($isOpen)
-        <div wire:ignore.self>
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            <div class="fixed inset-0 z-50 overflow-auto flex items-center justify-center p-4">
-                <div class="bg-white rounded-lg shadow-lg p-4 w-full max-w-md max-h-screen overflow-y-auto">
-                    <h2 class="text-lg font-extrabold text-gray-700 text-center mb-4">Update Time Record</h2>
+        <!-- Modal Backdrop -->
+        <div style="position: fixed; inset: 0; background-color: rgba(107, 114, 128, 0.75); z-index: 9998;"></div>
 
-                    <form wire:submit.prevent="updateTimeRecord">
+        <!-- Modal Container -->
+        <div style="position: fixed; inset: 0; z-index: 9999; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+            <div style="background-color: #fff; border-radius: 0.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); padding: 1rem; width: 100%; max-width: 28rem; max-height: 100vh; overflow-y: auto;">
+                <h2 style="font-size: 1.125rem; font-weight: 800; color: #374151; text-align: center; margin-bottom: 1rem;">Update Time Record</h2>
 
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">ID</label>
-                            <input
-                                type="text"
-                                wire:model="attendanceId"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
+                <form wire:submit.prevent="updateTimeRecord">
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">ID</label>
+                        <input
+                            type="text"
+                            wire:model="attendanceId"
+                            readonly
+                            style="display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #f9fafb;">
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">Employee</label>
+                        <input
+                            type="text"
+                            wire:model="employeeId"
+                            readonly
+                            style="display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #f9fafb;">
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">Device ID</label>
+                        <input
+                            type="text"
+                            wire:model="deviceId"
+                            readonly
+                            style="display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #f9fafb;">
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">Date</label>
+                        <input
+                            type="text"
+                            wire:model="date"
+                            readonly
+                            style="display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #f9fafb;">
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">Punch Type</label>
+                        <select
+                            wire:model="punchType"
+                            style="display: block; width: 100%; height: 42px; margin-top: 0.25rem; padding: 0.5rem 2rem 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #fff; font-size: 0.875rem; background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.25rem; -webkit-appearance: none; -moz-appearance: none; appearance: none; cursor: pointer;">
+                            <option value="">Select Punch Type</option>
+                            @foreach ($this->getPunchTypes() as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('punchType') <span style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #991b1b; background-color: #fee2e2; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">Punch State</label>
+                        <select
+                            wire:model="punchState"
+                            style="display: block; width: 100%; height: 42px; margin-top: 0.25rem; padding: 0.5rem 2rem 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #fff; font-size: 0.875rem; background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22%3E%3C/polyline%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.25rem; -webkit-appearance: none; -moz-appearance: none; appearance: none; cursor: pointer;">
+                            <option value="">Select Punch State</option>
+                            <option value="start">Start</option>
+                            <option value="stop">Stop</option>
+                            <option value="unknown">Unknown</option>
+                        </select>
+                        @error('punchState')
+                        <span style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #991b1b; background-color: #fee2e2; padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: 1px solid #fca5a5;">
+                            {{ $message }}
+                        </span>
+                        @enderror
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151;">Punch Time</label>
+                        <input
+                            type="time"
+                            step="1"
+                            wire:model="punchTime"
+                            style="display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; color: #1a202c; background-color: #fff;">
+                        @error('punchTime') <span style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #991b1b; background-color: #fee2e2; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">{{ $message }}</span> @enderror
+                    </div>
+
+                    @if ($status === 'Discrepancy')
+                        <div style="margin-bottom: 0.75rem; padding: 0.5rem; border-radius: 0.375rem; background-color: #fed7aa; border: 1px solid #fdba74;">
+                            <p style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #7c2d12;">
+                                🔥 Engine Discrepancy - engines disagree on punch type
+                            </p>
+                            <p style="font-size: 0.75rem; color: #9a3412;">
+                                <strong>Accept</strong> current type or <strong>Change</strong> punch type to resolve
+                            </p>
                         </div>
+                    @endif
 
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">Employee</label>
-                            <input
-                                type="text"
-                                wire:model="employeeId"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
+                    <!-- Button Styling -->
+                    @if ($status === 'Discrepancy')
+                        <!-- Discrepancy Resolution Buttons -->
+                        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem;">
+                            <button
+                                type="button"
+                                wire:click="closeModal"
+                                style="padding: 0.5rem 0.75rem; border-radius: 0.375rem; border: 1px solid #d1d5db; color: #374151; background-color: #f3f4f6; cursor: pointer; font-size: 0.875rem;">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="acceptPunchType"
+                                style="padding: 0.5rem 0.75rem; border-radius: 0.375rem; color: #fff; background-color: #f97316; cursor: pointer; font-size: 0.875rem; border: none;">
+                                Accept Punch Type
+                            </button>
+                            <button
+                                type="submit"
+                                style="padding: 0.5rem 0.75rem; border-radius: 0.375rem; border: 1px solid #d1d5db; color: #374151; background-color: #f3f4f6; cursor: pointer; font-size: 0.875rem;">
+                                Accept / Update
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="deleteTimeRecord"
+                                style="padding: 0.5rem 0.75rem; border-radius: 0.375rem; color: #fff; background-color: #ef4444; cursor: pointer; font-size: 0.875rem; border: none;">
+                                Delete
+                            </button>
                         </div>
-
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">Device ID</label>
-                            <input
-                                type="text"
-                                wire:model="deviceId"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
+                    @else
+                        <!-- Normal Buttons -->
+                        <div style="display: flex; justify-content: space-between; gap: 0.5rem;">
+                            <button
+                                type="button"
+                                wire:click="closeModal"
+                                style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: 1px solid #d1d5db; color: #374151; background-color: #f3f4f6; cursor: pointer;">
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: 1px solid #d1d5db; color: #374151; background-color: #f3f4f6; cursor: pointer;">
+                                Update Record
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="deleteTimeRecord"
+                                style="padding: 0.5rem 1rem; border-radius: 0.375rem; color: #fff; background-color: #ef4444; cursor: pointer; border: none;">
+                                Delete
+                            </button>
                         </div>
+                    @endif
 
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">Date</label>
-                            <input
-                                type="text"
-                                wire:model="date"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                readonly
-                                style="color: #1a202c; background-color: #fff;">
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">Punch Type</label>
-                            <select
-                                wire:model="punchType"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                style="color: #1a202c; background-color: #fff;">
-                                <option value="">Select Punch Type</option>
-                                @foreach ($this->getPunchTypes() as $key => $label)
-                                    <option value="{{ $key }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('punchType') <span class="text-red-800 text-sm bg-red-100 px-2 py-1 rounded">{{ $message }}</span> @enderror
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">Punch State</label>
-                            <select
-                                wire:model="punchState"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                style="color: #1a202c; background-color: #fff;">
-                                <option value="">Select Punch State</option>
-                                <option value="start">Start</option>
-                                <option value="stop">Stop</option>
-                                <option value="unknown">Unknown</option>
-                            </select>
-                            @error('punchState')
-                            <span class="block mt-1 text-red-800 text-sm bg-red-100 px-2 py-1 rounded border border-red-300">
-                                {{ $message }}
-                            </span>
-                            @enderror
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="block text-md font-medium text-gray-700">Punch Time</label>
-                            <input
-                                type="time"
-                                step="1"
-                                wire:model="punchTime"
-                                class="block w-full mt-1 border-gray-300 rounded-md text-gray-900"
-                                style="color: #1a202c; background-color: #fff;">
-                            @error('punchTime') <span class="text-red-800 text-sm bg-red-100 px-2 py-1 rounded">{{ $message }}</span> @enderror
-                        </div>
-
-                        @if ($status === 'Discrepancy')
-                            <div class="mb-3 p-2 rounded-md" style="background-color: #fed7aa; border: 1px solid #fdba74;">
-                                <p class="text-sm font-medium mb-1" style="color: #7c2d12 !important;">
-                                    🔥 Engine Discrepancy - engines disagree on punch type
-                                </p>
-                                <p class="text-xs" style="color: #9a3412 !important;">
-                                    <strong>Accept</strong> current type or <strong>Change</strong> punch type to resolve
-                                </p>
-                            </div>
-                        @endif
-
-                        <!-- Button Styling -->
-                        @if ($status === 'Discrepancy')
-                            <!-- Discrepancy Resolution Buttons -->
-                            <div class="flex flex-wrap justify-between gap-2">
-                                <button
-                                    type="button"
-                                    wire:click="closeModal"
-                                    class="px-3 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm">
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="acceptPunchType"
-                                    class="px-3 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 text-sm">
-                                    Accept Punch Type
-                                </button>
-                                <button
-                                    type="submit"
-                                    class="px-3 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm">
-                                    Accept / Update
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="deleteTimeRecord"
-                                    class="px-3 py-2 rounded-md text-white bg-red-500 hover:bg-red-600 text-sm">
-                                    Delete
-                                </button>
-                            </div>
-                        @else
-                            <!-- Normal Buttons -->
-                            <div class="flex justify-between">
-                                <button
-                                    type="button"
-                                    wire:click="closeModal"
-                                    class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    class="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200">
-                                    Update Record
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="deleteTimeRecord"
-                                    class="px-4 py-2 rounded-md text-white"
-                                    style="background-color: red; border-color: darkred;">
-                                    Delete
-                                </button>
-                            </div>
-                        @endif
-
-                    </form>
-                </div>
+                </form>
             </div>
         </div>
     @endif

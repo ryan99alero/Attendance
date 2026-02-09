@@ -4,8 +4,11 @@ namespace App\Filament\Pages;
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Schema;
 use Carbon\Carbon;
 use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Log;
@@ -14,18 +17,17 @@ use App\Models\Attendance;
 use App\Models\PayPeriod;
 use App\Models\PunchType;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 
-class AttendanceSummary extends Page
+class AttendanceSummary extends Page implements HasForms
 {
+    use InteractsWithForms;
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table';
     protected string $view = 'filament.pages.attendance-summary';
     protected static ?string $navigationLabel = 'Attendance Summary';
     protected static bool $shouldRegisterNavigation = false;
 
-    public $payPeriodId;
-    public $search = '';
-    public $statusFilter = 'NeedsReview';
-    public $duplicatesFilter = 'all';
+    public ?array $data = [];
     public $groupedAttendances;
     public array $selectedAttendances = [];
     public bool $selectAll = false;
@@ -38,70 +40,73 @@ class AttendanceSummary extends Page
     {
         Log::info("[AttendanceSummary] mount() called - Initializing component.");
 
-        // Set defaults
-        $this->payPeriodId = null;
-        $this->search = '';
         $this->groupedAttendances = collect();
 
-        // Check for URL parameters
-        if (request()->has('payPeriodId')) {
-            $this->payPeriodId = request()->get('payPeriodId');
-        }
-
-        if (request()->has('statusFilter')) {
-            $this->statusFilter = request()->get('statusFilter');
-        }
-
-        if (request()->has('duplicatesFilter')) {
-            $this->duplicatesFilter = request()->get('duplicatesFilter');
-        }
+        // Initialize data array directly first
+        $this->data = [
+            'payPeriodId' => request()->get('payPeriodId'),
+            'search' => '',
+            'statusFilter' => request()->get('statusFilter', 'NeedsReview'),
+            'duplicatesFilter' => request()->get('duplicatesFilter', 'all'),
+        ];
 
         // If payPeriodId was set from URL, fetch attendances
-        if ($this->payPeriodId) {
-            $this->updateAttendances();
+        if (request()->has('payPeriodId')) {
+            $this->groupedAttendances = $this->fetchAttendances();
         }
     }
 
-    protected function getFormSchema(): array
+    public function form(Schema $schema): Schema
     {
-        return [
-            Select::make('payPeriodId')
-                ->label('Select Pay Period')
-                ->options($this->getPayPeriods())
-                ->reactive()
-                ->afterStateUpdated(fn () => $this->updateAttendances())
-                ->placeholder('All Pay Periods'),
+        return $schema
+            ->columns(4)
+            ->components([
+                Select::make('payPeriodId')
+                    ->label('Select Pay Period')
+                    ->options($this->getPayPeriods())
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function () {
+                        $this->groupedAttendances = $this->fetchAttendances();
+                    })
+                    ->placeholder('All Pay Periods'),
 
-            TextInput::make('search')
-                ->label('Search')
-                ->placeholder('Search any value...')
-                ->reactive()
-                ->afterStateUpdated(fn () => $this->updateAttendances()),
+                TextInput::make('search')
+                    ->label('Search')
+                    ->placeholder('Search any value...')
+                    ->live(debounce: 500, onBlur: true)
+                    ->afterStateUpdated(function () {
+                        $this->groupedAttendances = $this->fetchAttendances();
+                    }),
 
-            Select::make('statusFilter')
-                ->label('Filter by Status')
-                ->options([
-                    'all' => 'All',
-                    'Migrated' => 'Migrated',
-                    'problem' => 'Problem (All Except Migrated)',
-                    'problem_with_migrated' => 'Problem (Including Migrated)',
-                ])
-                ->default('problem')
-                ->reactive()
-                ->afterStateUpdated(fn () => $this->updateAttendances()),
+                Select::make('statusFilter')
+                    ->label('Filter by Status')
+                    ->options([
+                        'all' => 'All',
+                        'Migrated' => 'Migrated',
+                        'problem' => 'Problem (All Except Migrated)',
+                        'problem_with_migrated' => 'Problem (Including Migrated)',
+                    ])
+                    ->default('problem')
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function () {
+                        $this->groupedAttendances = $this->fetchAttendances();
+                    }),
 
-            Select::make('duplicatesFilter')
-                ->label('Filter by Issues')
-                ->options([
-                    'all' => 'All',
-                    'duplicates_only' => 'Duplicates Only',
-                    'flexibility_issues' => 'Flexibility Issues (2+ Unclassified)',
-                    'consensus' => 'Engine Discrepancy',
-                ])
-                ->default('all')
-                ->reactive()
-                ->afterStateUpdated(fn () => $this->updateAttendances()),
-        ];
+                Select::make('duplicatesFilter')
+                    ->label('Filter by Issues')
+                    ->options([
+                        'all' => 'All',
+                        'duplicates_only' => 'Duplicates Only',
+                        'flexibility_issues' => 'Flexibility Issues (2+ Unclassified)',
+                        'consensus' => 'Engine Discrepancy',
+                    ])
+                    ->default('all')
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function () {
+                        $this->groupedAttendances = $this->fetchAttendances();
+                    }),
+            ])
+            ->statePath('data');
     }
 
     protected function getPayPeriods(): array
@@ -187,17 +192,22 @@ class AttendanceSummary extends Page
 
     public function fetchAttendances(): Collection
     {
-        if (!$this->payPeriodId) {
+        $payPeriodId = $this->data['payPeriodId'] ?? null;
+        $statusFilter = $this->data['statusFilter'] ?? 'NeedsReview';
+        $duplicatesFilter = $this->data['duplicatesFilter'] ?? 'all';
+        $search = $this->data['search'] ?? '';
+
+        if (!$payPeriodId) {
             return collect();
         }
 
-        $payPeriod = PayPeriod::find($this->payPeriodId);
+        $payPeriod = PayPeriod::find($payPeriodId);
         if (!$payPeriod) {
-            $this->duplicatesFilter = 'all';
+            $this->data['duplicatesFilter'] = 'all';
             return collect();
         }
 
-        Log::info("[AttendanceSummary] Fetching attendance records for PayPeriod ID: {$this->payPeriodId} ({$payPeriod->start_date} to {$payPeriod->end_date})");
+        Log::info("[AttendanceSummary] Fetching attendance records for PayPeriod ID: {$payPeriodId} ({$payPeriod->start_date} to {$payPeriod->end_date})");
 
         // Fetch all attendance records within the date range
         $attendancesQuery = Attendance::with('employee')
@@ -230,9 +240,9 @@ class AttendanceSummary extends Page
         }
 
         // Handle different status filters
-        if ($this->statusFilter === 'problem') {
+        if ($statusFilter === 'problem') {
             $attendancesQuery->where('attendances.status', '!=', 'Migrated');
-        } elseif ($this->statusFilter === 'problem_with_migrated') {
+        } elseif ($statusFilter === 'problem_with_migrated') {
             // Find employee/date combinations that have problem records
             $problemDays = Attendance::select('employee_id', 'shift_date')
                 ->whereBetween('shift_date', [$payPeriod->start_date, $payPeriod->end_date])
@@ -259,16 +269,16 @@ class AttendanceSummary extends Page
                 // No problem days found, return empty result
                 $attendancesQuery->whereRaw('1 = 0');
             }
-        } elseif ($this->statusFilter !== 'all') {
-            $attendancesQuery->where('attendances.status', $this->statusFilter);
+        } elseif ($statusFilter !== 'all') {
+            $attendancesQuery->where('attendances.status', $statusFilter);
         }
 
         $attendances = $attendancesQuery
             ->orderBy('attendances.employee_id')
             ->orderBy('attendances.shift_date')
             ->orderBy('attendances.punch_time')
-            ->when($this->search, function ($query) {
-                $searchTerm = '%' . $this->search . '%';
+            ->when($search, function ($query) use ($search) {
+                $searchTerm = '%' . $search . '%';
 
                 $query->where(function ($q) use ($searchTerm) {
                     $q->where('employees.full_names', 'like', $searchTerm)
@@ -280,7 +290,7 @@ class AttendanceSummary extends Page
             })
             ->get();
 
-        if ($this->duplicatesFilter === 'duplicates_only') {
+        if ($duplicatesFilter === 'duplicates_only') {
             $duplicateKeys = $attendances
                 ->groupBy(fn ($p) => "{$p->employee_id}|{$p->shift_date}|{$p->punch_type_id}")
                 ->filter(fn ($group) => $group->count() > 1)
@@ -369,14 +379,14 @@ class AttendanceSummary extends Page
         });
 
         // Apply flexibility issues filter
-        if ($this->duplicatesFilter === 'flexibility_issues') {
+        if ($duplicatesFilter === 'flexibility_issues') {
             $grouped = $grouped->filter(function ($item) {
                 return $item['employee']['has_flexibility_issue'] ?? false;
             });
         }
 
         // Apply consensus filter
-        if ($this->duplicatesFilter === 'consensus') {
+        if ($duplicatesFilter === 'consensus') {
             $grouped = $grouped->filter(function ($item) {
                 return $item['employee']['status'] === 'Discrepancy';
             });
@@ -389,8 +399,7 @@ class AttendanceSummary extends Page
     {
         Log::info("[AttendanceSummary] updateAttendances() called.");
         $this->groupedAttendances = $this->fetchAttendances();
-        $this->dispatch('$refresh');
-        Log::info("[AttendanceSummary] updateAttendances() completed.");
+        Log::info("[AttendanceSummary] updateAttendances() completed. Records: " . $this->groupedAttendances->count());
     }
 
     public function sortBy($field): void
@@ -424,14 +433,14 @@ class AttendanceSummary extends Page
         ];
     }
 
-    protected $listeners = [
-        'processSelected' => 'processSelected',
-        'timeRecordCreated' => 'refreshAttendanceData',
-        'timeRecordUpdated' => 'refreshAttendanceData',
-        'open-update-modal' => 'openUpdateModal',
-        'open-create-modal' => 'openCreateModal',
-    ];
+    #[On('processSelected')]
+    public function processSelected(): void
+    {
+        // Process selected records
+    }
 
+    #[On('timeRecordCreated')]
+    #[On('timeRecordUpdated')]
     public function refreshAttendanceData(): void
     {
         $this->updateAttendances();

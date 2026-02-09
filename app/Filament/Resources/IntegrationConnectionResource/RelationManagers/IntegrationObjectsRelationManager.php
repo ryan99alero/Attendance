@@ -40,15 +40,19 @@ class IntegrationObjectsRelationManager extends RelationManager
         $discoveryService = new ModelDiscoveryService();
 
         return $schema
+            ->columns(1)
             ->components([
                 // Section 1: Object Definition
                 Section::make('Object Definition')
+                    ->columnSpanFull()
                     ->schema([
                         Select::make('object_name')
                             ->label('Object Name')
-                            ->options(fn () => (new PaceApiClient(
-                                $this->getOwnerRecord()
-                            ))->getCommonObjectTypes())
+                            ->options(function () {
+                                /** @var \App\Models\IntegrationConnection $connection */
+                                $connection = $this->getOwnerRecord();
+                                return (new PaceApiClient($connection))->getCommonObjectTypes();
+                            })
                             ->searchable()
                             ->required()
                             ->helperText('Select a Pace object type or enter a custom name'),
@@ -106,6 +110,7 @@ class IntegrationObjectsRelationManager extends RelationManager
 
                 // Section 2: Sync Settings
                 Section::make('Sync Settings')
+                    ->columnSpanFull()
                     ->schema([
                         Toggle::make('sync_enabled')
                             ->label('Sync Enabled')
@@ -147,6 +152,7 @@ class IntegrationObjectsRelationManager extends RelationManager
 
                 // Section 3: Field Mappings (Repeater)
                 Section::make('Field Mappings')
+                    ->columnSpanFull()
                     ->schema([
                         Repeater::make('fieldMappings')
                             ->relationship()

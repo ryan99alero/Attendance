@@ -1,81 +1,179 @@
 <?php
 
+declare(strict_types=1);
+
 return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shield Resource
+    |--------------------------------------------------------------------------
+    */
+
     'shield_resource' => [
-        'should_register_navigation' => true,
         'slug' => 'shield/roles',
+        'show_model_path' => true,
+        'cluster' => null,
         'navigation_sort' => 30,
         'navigation_badge' => true,
         'navigation_group' => 'User Management',
-        'sub_navigation_position' => null,
-        'is_globally_searchable' => false,
-        'show_model_path' => true,
-        'is_scoped_to_tenant' => true,
-        'cluster' => null,
+        'tabs' => [
+            'pages' => true,
+            'widgets' => true,
+            'resources' => true,
+            'custom_permissions' => false,
+        ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Multi-Tenancy
+    |--------------------------------------------------------------------------
+    */
 
     'tenant_model' => null,
 
+    /*
+    |--------------------------------------------------------------------------
+    | User Model
+    |--------------------------------------------------------------------------
+    */
+
     'auth_provider_model' => \App\Models\User::class,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin
+    |--------------------------------------------------------------------------
+    */
 
     'super_admin' => [
         'enabled' => true,
         'name' => 'super_admin',
         'define_via_gate' => false,
-        'intercept_gate' => 'before', // after
+        'intercept_gate' => 'before',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Panel User
+    |--------------------------------------------------------------------------
+    */
 
     'panel_user' => [
         'enabled' => true,
         'name' => 'panel_user',
     ],
 
-    'permission_prefixes' => [
-        'resource' => [
-            'view',
-            'view_any',
+    /*
+    |--------------------------------------------------------------------------
+    | Permission Builder
+    |--------------------------------------------------------------------------
+    */
+
+    'permissions' => [
+        'separator' => ':',
+        'case' => 'pascal',
+        'generate' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Policies
+    |--------------------------------------------------------------------------
+    */
+
+    'policies' => [
+        'path' => app_path('Policies'),
+        'merge' => true,
+        'generate' => true,
+        'methods' => [
+            'viewAny', 'view', 'create', 'update', 'delete', 'restore',
+            'forceDelete', 'forceDeleteAny', 'restoreAny', 'replicate', 'reorder',
+        ],
+        'single_parameter_methods' => [
+            'viewAny',
             'create',
-            'update',
-            'restore',
-            'restore_any',
-            'replicate',
+            'deleteAny',
+            'forceDeleteAny',
+            'restoreAny',
             'reorder',
-            'delete',
-            'delete_any',
-            'force_delete',
-            'force_delete_any',
         ],
-
-        'page' => 'page',
-        'widget' => 'widget',
     ],
 
-    'entities' => [
-        'pages' => true,
-        'widgets' => true,
-        'resources' => true,
-        'custom_permissions' => false,
+    /*
+    |--------------------------------------------------------------------------
+    | Localization
+    |--------------------------------------------------------------------------
+    */
+
+    'localization' => [
+        'enabled' => false,
+        'key' => 'filament-shield::filament-shield.resource_permission_prefixes_labels',
     ],
 
-    'generator' => [
-        'option' => 'policies_and_permissions',
-        'policy_directory' => 'Policies',
-        'policy_namespace' => 'Policies',
-    ],
+    /*
+    |--------------------------------------------------------------------------
+    | Resources
+    |--------------------------------------------------------------------------
+    */
 
-    'exclude' => [
-        'enabled' => true,
-
-        'pages' => [
-            'Dashboard',
+    'resources' => [
+        'subject' => 'model',
+        'manage' => [
+            \BezhanSalleh\FilamentShield\Resources\Roles\RoleResource::class => [
+                'viewAny',
+                'view',
+                'create',
+                'update',
+                'delete',
+            ],
         ],
-
-        'widgets' => [
-            'AccountWidget', 'FilamentInfoWidget',
-        ],
-
-        'resources' => [],
+        'exclude' => [],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pages
+    |--------------------------------------------------------------------------
+    */
+
+    'pages' => [
+        'subject' => 'class',
+        'prefix' => 'view',
+        'exclude' => [
+            \Filament\Pages\Dashboard::class,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Widgets
+    |--------------------------------------------------------------------------
+    */
+
+    'widgets' => [
+        'subject' => 'class',
+        'prefix' => 'view',
+        'exclude' => [
+            \Filament\Widgets\AccountWidget::class,
+            \Filament\Widgets\FilamentInfoWidget::class,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Permissions
+    |--------------------------------------------------------------------------
+    */
+
+    'custom_permissions' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Entity Discovery
+    |--------------------------------------------------------------------------
+    */
 
     'discovery' => [
         'discover_all_resources' => true,
@@ -83,8 +181,12 @@ return [
         'discover_all_pages' => true,
     ],
 
-    'register_role_policy' => [
-        'enabled' => true,
-    ],
+    /*
+    |--------------------------------------------------------------------------
+    | Role Policy
+    |--------------------------------------------------------------------------
+    */
+
+    'register_role_policy' => true,
 
 ];

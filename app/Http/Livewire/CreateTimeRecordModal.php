@@ -7,6 +7,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Foundation\Application;
 use Livewire\Component;
+use Livewire\Attributes\On;
 use App\Models\Attendance;
 use App\Models\PunchType;
 use App\Filament\Pages\AttendanceSummary;
@@ -21,9 +22,7 @@ class CreateTimeRecordModal extends Component
     public ?string $punchType = null;
     public ?string $punchTime = null;
     public bool $isOpen = false;
-    public ?string $punchState = 'unknown'; // ✅ Default to unknown
-
-    protected $listeners = ['open-create-modal' => 'openCreateModal'];
+    public ?string $punchState = 'unknown'; // Default to unknown
 
     public function getPunchTypes()
     {
@@ -47,6 +46,25 @@ class CreateTimeRecordModal extends Component
                 return [$key => $punchType->id];
             })
             ->toArray();
+    }
+
+    #[On('open-create-modal')]
+    public function openCreateModal($employeeId, $date, $punchType): void
+    {
+        Log::info('[CreateTimeRecordModal] Opened', compact('employeeId', 'date', 'punchType'));
+
+        $this->employeeId = $employeeId;
+        $this->date = $date;
+        $this->punchType = $punchType;
+        $this->punchTime = null;
+
+        // Determine and set punch state
+        $determinedPunchState = PunchStateService::determinePunchState($punchType);
+        $this->punchState = $determinedPunchState;
+
+        Log::info('[CreateTimeRecordModal] PunchState set to: ' . $this->punchState);
+
+        $this->isOpen = true;
     }
 
     protected function rules(): array
@@ -84,23 +102,6 @@ class CreateTimeRecordModal extends Component
         Log::info("[CreateTimeRecordModal] PunchState updated to: {$this->punchState}");
     }
 
-    public function openCreateModal($employeeId, $date, $punchType): void
-    {
-        Log::info('[CreateTimeRecordModal] Opened', compact('employeeId', 'date', 'punchType'));
-
-        $this->employeeId = $employeeId;
-        $this->date = $date;
-        $this->punchType = $punchType;
-        $this->punchTime = null;
-
-        // Determine and set punch state
-        $determinedPunchState = PunchStateService::determinePunchState($punchType);
-        $this->punchState = $determinedPunchState;
-
-        Log::info('[CreateTimeRecordModal] PunchState set to: ' . $this->punchState);
-
-        $this->isOpen = true;
-    }
     public function closeModal(): void
     {
         $this->reset();

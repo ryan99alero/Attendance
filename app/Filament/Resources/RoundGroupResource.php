@@ -7,6 +7,7 @@ use Filament\Actions\EditAction;
 use App\Filament\Resources\RoundGroupResource\Pages\ListRoundGroups;
 use App\Filament\Resources\RoundGroupResource\Pages\CreateRoundGroup;
 use App\Filament\Resources\RoundGroupResource\Pages\EditRoundGroup;
+use App\Filament\Resources\RoundGroupResource\RelationManagers\RoundingRulesRelationManager;
 use UnitEnum;
 use BackedEnum;
 
@@ -25,7 +26,9 @@ class RoundGroupResource extends Resource
 
     // Navigation Configuration
     protected static string | \UnitEnum | null $navigationGroup = 'Payroll & Overtime';
-    protected static ?string $navigationLabel = 'Round Groups';
+    protected static ?string $navigationLabel = 'Rounding Rules';
+    protected static ?string $modelLabel = 'Rounding Group';
+    protected static ?string $pluralModelLabel = 'Rounding Groups';
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calculator';
     protected static ?int $navigationSort = 30;
 
@@ -44,14 +47,18 @@ class RoundGroupResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('id')
-                    ->label('ID')
-                    ->sortable()
-                    ->searchable(),
                 TextColumn::make('group_name')
-                    ->label('Group Name')
+                    ->label('Rounding Group')
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('rounding_rules_count')
+                    ->label('Rules')
+                    ->counts('roundingRules')
+                    ->sortable(),
+                TextColumn::make('employees_count')
+                    ->label('Employees')
+                    ->counts('employees')
+                    ->sortable(),
             ])
             ->filters([
                 // Add filters if needed
@@ -64,7 +71,7 @@ class RoundGroupResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // Define relationships if needed
+            RoundingRulesRelationManager::class,
         ];
     }
 
