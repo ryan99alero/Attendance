@@ -162,6 +162,16 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     $data['external_field'] = $data['local_field']
                                         ?: ltrim(basename($data['external_xpath'] ?? ''), '@');
                                 }
+                                // Build transform_options for fk_lookup
+                                if (($data['transform'] ?? null) === 'fk_lookup') {
+                                    $data['transform_options'] = [
+                                        'model' => $data['lookup_model'] ?? null,
+                                        'match_column' => $data['lookup_match_column'] ?? null,
+                                        'return_column' => $data['lookup_return_column'] ?? 'id',
+                                    ];
+                                }
+                                // Remove temporary lookup fields
+                                unset($data['lookup_model'], $data['lookup_match_column'], $data['lookup_return_column']);
                                 return $data;
                             })
                             ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
@@ -170,6 +180,19 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     $data['external_field'] = $data['local_field']
                                         ?: ltrim(basename($data['external_xpath'] ?? ''), '@');
                                 }
+                                // Build transform_options for fk_lookup
+                                if (($data['transform'] ?? null) === 'fk_lookup') {
+                                    $data['transform_options'] = [
+                                        'model' => $data['lookup_model'] ?? null,
+                                        'match_column' => $data['lookup_match_column'] ?? null,
+                                        'return_column' => $data['lookup_return_column'] ?? 'id',
+                                    ];
+                                } else {
+                                    // Clear transform_options if not fk_lookup
+                                    $data['transform_options'] = null;
+                                }
+                                // Remove temporary lookup fields
+                                unset($data['lookup_model'], $data['lookup_match_column'], $data['lookup_return_column']);
                                 return $data;
                             })
                             ->schema([
@@ -270,8 +293,71 @@ class IntegrationObjectsRelationManager extends RelationManager
                                         'json_decode' => 'JSON Decode',
                                     ])
                                     ->placeholder('None')
+                                    ->live()
                                     ->dehydrateStateUsing(fn ($state) => $state ?: null)
                                     ->nullable(),
+
+                                // FK Lookup configuration fields
+                                Select::make('lookup_model')
+                                    ->label('Lookup Model')
+                                    ->options(fn () => $discoveryService->getModelOptionsForSelect())
+                                    ->searchable()
+                                    ->live()
+                                    ->visible(fn (Get $get) => $get('transform') === 'fk_lookup')
+                                    ->required(fn (Get $get) => $get('transform') === 'fk_lookup')
+                                    ->afterStateHydrated(function ($state, $record, Set $set) {
+                                        // Pre-populate from transform_options when editing
+                                        if (!$state && $record instanceof IntegrationFieldMapping) {
+                                            $options = $record->transform_options ?? [];
+                                            $set('lookup_model', $options['model'] ?? null);
+                                        }
+                                    })
+                                    ->helperText('Model to look up the foreign key in'),
+
+                                Select::make('lookup_match_column')
+                                    ->label('Match Column')
+                                    ->options(function (Get $get) use ($discoveryService) {
+                                        $model = $get('lookup_model');
+                                        if ($model && class_exists($model)) {
+                                            $table = (new $model)->getTable();
+                                            return $discoveryService->getTableColumns($table);
+                                        }
+                                        return [];
+                                    })
+                                    ->searchable()
+                                    ->visible(fn (Get $get) => $get('transform') === 'fk_lookup')
+                                    ->required(fn (Get $get) => $get('transform') === 'fk_lookup')
+                                    ->afterStateHydrated(function ($state, $record, Set $set) {
+                                        // Pre-populate from transform_options when editing
+                                        if (!$state && $record instanceof IntegrationFieldMapping) {
+                                            $options = $record->transform_options ?? [];
+                                            $set('lookup_match_column', $options['match_column'] ?? null);
+                                        }
+                                    })
+                                    ->helperText('Column to match API value against'),
+
+                                Select::make('lookup_return_column')
+                                    ->label('Return Column')
+                                    ->options(function (Get $get) use ($discoveryService) {
+                                        $model = $get('lookup_model');
+                                        if ($model && class_exists($model)) {
+                                            $table = (new $model)->getTable();
+                                            return $discoveryService->getTableColumns($table);
+                                        }
+                                        return [];
+                                    })
+                                    ->searchable()
+                                    ->default('id')
+                                    ->visible(fn (Get $get) => $get('transform') === 'fk_lookup')
+                                    ->required(fn (Get $get) => $get('transform') === 'fk_lookup')
+                                    ->afterStateHydrated(function ($state, $record, Set $set) {
+                                        // Pre-populate from transform_options when editing
+                                        if (!$state && $record instanceof IntegrationFieldMapping) {
+                                            $options = $record->transform_options ?? [];
+                                            $set('lookup_return_column', $options['return_column'] ?? 'id');
+                                        }
+                                    })
+                                    ->helperText('Column value to return (usually id)'),
 
                                 Toggle::make('sync_on_pull')
                                     ->label('Pull')

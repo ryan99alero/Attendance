@@ -157,28 +157,70 @@ class EditIntegrationConnection extends EditRecord
                 ->color('success')
                 ->requiresConfirmation()
                 ->modalHeading('Force Sync Now')
-                ->modalDescription('This will immediately run a full sync for this connection. Continue?')
+                ->modalDescription('This will immediately run a full sync for all enabled objects on this connection. Continue?')
                 ->action(function () {
                     try {
-                        $exitCode = Artisan::call('pace:sync-employees', [
-                            '--connection' => $this->record->id,
-                        ]);
+                        $objects = $this->record->objects()
+                            ->where('sync_enabled', true)
+                            ->where('sync_direction', '!=', 'push')
+                            ->get();
+
+                        if ($objects->isEmpty()) {
+                            Notification::make()
+                                ->title('No Objects to Sync')
+                                ->body('No objects are enabled for pull sync on this connection.')
+                                ->warning()
+                                ->send();
+                            return;
+                        }
+
+                        $client = new PaceApiClient($this->record);
+                        $engine = new IntegrationSyncEngine($client);
+
+                        $results = [];
+                        $hasErrors = false;
+
+                        foreach ($objects as $object) {
+                            $result = $engine->sync($object);
+                            $results[] = [
+                                'name' => $object->display_name ?? $object->object_name,
+                                'created' => $result->created,
+                                'updated' => $result->updated,
+                                'skipped' => $result->skipped,
+                                'errors' => $result->errors,
+                            ];
+                            if (!empty($result->errors)) {
+                                $hasErrors = true;
+                            }
+                        }
 
                         $this->record->markSynced();
 
-                        if ($exitCode === 0) {
+                        // Build summary
+                        $lines = [];
+                        foreach ($results as $r) {
+                            $line = "{$r['name']}: {$r['created']} created, {$r['updated']} updated, {$r['skipped']} skipped";
+                            if (!empty($r['errors'])) {
+                                $errorCount = is_array($r['errors']) ? count($r['errors']) : $r['errors'];
+                                $line .= " ({$errorCount} errors)";
+                            }
+                            $lines[] = $line;
+                        }
+                        $body = implode("\n", $lines);
+
+                        if ($hasErrors) {
                             Notification::make()
-                                ->title('Sync Completed')
-                                ->body('Employee sync finished successfully.')
-                                ->success()
-                                ->duration(10000)
+                                ->title('Sync Completed with Errors')
+                                ->body($body)
+                                ->warning()
+                                ->persistent()
                                 ->send();
                         } else {
                             Notification::make()
-                                ->title('Sync Completed with Errors')
-                                ->body('Sync ran but returned errors. Check sync logs for details.')
-                                ->warning()
-                                ->persistent()
+                                ->title('Sync Completed')
+                                ->body($body)
+                                ->success()
+                                ->duration(15000)
                                 ->send();
                         }
                     } catch (Exception $e) {

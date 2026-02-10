@@ -583,15 +583,38 @@ class TimeClockController extends Controller
         // Try to identify and update the device if credentials provided
         $apiToken = $request->header('X-Device-Token');
         $deviceId = $request->header('X-Device-ID');
+        $macAddress = $request->header('X-Device-MAC');
 
-        if ($apiToken && $deviceId) {
+        $device = null;
+
+        // Primary lookup: device_id
+        if ($deviceId) {
             $device = Device::where('device_id', $deviceId)->first();
-            if ($device && $device->isTokenValid($apiToken)) {
+        }
+
+        // Fallback lookup: MAC address (handles device_id mismatch after power loss)
+        if (!$device && $macAddress) {
+            $device = Device::where('mac_address', $macAddress)->first();
+            if ($device) {
+                Log::info("[TimeClockAPI] Health check: device found by MAC fallback", [
+                    'mac_address' => $macAddress,
+                    'sent_device_id' => $deviceId,
+                    'actual_device_id' => $device->device_id,
+                ]);
+            }
+        }
+
+        if ($device) {
+            // Check if token is valid
+            $tokenValid = $apiToken && $device->isTokenValid($apiToken);
+
+            if ($tokenValid) {
                 $device->markAsSeen();
 
                 // Include device status in response for connectivity monitor
                 $response['device'] = [
                     'device_id' => $device->device_id,
+                    'display_name' => $device->display_name ?? $device->device_name,
                     'registration_status' => $device->registration_status ?? 'pending',
                     'is_approved' => ($device->registration_status === 'approved'),
                     'reboot_requested' => (bool) $device->reboot_requested,
@@ -601,9 +624,25 @@ class TimeClockController extends Controller
                 if ($device->reboot_requested) {
                     $device->update(['reboot_requested' => false]);
                     Log::info("[TimeClockAPI] Reboot command sent to device", [
-                        'device_id' => $deviceId,
+                        'device_id' => $device->device_id,
                     ]);
                 }
+            } else {
+                // Device exists but token is invalid/expired - tell device to re-authenticate
+                $response['device'] = [
+                    'device_id' => $device->device_id,
+                    'display_name' => $device->display_name ?? $device->device_name,
+                    'registration_status' => $device->registration_status ?? 'pending',
+                    'is_approved' => ($device->registration_status === 'approved'),
+                    'reboot_requested' => false,
+                    'needs_reauth' => true, // Signal to device to call /auth endpoint
+                ];
+
+                Log::info("[TimeClockAPI] Health check: token invalid/expired, needs reauth", [
+                    'device_id' => $device->device_id,
+                    'mac_address' => $device->mac_address,
+                    'token_expires_at' => $device->token_expires_at,
+                ]);
             }
         }
 
@@ -945,38 +984,66 @@ class TimeClockController extends Controller
     }
 
     /**
+     * Reverse lookup: display name to IANA timezone
+     */
+    /**
+     * Map display names (stored in DB) to IANA timezone names (for PHP calculation)
+     * These MUST match exactly what's in the Filament admin panel dropdown
+     */
+    private const DISPLAY_TO_IANA = [
+        'Alaska Time (AKST/AKDT)'        => 'America/Anchorage',
+        'Atlantic Time (AST)'            => 'America/Puerto_Rico',
+        'Central Time (CST/CDT)'         => 'America/Chicago',
+        'Chamorro Time (ChST)'           => 'Pacific/Guam',
+        'Eastern Time (EST/EDT)'         => 'America/New_York',
+        'Hawaii-Aleutian Time (HST/HDT)' => 'America/Adak',
+        'Mountain Time (MST/MDT)'        => 'America/Denver',
+        'Pacific Time (PST/PDT)'         => 'America/Los_Angeles',
+        'Samoa Time (SST)'               => 'Pacific/Pago_Pago',
+    ];
+
+    /**
      * Get device timezone configuration with automatic DST calculation
      */
     private function getDeviceTimezoneConfig($device)
     {
         // Get device's configured timezone (device -> department -> app default)
-        $deviceTimezone = $device->timezone ?? $device->department?->timezone ?? config('app.timezone');
+        $originalTimezone = $device->timezone ?? $device->department?->timezone ?? config('app.timezone');
+
+        // Keep the display name for the ESP32 (it expects display names)
+        $displayName = $originalTimezone;
+
+        // Convert display name to IANA name for PHP timezone calculation
+        $ianaTimezone = self::DISPLAY_TO_IANA[$originalTimezone] ?? $originalTimezone;
 
         try {
-            // Create Carbon instance in the device's timezone
-            $deviceTime = now()->setTimezone($deviceTimezone);
+            // Create Carbon instance in the device's timezone using IANA name
+            $deviceTime = now()->setTimezone($ianaTimezone);
 
             // Calculate the current UTC offset (includes DST automatically)
             $offsetSeconds = $deviceTime->getOffset();
             $offsetHours = $offsetSeconds / 3600;
 
             return [
-                'timezone_name' => $deviceTimezone,
-                'timezone_display' => $this->getTimezoneDisplayName($deviceTimezone),
+                // Send display name - ESP32 matches against this
+                'timezone_name' => $displayName,
+                'timezone_display' => $displayName,
                 'current_offset' => (int)$offsetHours,
                 'is_dst' => $deviceTime->format('I') == '1', // 1 if DST, 0 if not
                 'timezone_abbr' => $deviceTime->format('T'), // e.g., "CDT", "CST"
                 'device_time' => $deviceTime->format('Y-m-d H:i:s'),
             ];
         } catch (Exception $e) {
-            // Fallback to Central Time if timezone parsing fails
+            // Fallback to Central Time if timezone parsing fails - calculate dynamically
+            $fallbackTime = now()->setTimezone('America/Chicago');
+            $offsetHours = $fallbackTime->getOffset() / 3600;
             return [
-                'timezone_name' => 'America/Chicago',
+                'timezone_name' => 'Central Time (CST/CDT)',
                 'timezone_display' => 'Central Time (CST/CDT)',
-                'current_offset' => -5, // Default to CDT
-                'is_dst' => true,
-                'timezone_abbr' => 'CDT',
-                'device_time' => now()->subHours(5)->format('Y-m-d H:i:s'),
+                'current_offset' => (int)$offsetHours,
+                'is_dst' => $fallbackTime->format('I') == '1',
+                'timezone_abbr' => $fallbackTime->format('T'),
+                'device_time' => $fallbackTime->format('Y-m-d H:i:s'),
             ];
         }
     }

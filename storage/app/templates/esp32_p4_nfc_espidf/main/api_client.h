@@ -22,6 +22,8 @@ typedef struct {
     char api_token[256];        // Bearer token for authentication
     char device_id[64];         // Device ID from registration
     char device_name[64];       // Friendly device name
+    char display_name[64];      // Display name from server (shown on UI)
+    char mac_address[18];       // Device MAC address (XX:XX:XX:XX:XX:XX)
     bool is_registered;         // Registration status
     bool is_approved;           // Approval status
 } api_config_t;
@@ -61,8 +63,10 @@ typedef struct {
     bool server_reachable;              // True if server responded
     bool device_found;                  // True if device exists on server
     char registration_status[16];       // "pending", "approved", "rejected", "suspended"
+    char display_name[64];              // Display name from server
     bool is_approved;                   // True if registration_status == "approved"
     bool reboot_requested;              // True if server wants device to reboot
+    bool needs_reauth;                  // True if token expired, device should call /auth
 } health_check_result_t;
 
 // API client functions

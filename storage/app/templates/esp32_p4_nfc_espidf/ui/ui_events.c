@@ -10,6 +10,7 @@
 #include "nvs.h"
 #include "api_client.h"
 #include "network_manager.h"
+#include "time_settings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_lvgl_port.h"
@@ -176,19 +177,34 @@ static void time_sync_task(void *pvParameters)
         ESP_LOGI(TAG, "Got server time: %s (unix: %lld)", sync_data.server_time, sync_data.unix_timestamp);
 
         // Set timezone BEFORE setting system time so localtime_r works correctly
-        // Format: "UTC+HH" or "UTC-HH" (note: POSIX TZ uses inverted sign)
+        // First try to apply by timezone name (e.g., "America/Chicago") to get full DST rules
         int offset_hours = sync_data.timezone_offset / 3600;
-        char tz_str[32];
-        // POSIX TZ format uses inverted sign: UTC-6 means 6 hours BEHIND UTC
-        // So for Chicago (UTC-6), we need "CST6CDT" or simply "UTC+6"
-        if (offset_hours <= 0) {
-            snprintf(tz_str, sizeof(tz_str), "UTC%d", -offset_hours);
-        } else {
-            snprintf(tz_str, sizeof(tz_str), "UTC-%d", offset_hours);
+        char tz_str[64];
+        bool tz_applied = false;
+
+        // Try matching by timezone name first (gives us proper DST rules)
+        if (strlen(sync_data.timezone) > 0) {
+            tz_applied = time_settings_apply_by_name(sync_data.timezone);
+            if (tz_applied) {
+                // Get the TZ string that was applied for logging
+                const char *applied_tz = getenv("TZ");
+                if (applied_tz) {
+                    strncpy(tz_str, applied_tz, sizeof(tz_str) - 1);
+                    tz_str[sizeof(tz_str) - 1] = '\0';
+                }
+                ESP_LOGI(TAG, "Applied timezone by name '%s': TZ=%s", sync_data.timezone, tz_str);
+            }
         }
-        setenv("TZ", tz_str, 1);
-        tzset();
-        ESP_LOGI(TAG, "Set timezone: TZ=%s (offset=%d hours)", tz_str, offset_hours);
+
+        // Fall back to offset-based lookup if name matching failed
+        if (!tz_applied) {
+            // Try to get a full POSIX TZ string with DST rules for this offset
+            tz_applied = time_settings_get_posix_for_offset(sync_data.timezone_offset, tz_str, sizeof(tz_str));
+            setenv("TZ", tz_str, 1);
+            tzset();
+            ESP_LOGI(TAG, "Set timezone from offset (%d hours): TZ=%s%s",
+                     offset_hours, tz_str, tz_applied ? " (with DST rules)" : " (fallback)");
+        }
 
         // Set the system clock (UTC time)
         if (set_system_time_from_iso8601(sync_data.server_time, sync_data.unix_timestamp)) {
@@ -313,8 +329,8 @@ static void time_sync_task(void *pvParameters)
                     ESP_LOGI(TAG, "FIELD: ui_mainscreen_label_timelabel = '%s'", main_time);
                 }
                 if (ui_mainscreen_label_datelabel) {
-                    char main_date[32];
-                    strftime(main_date, sizeof(main_date), "%a %b %d", &timeinfo);
+                    char main_date[16];
+                    strftime(main_date, sizeof(main_date), "%m/%d/%Y", &timeinfo);
                     lv_label_set_text(ui_mainscreen_label_datelabel, main_date);
                     ESP_LOGI(TAG, "FIELD: ui_mainscreen_label_datelabel = '%s'", main_date);
                 }
@@ -954,4 +970,106 @@ void ui_hide_server_offline_alert(void)
     if (s_current_clock_status == CLOCK_STATUS_SERVER_OFFLINE) {
         ui_set_clock_status(CLOCK_STATUS_OK, NULL);
     }
+}
+
+// Save time settings from the Time Information screen
+void ui_event_save_time_settings(lv_event_t *e)
+{
+    ESP_LOGI(TAG, "Saving time settings from UI");
+
+    // Get timezone dropdown selection
+    if (ui_timeinformation_dropdown_timezone) {
+        uint16_t tz_index = lv_dropdown_get_selected(ui_timeinformation_dropdown_timezone);
+        char tz_text[64];
+        lv_dropdown_get_selected_str(ui_timeinformation_dropdown_timezone, tz_text, sizeof(tz_text));
+
+        ESP_LOGI(TAG, "Selected timezone index: %d, text: %s", tz_index, tz_text);
+
+        // Map dropdown index to timezone - dropdown options match k_tz_list order:
+        // 0: Alaska, 1: Atlantic, 2: Central, 3: Chamorro, 4: Eastern,
+        // 5: Hawaii-Aleutian, 6: Mountain, 7: Pacific, 8: Samoa
+
+        // Display names must match k_tz_list labels exactly (same as Filament admin panel)
+        const char *tz_names[] = {
+            "Alaska Time (AKST/AKDT)",           // 0: Alaska
+            "Atlantic Time (AST)",               // 1: Atlantic
+            "Central Time (CST/CDT)",            // 2: Central
+            "Chamorro Time (ChST)",              // 3: Chamorro
+            "Eastern Time (EST/EDT)",            // 4: Eastern
+            "Hawaii-Aleutian Time (HST/HDT)",    // 5: Hawaii-Aleutian
+            "Mountain Time (MST/MDT)",           // 6: Mountain
+            "Pacific Time (PST/PDT)",            // 7: Pacific
+            "Samoa Time (SST)"                   // 8: Samoa
+        };
+
+        if (tz_index < 9) {
+            // Apply timezone using the time_settings module
+            bool applied = time_settings_apply_by_name(tz_names[tz_index]);
+            if (applied) {
+                ESP_LOGI(TAG, "Timezone applied: %s", tz_names[tz_index]);
+            } else {
+                ESP_LOGW(TAG, "Failed to apply timezone: %s", tz_names[tz_index]);
+            }
+        }
+    }
+
+    // Check if using server time
+    bool use_server_time = false;
+    if (ui_timeinformation_checkbox_servertime) {
+        use_server_time = lv_obj_has_state(ui_timeinformation_checkbox_servertime, LV_STATE_CHECKED);
+    }
+
+    // If NOT using server time, apply manual time from spinbox
+    if (!use_server_time && ui_timeinformation_spinbox_timeinput && ui_timeinformation_dropdown_ampm) {
+        int32_t spinbox_val = lv_spinbox_get_value(ui_timeinformation_spinbox_timeinput);
+        int hour = spinbox_val / 100;
+        int minute = spinbox_val % 100;
+
+        // Get AM/PM
+        uint16_t ampm = lv_dropdown_get_selected(ui_timeinformation_dropdown_ampm);
+
+        // Convert to 24-hour format
+        if (ampm == 1) { // PM
+            if (hour != 12) hour += 12;
+        } else { // AM
+            if (hour == 12) hour = 0;
+        }
+
+        ESP_LOGI(TAG, "Manual time: %02d:%02d (24h)", hour, minute);
+
+        // Set the system time (keep current date, just change time)
+        time_t now;
+        struct tm timeinfo;
+        time(&now);
+        localtime_r(&now, &timeinfo);
+
+        timeinfo.tm_hour = hour;
+        timeinfo.tm_min = minute;
+        timeinfo.tm_sec = 0;
+
+        time_t new_time = mktime(&timeinfo);
+        struct timeval tv = { .tv_sec = new_time, .tv_usec = 0 };
+        settimeofday(&tv, NULL);
+
+        ESP_LOGI(TAG, "System time updated to %02d:%02d", hour, minute);
+    }
+
+    // Save NTP server if provided
+    if (ui_timeinformation_textarea_ntpinput) {
+        const char *ntp_server = lv_textarea_get_text(ui_timeinformation_textarea_ntpinput);
+        if (ntp_server && strlen(ntp_server) > 0 &&
+            strcmp(ntp_server, "Input NTP Server") != 0) {
+
+            nvs_handle_t nvs_h;
+            if (nvs_open("app_settings", NVS_READWRITE, &nvs_h) == ESP_OK) {
+                nvs_set_str(nvs_h, "ntp_server", ntp_server);
+                nvs_set_u8(nvs_h, "use_server_time", use_server_time ? 1 : 0);
+                nvs_commit(nvs_h);
+                nvs_close(nvs_h);
+                ESP_LOGI(TAG, "Saved NTP server: %s, use_server_time: %d", ntp_server, use_server_time);
+            }
+        }
+    }
+
+    ESP_LOGI(TAG, "Time settings saved");
 }

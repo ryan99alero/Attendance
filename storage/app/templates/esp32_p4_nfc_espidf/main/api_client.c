@@ -120,6 +120,12 @@ esp_err_t api_save_config(void) {
     err = nvs_set_str(nvs_handle, "dev_name", g_api_config.device_name);
     ESP_LOGI(TAG, "  nvs_set dev_name: %s", esp_err_to_name(err));
 
+    err = nvs_set_str(nvs_handle, "disp_name", g_api_config.display_name);
+    ESP_LOGI(TAG, "  nvs_set disp_name: %s", esp_err_to_name(err));
+
+    err = nvs_set_str(nvs_handle, "mac_addr", g_api_config.mac_address);
+    ESP_LOGI(TAG, "  nvs_set mac_addr: %s", esp_err_to_name(err));
+
     err = nvs_set_u8(nvs_handle, "registered", g_api_config.is_registered ? 1 : 0);
     ESP_LOGI(TAG, "  nvs_set registered: %s", esp_err_to_name(err));
 
@@ -180,6 +186,14 @@ esp_err_t api_load_config(void) {
     len = sizeof(g_api_config.device_name);
     err = nvs_get_str(nvs_handle, "dev_name", g_api_config.device_name, &len);
     ESP_LOGI(TAG, "  nvs_get dev_name: %s -> '%s'", esp_err_to_name(err), g_api_config.device_name);
+
+    len = sizeof(g_api_config.display_name);
+    err = nvs_get_str(nvs_handle, "disp_name", g_api_config.display_name, &len);
+    ESP_LOGI(TAG, "  nvs_get disp_name: %s -> '%s'", esp_err_to_name(err), g_api_config.display_name);
+
+    len = sizeof(g_api_config.mac_address);
+    err = nvs_get_str(nvs_handle, "mac_addr", g_api_config.mac_address, &len);
+    ESP_LOGI(TAG, "  nvs_get mac_addr: %s -> '%s'", esp_err_to_name(err), g_api_config.mac_address);
 
     uint8_t is_registered = 0;
     err = nvs_get_u8(nvs_handle, "registered", &is_registered);
@@ -275,6 +289,7 @@ esp_err_t api_register_device(const char *mac_address, const char *device_name) 
                                 strncpy(g_api_config.api_token, token->valuestring, sizeof(g_api_config.api_token) - 1);
                                 strncpy(g_api_config.device_id, dev_id->valuestring, sizeof(g_api_config.device_id) - 1);
                                 strncpy(g_api_config.device_name, device_name, sizeof(g_api_config.device_name) - 1);
+                                strncpy(g_api_config.mac_address, mac_address, sizeof(g_api_config.mac_address) - 1);
                                 g_api_config.is_registered = true;
 
                                 ESP_LOGW(TAG, "✅ REGISTRATION SUCCESSFUL!");
@@ -638,6 +653,11 @@ esp_err_t api_health_check_full(health_check_result_t *result) {
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
+    // Always send MAC address for fallback lookup (handles device_id mismatch after power loss)
+    if (strlen(g_api_config.mac_address) > 0) {
+        esp_http_client_set_header(client, "X-Device-MAC", g_api_config.mac_address);
+    }
+
     // If device is registered, include credentials so server can return device status
     if (g_api_config.is_registered && strlen(g_api_config.api_token) > 0) {
         esp_http_client_set_header(client, "X-Device-Token", g_api_config.api_token);
@@ -677,11 +697,31 @@ esp_err_t api_health_check_full(health_check_result_t *result) {
                                      result->registration_status, result->is_approved);
                         }
 
+                        // Get display_name from server (allows admin to rename device)
+                        cJSON *disp_name = cJSON_GetObjectItem(device, "display_name");
+                        if (disp_name && cJSON_IsString(disp_name)) {
+                            strncpy(result->display_name, disp_name->valuestring,
+                                    sizeof(result->display_name) - 1);
+                            // Update global config if different
+                            if (strcmp(g_api_config.display_name, disp_name->valuestring) != 0) {
+                                strncpy(g_api_config.display_name, disp_name->valuestring,
+                                        sizeof(g_api_config.display_name) - 1);
+                                ESP_LOGI(TAG, "Display name updated: %s", g_api_config.display_name);
+                            }
+                        }
+
                         // Check for reboot command
                         cJSON *reboot = cJSON_GetObjectItem(device, "reboot_requested");
                         if (reboot && cJSON_IsTrue(reboot)) {
                             result->reboot_requested = true;
                             ESP_LOGW(TAG, "⚠️ Server requested reboot!");
+                        }
+
+                        // Check if re-authentication is needed (token expired)
+                        cJSON *needs_reauth = cJSON_GetObjectItem(device, "needs_reauth");
+                        if (needs_reauth && cJSON_IsTrue(needs_reauth)) {
+                            result->needs_reauth = true;
+                            ESP_LOGW(TAG, "⚠️ Token expired - re-authentication needed");
                         }
                     }
                     cJSON_Delete(json);

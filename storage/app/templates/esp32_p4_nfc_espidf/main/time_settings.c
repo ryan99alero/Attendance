@@ -4,12 +4,14 @@
 // - Applies POSIX TZ via setenv("TZ", ...); tzset();
 // - Saves/loads selection from NVS so it persists across reboots
 
+#include "time_settings.h"
 #include "lvgl.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <time.h>
 
 static const char *TAG = "time_settings";
@@ -26,25 +28,25 @@ typedef struct {
 } tz_entry_t;
 
 static const tz_entry_t k_tz_list[] = {
-    // Sorted alphabetically by display name to match Filament admin panel
+    // Sorted alphabetically - labels MUST match Filament admin panel exactly
     // Index 0: Alaska Time
-    { "America/Anchorage (AKST/AKDT)", "AKST9AKDT,M3.2.0/2,M11.1.0/2" },  // UTC-9, DST
+    { "Alaska Time (AKST/AKDT)", "AKST9AKDT,M3.2.0/2,M11.1.0/2" },        // UTC-9, DST
     // Index 1: Atlantic Time
-    { "America/Puerto_Rico (AST)", "AST4" },                              // UTC-4, no DST
+    { "Atlantic Time (AST)", "AST4" },                                    // UTC-4, no DST
     // Index 2: Central Time
-    { "America/Chicago (CST/CDT)", "CST6CDT,M3.2.0/2,M11.1.0/2" },        // UTC-6, DST
+    { "Central Time (CST/CDT)", "CST6CDT,M3.2.0/2,M11.1.0/2" },           // UTC-6, DST
     // Index 3: Chamorro Time
-    { "Pacific/Guam (ChST)", "ChST-10" },                                 // UTC+10, no DST
+    { "Chamorro Time (ChST)", "ChST-10" },                                // UTC+10, no DST
     // Index 4: Eastern Time
-    { "America/New_York (EST/EDT)", "EST5EDT,M3.2.0/2,M11.1.0/2" },       // UTC-5, DST
+    { "Eastern Time (EST/EDT)", "EST5EDT,M3.2.0/2,M11.1.0/2" },           // UTC-5, DST
     // Index 5: Hawaii-Aleutian Time
-    { "America/Adak (HST/HDT)", "HAST10HADT,M3.2.0/2,M11.1.0/2" },        // UTC-10, DST
+    { "Hawaii-Aleutian Time (HST/HDT)", "HAST10HADT,M3.2.0/2,M11.1.0/2" },// UTC-10, DST
     // Index 6: Mountain Time
-    { "America/Denver (MST/MDT)", "MST7MDT,M3.2.0/2,M11.1.0/2" },         // UTC-7, DST
+    { "Mountain Time (MST/MDT)", "MST7MDT,M3.2.0/2,M11.1.0/2" },          // UTC-7, DST
     // Index 7: Pacific Time
-    { "America/Los_Angeles (PST/PDT)", "PST8PDT,M3.2.0/2,M11.1.0/2" },    // UTC-8, DST
+    { "Pacific Time (PST/PDT)", "PST8PDT,M3.2.0/2,M11.1.0/2" },           // UTC-8, DST
     // Index 8: Samoa Time
-    { "Pacific/Pago_Pago (SST)", "SST11" },                               // UTC-11, no DST
+    { "Samoa Time (SST)", "SST11" },                                      // UTC-11, no DST
 };
 static const size_t k_tz_count = sizeof(k_tz_list) / sizeof(k_tz_list[0]);
 
@@ -84,7 +86,7 @@ lv_obj_t * time_settings_create(lv_obj_t *parent)
     lv_roller_set_visible_row_count(roller, 4); // Show 4 rows at a time
 
     // Restore previously saved selection (default to "America/Chicago")
-    int default_idx = 1; // index of "America/Chicago (CT)" in k_tz_list
+    int default_idx = 2; // index of "America/Chicago (CST/CDT)" in k_tz_list
     int saved_idx   = load_timezone_index_nvs(default_idx);
     if (saved_idx < 0 || saved_idx >= (int)k_tz_count) saved_idx = default_idx;
 
@@ -158,6 +160,97 @@ const char* time_settings_get_ntp_server(void)
         return s_saved_ntp_server;
     }
     return "pool.ntp.org";
+}
+
+// Look up timezone by name (e.g., "America/Chicago") and apply the full POSIX TZ string
+bool time_settings_apply_by_name(const char *timezone_name)
+{
+    if (!timezone_name || strlen(timezone_name) == 0) {
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Looking up timezone: %s", timezone_name);
+
+    // Search for matching timezone in our list
+    for (size_t i = 0; i < k_tz_count; ++i) {
+        // Check if the timezone name appears in the label
+        // Labels are like "America/Chicago (CST/CDT)"
+        if (strstr(k_tz_list[i].label, timezone_name) != NULL) {
+            ESP_LOGI(TAG, "Found timezone match at index %zu: %s", i, k_tz_list[i].label);
+
+            // Apply the full POSIX TZ string with DST rules
+            apply_timezone_from_index((int)i);
+
+            // Save to NVS
+            save_timezone_nvs((int)i);
+
+            return true;
+        }
+    }
+
+    ESP_LOGW(TAG, "No matching timezone found for: %s", timezone_name);
+    return false;
+}
+
+// Get the POSIX TZ string for a given offset, preferring full DST rules
+bool time_settings_get_posix_for_offset(int offset_seconds, char *tz_buf, size_t buf_size)
+{
+    if (!tz_buf || buf_size == 0) {
+        return false;
+    }
+
+    int offset_hours = offset_seconds / 3600;
+
+    // Map common US offsets to their timezone entries with DST rules
+    // Note: offset_seconds is negative for west of UTC
+    int target_idx = -1;
+
+    switch (offset_hours) {
+        case -9:  // Alaska Time (AKST)
+            target_idx = 0;
+            break;
+        case -8:  // Pacific Time (PST)
+            target_idx = 7;
+            break;
+        case -7:  // Mountain Time (MST)
+            target_idx = 6;
+            break;
+        case -6:  // Central Time (CST)
+            target_idx = 2;
+            break;
+        case -5:  // Eastern Time (EST)
+            target_idx = 4;
+            break;
+        case -4:  // Atlantic Time (AST)
+            target_idx = 1;
+            break;
+        case -10: // Hawaii-Aleutian Time (HST)
+            target_idx = 5;
+            break;
+        case -11: // Samoa Time (SST)
+            target_idx = 8;
+            break;
+        case 10:  // Chamorro Time (ChST)
+            target_idx = 3;
+            break;
+    }
+
+    if (target_idx >= 0 && target_idx < (int)k_tz_count) {
+        strncpy(tz_buf, k_tz_list[target_idx].posix, buf_size - 1);
+        tz_buf[buf_size - 1] = '\0';
+        ESP_LOGI(TAG, "Using full POSIX TZ for offset %d: %s", offset_hours, tz_buf);
+        return true;
+    }
+
+    // Fallback: generate simple UTC offset string
+    // POSIX TZ sign is inverted: UTC-6 means 6 hours behind UTC, written as "UTC6"
+    if (offset_hours <= 0) {
+        snprintf(tz_buf, buf_size, "UTC%d", -offset_hours);
+    } else {
+        snprintf(tz_buf, buf_size, "UTC-%d", offset_hours);
+    }
+    ESP_LOGW(TAG, "No matching TZ entry for offset %d, using fallback: %s", offset_hours, tz_buf);
+    return false;
 }
 
 // Call once early in app (e.g., app_main) after nvs_flash_init() has been called.

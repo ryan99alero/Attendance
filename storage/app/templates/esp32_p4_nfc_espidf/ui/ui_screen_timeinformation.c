@@ -66,6 +66,8 @@ void ui_event_timeinformation_button_okbutton( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);
 
 if ( event_code == LV_EVENT_CLICKED) {
+      // Save time settings before navigating away
+      ui_event_save_time_settings(e);
       _ui_screen_change( &ui_screen_setupconfigurations, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_screen_setupconfigurations_screen_init);
 }
 }

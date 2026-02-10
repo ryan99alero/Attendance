@@ -17,6 +17,7 @@ void ui_event_keyboard_close(lv_event_t * e);
 void ui_event_sync_now(lv_event_t * e);
 void ui_event_server_test(lv_event_t * e);
 void ui_event_server_register(lv_event_t * e);
+void ui_event_save_time_settings(lv_event_t * e);
 
 // Clock status types for the ClockStatusInput field
 typedef enum {

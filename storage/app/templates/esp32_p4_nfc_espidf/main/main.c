@@ -182,6 +182,29 @@ static void connectivity_monitor_task(void *pvParameters) {
 						vTaskDelay(pdMS_TO_TICKS(3000));
 						esp_restart();
 					}
+
+					// Handle token expiration - auto re-authenticate
+					if (health_result.needs_reauth && strlen(cfg->mac_address) > 0) {
+						ESP_LOGW(TAG, "🔑 Token expired - auto re-authenticating...");
+						esp_err_t reauth_result = api_register_device(cfg->mac_address, cfg->device_name);
+						if (reauth_result == ESP_OK) {
+							ESP_LOGI(TAG, "✅ Re-authentication successful");
+							api_save_config();
+						} else {
+							ESP_LOGE(TAG, "❌ Re-authentication failed: %s", esp_err_to_name(reauth_result));
+						}
+					}
+
+					// Update machine name label if display_name changed
+					if (strlen(health_result.display_name) > 0) {
+						api_save_config();  // Save updated display_name to NVS
+						// Update the machine name label on UI
+						if (ui_mainscreen_label_machinenamelabel) {
+							const char *name = (cfg->display_name[0] != '\0') ? cfg->display_name : cfg->device_name;
+							lv_label_set_text(ui_mainscreen_label_machinenamelabel, name);
+							ESP_LOGI(TAG, "Updated machine name label: %s", name);
+						}
+					}
 				} else if (cfg->is_registered && !health_result.device_found) {
 					// Device was deleted from server
 					ESP_LOGW(TAG, "Device deleted from server - clearing registration");
@@ -215,7 +238,8 @@ static void connectivity_monitor_task(void *pvParameters) {
 	}
 }
 
-// Daily sync task - syncs time and sends heartbeat every 24 hours
+// Daily sync task - syncs time, timezone, and sends heartbeat every 24 hours
+// Also runs 30 seconds after boot to sync settings from server
 static void daily_sync_task(void *pvParameters) {
 	const TickType_t initial_delay = pdMS_TO_TICKS(30000);  // 30 sec after boot
 	const TickType_t sync_interval = pdMS_TO_TICKS(24 * 60 * 60 * 1000);  // 24 hours
@@ -230,10 +254,26 @@ static void daily_sync_task(void *pvParameters) {
 		if (network_manager_is_connected()) {
 			api_config_t *config = api_get_config();
 
-			// Sync time from server
+			// Sync time and timezone from server
 			time_sync_data_t sync_data;
 			esp_err_t ret = api_sync_time(&sync_data);
 			if (ret == ESP_OK && sync_data.valid) {
+				// Apply timezone FIRST (before setting time)
+				if (strlen(sync_data.timezone) > 0) {
+					bool tz_applied = time_settings_apply_by_name(sync_data.timezone);
+					if (tz_applied) {
+						ESP_LOGI(TAG, "Timezone applied from server: %s", sync_data.timezone);
+					} else {
+						// Fallback to offset-based timezone
+						char tz_str[64];
+						if (time_settings_get_posix_for_offset(sync_data.timezone_offset, tz_str, sizeof(tz_str))) {
+							setenv("TZ", tz_str, 1);
+							tzset();
+							ESP_LOGI(TAG, "Timezone set from offset: %s", tz_str);
+						}
+					}
+				}
+
 				// Set system time from unix timestamp
 				if (sync_data.unix_timestamp > 0) {
 					struct timeval tv;
@@ -242,6 +282,29 @@ static void daily_sync_task(void *pvParameters) {
 					settimeofday(&tv, NULL);
 					ESP_LOGI(TAG, "System time synced: %lld", (long long)sync_data.unix_timestamp);
 				}
+
+				// Update display with new time
+				time_t now;
+				struct tm timeinfo;
+				time(&now);
+				localtime_r(&now, &timeinfo);
+
+				if (lvgl_port_lock(100)) {
+					// Update main screen time display
+					if (ui_mainscreen_label_timelabel) {
+						char time_str[16];
+						strftime(time_str, sizeof(time_str), "%I:%M %p", &timeinfo);
+						lv_label_set_text(ui_mainscreen_label_timelabel, time_str);
+					}
+					if (ui_mainscreen_label_datelabel) {
+						char date_str[16];
+						strftime(date_str, sizeof(date_str), "%m/%d/%Y", &timeinfo);
+						lv_label_set_text(ui_mainscreen_label_datelabel, date_str);
+					}
+					lvgl_port_unlock();
+				}
+
+				ESP_LOGI(TAG, "Time and timezone synced from server");
 			}
 
 			// Send heartbeat with IP address if registered
@@ -375,10 +438,12 @@ void app_main(void) {
 		api_config_t api_config = {
 			.server_host = API_SERVER_HOST,
 			.server_port = API_SERVER_PORT,
+			.mac_address = "",  // Will be populated below
 			.is_registered = false,
 			.is_approved = false
 		};
 		strcpy(api_config.device_name, API_DEVICE_NAME);
+		strncpy(api_config.mac_address, mac_str, sizeof(api_config.mac_address) - 1);
 
 		api_client_init(&api_config);
 
@@ -389,6 +454,13 @@ void app_main(void) {
 				printf("✅ Restored registration from NVS\n");
 				printf("   Device ID: %s\n", saved_config->device_id);
 				printf("   Server: %s:%d\n\n", saved_config->server_host, saved_config->server_port);
+			}
+
+			// Ensure MAC address is populated (for devices registered before this update)
+			if (strlen(saved_config->mac_address) == 0) {
+				strncpy(saved_config->mac_address, mac_str, sizeof(saved_config->mac_address) - 1);
+				printf("   MAC address populated: %s\n", mac_str);
+				api_save_config();
 			}
 		}
 

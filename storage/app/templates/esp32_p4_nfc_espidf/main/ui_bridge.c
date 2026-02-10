@@ -152,11 +152,15 @@ esp_err_t ui_bridge_init(void) {
         lv_obj_set_style_text_color(ui_mainscreen_label_neticonlabel, lv_color_hex(0xFF0000), 0);
     }
 
-    // Initialize machine name from API config
+    // Initialize machine name from API config (prefer display_name from server)
     if (ui_mainscreen_label_machinenamelabel) {
         api_config_t *cfg = api_get_config();
-        if (cfg && cfg->device_name[0] != '\0') {
-            lv_label_set_text(ui_mainscreen_label_machinenamelabel, cfg->device_name);
+        if (cfg) {
+            // Use display_name if set, otherwise fall back to device_name
+            const char *name = (cfg->display_name[0] != '\0') ? cfg->display_name : cfg->device_name;
+            if (name[0] != '\0') {
+                lv_label_set_text(ui_mainscreen_label_machinenamelabel, name);
+            }
         }
     }
 
@@ -224,10 +228,10 @@ static void clock_tick_cb(lv_timer_t *timer) {
         lv_label_set_text(ui_mainscreen_label_timelabel, time_str);
     }
 
-    // Update date label
+    // Update date label (MM/DD/YYYY format)
     if (ui_mainscreen_label_datelabel) {
-        char date_str[32];
-        strftime(date_str, sizeof(date_str), "%A, %B %d", &timeinfo);
+        char date_str[16];
+        strftime(date_str, sizeof(date_str), "%m/%d/%Y", &timeinfo);
         lv_label_set_text(ui_mainscreen_label_datelabel, date_str);
     }
 }
@@ -1185,11 +1189,14 @@ void ui_bridge_update_network_status(bool connected, bool is_wifi, const char *i
         }
     }
 
-    // Update machine name from API config
+    // Update machine name from API config (prefer display_name from server)
     if (ui_mainscreen_label_machinenamelabel) {
         api_config_t *cfg = api_get_config();
-        if (cfg && cfg->device_name[0] != '\0') {
-            lv_label_set_text(ui_mainscreen_label_machinenamelabel, cfg->device_name);
+        if (cfg) {
+            const char *name = (cfg->display_name[0] != '\0') ? cfg->display_name : cfg->device_name;
+            if (name[0] != '\0') {
+                lv_label_set_text(ui_mainscreen_label_machinenamelabel, name);
+            }
         }
     }
 }
