@@ -2,42 +2,40 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
+use App\Filament\Resources\CompanySetupResource\Pages\EditCompanySetup;
+use App\Filament\Resources\CompanySetupResource\Pages\ListCompanySetups;
+use App\Models\CompanySetup;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\TimePicker;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Grid;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\CompanySetupResource\Pages\ListCompanySetups;
-use App\Filament\Resources\CompanySetupResource\Pages\EditCompanySetup;
-use UnitEnum;
-use BackedEnum;
-
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Forms;
-use Filament\Tables;
-use App\Models\CompanySetup;
-use App\Filament\Resources\CompanySetupResource\Pages;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class CompanySetupResource extends Resource
 {
     protected static ?string $model = CompanySetup::class;
 
     protected static ?string $navigationLabel = 'Company Setup';
-    protected static string | \UnitEnum | null $navigationGroup = 'System & Hardware';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+
     protected static ?string $slug = 'company-setup';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog';
+
     protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
@@ -82,6 +80,17 @@ class CompanySetupResource extends Resource
                                             ->helperText('Maximum hours in a shift before requiring approval'),
                                     ])
                                     ->columns(3),
+
+                                Section::make('Pay Period Naming')
+                                    ->description('Configure automatic naming for generated pay periods')
+                                    ->schema([
+                                        TextInput::make('pay_period_naming_pattern')
+                                            ->label('Naming Pattern')
+                                            ->default('Week {week_number}, {year}')
+                                            ->helperText('Variables: {week_number}, {year}, {start_date}, {end_date}, {start_month}, {end_month}, {start_day}, {end_day}, {sequence}')
+                                            ->placeholder('Week {week_number}, {year}')
+                                            ->maxLength(255),
+                                    ]),
 
                                 Section::make('Attendance Rules')
                                     ->schema([
@@ -457,21 +466,52 @@ class CompanySetupResource extends Resource
                         Tab::make('System')
                             ->icon('heroicon-o-cog-6-tooth')
                             ->schema([
-                                Section::make('Logging')
-                                    ->description('Configure system logging level')
+                                Section::make('Logging Level')
+                                    ->description('Configure system logging level for all components')
                                     ->schema([
                                         Select::make('logging_level')
                                             ->label('System Logging Level')
                                             ->options([
-                                                'none' => 'None',
-                                                'error' => 'Error',
-                                                'warning' => 'Warning',
-                                                'info' => 'Info',
-                                                'debug' => 'Debug',
+                                                'none' => 'None - No logging',
+                                                'error' => 'Error - Only errors',
+                                                'warning' => 'Warning - Errors and warnings',
+                                                'info' => 'Info - General information',
+                                                'debug' => 'Debug - Detailed debugging',
                                             ])
                                             ->default('error')
                                             ->required()
-                                            ->helperText('Level of system logging detail'),
+                                            ->helperText('Controls verbosity of application logging'),
+                                    ]),
+
+                                Section::make('Integration Sync Logs')
+                                    ->description('Configure retention and detail level for API integration logs')
+                                    ->schema([
+                                        TextInput::make('log_retention_days')
+                                            ->label('Log Retention (Days)')
+                                            ->numeric()
+                                            ->default(30)
+                                            ->minValue(1)
+                                            ->maxValue(365)
+                                            ->required()
+                                            ->helperText('Number of days to keep integration sync logs before auto-purge'),
+
+                                        Toggle::make('log_request_payloads')
+                                            ->label('Log Request Payloads')
+                                            ->default(true)
+                                            ->helperText('Store full API request data in logs (useful for debugging)'),
+
+                                        Toggle::make('log_response_data')
+                                            ->label('Log Response Data')
+                                            ->default(true)
+                                            ->helperText('Store API response summaries in logs'),
+                                    ])
+                                    ->columns(3),
+
+                                Section::make('View Logs')
+                                    ->schema([
+                                        Placeholder::make('view_logs_link')
+                                            ->content('View integration sync logs in the Logs menu to see API call history, errors, and sync statistics.')
+                                            ->columnSpanFull(),
                                     ]),
                             ]),
                     ])

@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Livewire\Controllers\AttendanceController;
+use App\Http\Controllers\PayrollExportController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Livewire\Controllers\AttendanceController;
 use Illuminate\Support\Facades\Route;
-
 
 // Route for the homepage
 Route::get('/', function () {
@@ -22,4 +22,11 @@ Route::prefix('reports')->name('reports.')->group(function () {
     Route::get('/sample', [ReportsController::class, 'sample'])->name('sample');
     Route::post('/adp-export', [ReportsController::class, 'generateADPExport'])->name('adp-export');
     Route::get('/configuration', [ReportsController::class, 'getConfiguration'])->name('configuration');
+});
+
+// Payroll export routes
+Route::prefix('payroll')->name('payroll.')->middleware('auth')->group(function () {
+    Route::get('/export/{export}/download', [PayrollExportController::class, 'download'])->name('export.download');
+    Route::delete('/export/{export}', [PayrollExportController::class, 'destroy'])->name('export.destroy');
+    Route::get('/exports', [PayrollExportController::class, 'index'])->name('exports.index');
 });

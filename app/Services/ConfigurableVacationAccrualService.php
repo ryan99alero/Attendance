@@ -2,40 +2,55 @@
 
 namespace App\Services;
 
-use Exception;
-use App\Models\Employee;
 use App\Models\CompanySetup;
-use App\Models\VacationPolicy;
-use App\Models\VacationTransaction;
+use App\Models\Employee;
 use App\Models\EmployeeVacationAssignment;
 use App\Models\PayrollFrequency;
+use App\Models\VacationPolicy;
+use App\Models\VacationTransaction;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
+use Exception;
 
 class ConfigurableVacationAccrualService
 {
-    protected CompanySetup $companySetup;
+    protected ?CompanySetup $companySetup = null;
 
     public function __construct()
     {
-        $this->companySetup = CompanySetup::first() ?? new CompanySetup();
+        // Lazy load to avoid DB queries during kernel boot (breaks migrations)
+    }
+
+    /**
+     * Get company setup, loading lazily on first access
+     */
+    protected function getCompanySetup(): CompanySetup
+    {
+        if ($this->companySetup === null) {
+            try {
+                $this->companySetup = CompanySetup::first() ?? new CompanySetup;
+            } catch (\Exception $e) {
+                $this->companySetup = new CompanySetup;
+            }
+        }
+
+        return $this->companySetup;
     }
 
     /**
      * Calculate vacation accrual for an employee based on company configuration
      */
-    public function calculateEmployeeVacation(Employee $employee, Carbon $asOfDate = null): array
+    public function calculateEmployeeVacation(Employee $employee, ?Carbon $asOfDate = null): array
     {
         $asOfDate = $asOfDate ?? Carbon::now();
 
         // Get employee's current vacation policy assignment
         $assignment = $this->getCurrentVacationAssignment($employee, $asOfDate);
-        if (!$assignment) {
+        if (! $assignment) {
             return $this->getDefaultVacationData($employee);
         }
 
         $policy = $assignment->vacationPolicy;
-        $method = $this->companySetup->vacation_accrual_method ?? 'anniversary';
+        $method = $this->getCompanySetup()->vacation_accrual_method ?? 'anniversary';
 
         return match ($method) {
             'calendar_year' => $this->calculateCalendarYearAccrual($employee, $policy, $asOfDate),
@@ -51,7 +66,7 @@ class ConfigurableVacationAccrualService
     protected function calculateCalendarYearAccrual(Employee $employee, VacationPolicy $policy, Carbon $asOfDate): array
     {
         $currentYear = $asOfDate->year;
-        $awardDate = $this->companySetup->calendar_year_award_date;
+        $awardDate = $this->getCompanySetup()->calendar_year_award_date;
 
         // Use configured award date or default to January 1st
         $yearAwardDate = $awardDate ?
@@ -62,7 +77,7 @@ class ConfigurableVacationAccrualService
         $hireDate = $employee->date_of_hire;
         $totalYearHours = $policy->vacation_hours_per_year;
 
-        if ($this->companySetup->calendar_year_prorate_partial &&
+        if ($this->getCompanySetup()->calendar_year_prorate_partial &&
             $hireDate &&
             $hireDate->year == $currentYear &&
             $hireDate->gt($yearAwardDate)) {
@@ -87,7 +102,7 @@ class ConfigurableVacationAccrualService
             'used_this_period' => $used,
             'adjustments' => $adjustments,
             'current_balance' => $accrued - $used + $adjustments,
-            'proration_applied' => $this->companySetup->calendar_year_prorate_partial && $hireDate && $hireDate->year == $currentYear,
+            'proration_applied' => $this->getCompanySetup()->calendar_year_prorate_partial && $hireDate && $hireDate->year == $currentYear,
             'policy' => $policy->toArray(),
         ];
     }
@@ -97,21 +112,21 @@ class ConfigurableVacationAccrualService
      */
     protected function calculatePayPeriodAccrual(Employee $employee, VacationPolicy $policy, Carbon $asOfDate): array
     {
-        $payrollFreq = $this->companySetup->payrollFrequency;
-        if (!$payrollFreq) {
+        $payrollFreq = $this->getCompanySetup()->payrollFrequency;
+        if (! $payrollFreq) {
             throw new Exception('Payroll frequency not configured for pay period vacation accrual');
         }
 
         // Use configured hours per period or calculate from annual entitlement
-        $hoursPerPeriod = $this->companySetup->pay_period_hours_per_period;
-        if (!$hoursPerPeriod) {
+        $hoursPerPeriod = $this->getCompanySetup()->pay_period_hours_per_period;
+        if (! $hoursPerPeriod) {
             $annualHours = $policy->vacation_hours_per_year;
             $periodsPerYear = $this->getPeriodsPerYear($payrollFreq->frequency_name);
             $hoursPerPeriod = $annualHours / $periodsPerYear;
         }
 
         $hireDate = $employee->date_of_hire ?? $asOfDate;
-        $waitingPeriods = $this->companySetup->pay_period_waiting_periods ?? 0;
+        $waitingPeriods = $this->getCompanySetup()->pay_period_waiting_periods ?? 0;
 
         // Calculate periods worked, accounting for waiting period
         $totalPeriodsWorked = $this->calculatePeriodsWorked($hireDate, $asOfDate, $payrollFreq);
@@ -119,13 +134,13 @@ class ConfigurableVacationAccrualService
 
         // Calculate total accrued based on whether they accrue immediately or after waiting
         $totalAccrued = 0;
-        if ($this->companySetup->pay_period_accrue_immediately || $totalPeriodsWorked > $waitingPeriods) {
+        if ($this->getCompanySetup()->pay_period_accrue_immediately || $totalPeriodsWorked > $waitingPeriods) {
             $totalAccrued = $eligiblePeriods * $hoursPerPeriod;
         }
 
         // Apply cap if configured
-        if ($this->companySetup->max_accrual_balance) {
-            $totalAccrued = min($totalAccrued, $this->companySetup->max_accrual_balance);
+        if ($this->getCompanySetup()->max_accrual_balance) {
+            $totalAccrued = min($totalAccrued, $this->getCompanySetup()->max_accrual_balance);
         }
 
         // Get actual transactions
@@ -144,7 +159,7 @@ class ConfigurableVacationAccrualService
             'used_total' => $used,
             'adjustments' => $adjustments,
             'current_balance' => $totalAccrued - $used + $adjustments,
-            'accrue_immediately' => $this->companySetup->pay_period_accrue_immediately,
+            'accrue_immediately' => $this->getCompanySetup()->pay_period_accrue_immediately,
             'policy' => $policy->toArray(),
         ];
     }
@@ -154,7 +169,7 @@ class ConfigurableVacationAccrualService
      */
     protected function calculateAnniversaryAccrual(Employee $employee, VacationPolicy $policy, Carbon $asOfDate): array
     {
-        if (!$employee->date_of_hire) {
+        if (! $employee->date_of_hire) {
             return $this->getDefaultVacationData($employee);
         }
 
@@ -162,10 +177,10 @@ class ConfigurableVacationAccrualService
         $yearsOfService = $hireDate->diffInYears($asOfDate);
 
         // Apply company-specific anniversary settings
-        $hasFirstYearWaiting = $this->companySetup->anniversary_first_year_waiting_period;
-        $allowsPartialYear = $this->companySetup->anniversary_allow_partial_year;
-        $awardOnAnniversary = $this->companySetup->anniversary_award_on_anniversary;
-        $maxDaysCap = $this->companySetup->anniversary_max_days_cap;
+        $hasFirstYearWaiting = $this->getCompanySetup()->anniversary_first_year_waiting_period;
+        $allowsPartialYear = $this->getCompanySetup()->anniversary_allow_partial_year;
+        $awardOnAnniversary = $this->getCompanySetup()->anniversary_award_on_anniversary;
+        $maxDaysCap = $this->getCompanySetup()->anniversary_max_days_cap;
 
         // Get last anniversary date
         $lastAnniversary = $hireDate->copy()->addYears($yearsOfService);
@@ -232,10 +247,10 @@ class ConfigurableVacationAccrualService
     /**
      * Process vacation accrual for an employee
      */
-    public function processVacationAccrual(Employee $employee, Carbon $date = null): VacationTransaction
+    public function processVacationAccrual(Employee $employee, ?Carbon $date = null): VacationTransaction
     {
         $date = $date ?? Carbon::now();
-        $method = $this->companySetup->vacation_accrual_method ?? 'anniversary';
+        $method = $this->getCompanySetup()->vacation_accrual_method ?? 'anniversary';
 
         return match ($method) {
             'calendar_year' => $this->processCalendarYearAccrual($employee, $date),
@@ -260,11 +275,11 @@ class ConfigurableVacationAccrualService
     /**
      * Get vacation policy for employee based on tenure
      */
-    public function getVacationPolicyForEmployee(Employee $employee, Carbon $date = null): ?VacationPolicy
+    public function getVacationPolicyForEmployee(Employee $employee, ?Carbon $date = null): ?VacationPolicy
     {
         $date = $date ?? Carbon::now();
 
-        if (!$employee->date_of_hire) {
+        if (! $employee->date_of_hire) {
             return null;
         }
 
@@ -279,7 +294,7 @@ class ConfigurableVacationAccrualService
     /**
      * Assign vacation policy to employee
      */
-    public function assignVacationPolicy(Employee $employee, VacationPolicy $policy, Carbon $effectiveDate = null): EmployeeVacationAssignment
+    public function assignVacationPolicy(Employee $employee, VacationPolicy $policy, ?Carbon $effectiveDate = null): EmployeeVacationAssignment
     {
         $effectiveDate = $effectiveDate ?? Carbon::now();
 
@@ -347,9 +362,9 @@ class ConfigurableVacationAccrualService
     {
         return match ($payrollFreq->frequency_name) {
             'weekly' => $date->format('Y-W'),
-            'biweekly' => $date->format('Y') . '-B' . intval($date->weekOfYear / 2),
+            'biweekly' => $date->format('Y').'-B'.intval($date->weekOfYear / 2),
             'monthly' => $date->format('Y-m'),
-            'semimonthly' => $date->format('Y-m') . ($date->day <= 15 ? '-1' : '-2'),
+            'semimonthly' => $date->format('Y-m').($date->day <= 15 ? '-1' : '-2'),
             default => $date->format('Y-m')
         };
     }
@@ -378,7 +393,7 @@ class ConfigurableVacationAccrualService
     protected function processAnniversaryAccrual(Employee $employee, Carbon $date): VacationTransaction
     {
         // Use existing VacationAccrualService logic
-        $vacationService = new VacationAccrualService();
+        $vacationService = new VacationAccrualService;
         $balance = $vacationService->processAnniversaryAccrual($employee, $date);
 
         // Create transaction record
@@ -391,13 +406,13 @@ class ConfigurableVacationAccrualService
             'hours' => $hoursAwarded,
             'transaction_date' => $date,
             'effective_date' => $date,
-            'accrual_period' => $date->year . '-Anniversary',
-            'description' => "Anniversary accrual - Year " . ($employee->date_of_hire->diffInYears($date) + 1),
+            'accrual_period' => $date->year.'-Anniversary',
+            'description' => 'Anniversary accrual - Year '.($employee->date_of_hire->diffInYears($date) + 1),
             'metadata' => [
                 'years_of_service' => $employee->date_of_hire->diffInYears($date),
                 'policy_id' => $policy?->id,
-                'method' => 'anniversary'
-            ]
+                'method' => 'anniversary',
+            ],
         ]);
     }
 }

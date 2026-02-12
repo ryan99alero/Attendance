@@ -2,9 +2,9 @@
 
 namespace App\Services\Payroll;
 
+use App\Models\CompanySetup;
 use App\Models\PayPeriod;
 use App\Models\PayrollFrequency;
-use App\Models\CompanySetup;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -24,19 +24,25 @@ class PayPeriodGeneratorService
      * Special day codes
      */
     const LAST_DAY_OF_MONTH = 99;
+
     const FIRST_DAY_NEXT_MONTH = 98;
+
+    protected PayPeriodNamingService $namingService;
+
+    public function __construct(?PayPeriodNamingService $namingService = null)
+    {
+        $this->namingService = $namingService ?? new PayPeriodNamingService;
+    }
 
     /**
      * Generate pay periods for a given date range
      *
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @param PayrollFrequency|null $frequency If null, uses company default
+     * @param  PayrollFrequency|null  $frequency  If null, uses company default
      * @return Collection<PayPeriod>
      */
     public function generatePayPeriods(Carbon $startDate, Carbon $endDate, ?PayrollFrequency $frequency = null): Collection
     {
-        if (!$frequency) {
+        if (! $frequency) {
             $frequency = $this->getCompanyPayrollFrequency();
         }
 
@@ -51,7 +57,7 @@ class PayPeriodGeneratorService
 
         // Remove duplicates and filter to requested range
         $uniquePeriods = $periods->unique(function ($period) {
-            return $period->start_date->format('Y-m-d') . '|' . $period->end_date->format('Y-m-d');
+            return $period->start_date->format('Y-m-d').'|'.$period->end_date->format('Y-m-d');
         });
 
         return $uniquePeriods->filter(function ($period) use ($startDate, $endDate) {
@@ -139,8 +145,8 @@ class PayPeriodGeneratorService
      */
     private function generateBiweeklyPeriods(Carbon $month, PayrollFrequency $frequency): Collection
     {
-        if (!$frequency->reference_start_date) {
-            throw new InvalidArgumentException("Bi-weekly frequency requires reference_start_date");
+        if (! $frequency->reference_start_date) {
+            throw new InvalidArgumentException('Bi-weekly frequency requires reference_start_date');
         }
 
         $periods = collect();
@@ -218,7 +224,7 @@ class PayPeriodGeneratorService
         $periodEnd = $month->copy()->endOfMonth();
 
         return collect([
-            $this->createPayPeriod($periodStart, $periodEnd)
+            $this->createPayPeriod($periodStart, $periodEnd),
         ]);
     }
 
@@ -281,8 +287,12 @@ class PayPeriodGeneratorService
                     $before = $payDate->copy();
                     $after = $payDate->copy();
 
-                    while ($before->isWeekend()) $before->subDay();
-                    while ($after->isWeekend()) $after->addDay();
+                    while ($before->isWeekend()) {
+                        $before->subDay();
+                    }
+                    while ($after->isWeekend()) {
+                        $after->addDay();
+                    }
 
                     // Choose closest weekday
                     $payDate = ($payDate->diffInDays($before) <= $payDate->diffInDays($after)) ? $before : $after;
@@ -301,13 +311,14 @@ class PayPeriodGeneratorService
     }
 
     /**
-     * Create a PayPeriod model instance
+     * Create a PayPeriod model instance with auto-generated name
      */
     private function createPayPeriod(Carbon $startDate, Carbon $endDate): PayPeriod
     {
         return new PayPeriod([
             'start_date' => $startDate,
             'end_date' => $endDate,
+            'name' => $this->namingService->generateName($startDate, $endDate),
             'is_processed' => false,
             'is_posted' => false,
         ]);
@@ -320,8 +331,8 @@ class PayPeriodGeneratorService
     {
         $companySetup = CompanySetup::first();
 
-        if (!$companySetup || !$companySetup->payroll_frequency_id) {
-            throw new InvalidArgumentException("Company payroll frequency not configured");
+        if (! $companySetup || ! $companySetup->payroll_frequency_id) {
+            throw new InvalidArgumentException('Company payroll frequency not configured');
         }
 
         return $companySetup->payrollFrequency;
@@ -341,7 +352,7 @@ class PayPeriodGeneratorService
                 ->where('end_date', $period->end_date)
                 ->first();
 
-            if (!$existing) {
+            if (! $existing) {
                 $period->save();
                 $savedPeriods->push($period);
             }

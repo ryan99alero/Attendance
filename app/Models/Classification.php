@@ -2,15 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Support\Carbon;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
- *
- *
  * @property int $id Primary key of the classifications table
  * @property string $name Name of the classification (e.g., Holiday, Vacation)
  * @property string $code Unique code identifier (e.g., HOLIDAY, VACATION)
@@ -24,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read int|null $attendances_count
  * @property-read Collection<int, Punch> $punches
  * @property-read int|null $punches_count
+ *
  * @method static Builder<static>|Classification newModelQuery()
  * @method static Builder<static>|Classification newQuery()
  * @method static Builder<static>|Classification query()
@@ -36,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder<static>|Classification whereName($value)
  * @method static Builder<static>|Classification whereUpdatedAt($value)
  * @method static Builder<static>|Classification whereUpdatedBy($value)
+ *
  * @mixin \Eloquent
  */
 class Classification extends Model
@@ -57,15 +57,53 @@ class Classification extends Model
     protected $fillable = [
         'name', // The name of the classification
         'code', // Unique code identifier
+        'adp_code', // ADP hour code (H, V, S, D, P, etc.)
+        'is_regular', // Maps to standard Reg Hours column
+        'is_overtime', // Maps to standard O/T Hours column
         'description', // Description of the classification
         'created_by', // User who created this record
         'updated_by', // User who last updated this record
     ];
 
     /**
+     * The attributes that should be cast.
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_regular' => 'boolean',
+            'is_overtime' => 'boolean',
+            'is_active' => 'boolean',
+        ];
+    }
+
+    /**
+     * Scope to get classifications that map to regular hours
+     */
+    public function scopeRegular($query)
+    {
+        return $query->where('is_regular', true);
+    }
+
+    /**
+     * Scope to get classifications that map to overtime hours
+     */
+    public function scopeOvertime($query)
+    {
+        return $query->where('is_overtime', true);
+    }
+
+    /**
+     * Scope to get classifications with ADP codes (Hours 3 types)
+     */
+    public function scopeWithAdpCode($query)
+    {
+        return $query->whereNotNull('adp_code');
+    }
+
+    /**
      * Relationships to other models.
      */
-
     public function attendances()
     {
         return $this->hasMany(Attendance::class);

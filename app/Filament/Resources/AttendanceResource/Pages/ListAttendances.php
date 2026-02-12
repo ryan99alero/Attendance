@@ -2,18 +2,18 @@
 
 namespace App\Filament\Resources\AttendanceResource\Pages;
 
-use Illuminate\Database\Eloquent\Builder;
-use Filament\Forms\Components\FileUpload;
-use Exception;
-use App\Filament\Resources\AttendanceResource;
-use App\Models\Attendance;
-use App\Imports\DataImport;
 use App\Exports\DataExport;
+use App\Filament\Resources\AttendanceResource;
+use App\Jobs\ProcessDataImportJob;
+use App\Models\Attendance;
+use Exception;
 use Filament\Actions\Action;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
-use Maatwebsite\Excel\Facades\Excel;
+use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ListAttendances extends ListRecords
 {
@@ -26,10 +26,10 @@ class ListAttendances extends ListRecords
         // Apply department filtering for managers
         $user = auth()->user();
 
-        if ($user && $user->hasRole('manager') && !$user->hasRole('super_admin')) {
+        if ($user && $user->hasRole('manager') && ! $user->hasRole('super_admin')) {
             $managedEmployeeIds = $user->getManagedEmployeeIds();
 
-            if (!empty($managedEmployeeIds)) {
+            if (! empty($managedEmployeeIds)) {
                 $query->whereIn('employee_id', $managedEmployeeIds);
             } else {
                 // If manager has no employees, show no records
@@ -58,38 +58,32 @@ class ListAttendances extends ListRecords
                     FileUpload::make('file')
                         ->label('Import File')
                         ->required()
+                        ->disk('local')
+                        ->directory('imports')
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
                 ])
                 ->action(function (array $data) {
-                    $fileName = $data['file'];
-                    $filePath = storage_path("app/public/{$fileName}");
+                    $filePath = $data['file'];
+                    $fileName = basename($filePath);
 
-                    Log::info("Resolved file path for import: {$filePath}");
+                    Log::info("Queuing attendance import job for file: {$filePath}");
 
-                    $importService = new DataImport(Attendance::class);
+                    // Create import record and dispatch job
+                    $import = ProcessDataImportJob::createAndDispatch(
+                        $filePath,
+                        Attendance::class,
+                        ProcessDataImportJob::PROCESSOR_ATTENDANCE,
+                        auth()->id(),
+                        $fileName
+                    );
 
-                    try {
-                        Excel::import($importService, $filePath);
+                    $rowInfo = $import->total_rows ? " ({$import->total_rows} rows)" : '';
 
-                        if ($failedRecords = $importService->getFailedRecords()) {
-                            // Export failed records if any errors occurred
-                            return $importService->exportFailedRecords();
-                        }
-
-                        Notification::make()
-                            ->title('Import Success')
-                            ->body('Attendances imported successfully!')
-                            ->success()
-                            ->send();
-                    } catch (Exception $e) {
-                        Log::error("Import failed: {$e->getMessage()}");
-
-                        Notification::make()
-                            ->title('Import Failed')
-                            ->body("An error occurred during the import: {$e->getMessage()}")
-                            ->danger()
-                            ->send();
-                    }
+                    Notification::make()
+                        ->title('Import Queued')
+                        ->body("Your attendance import{$rowInfo} has been queued. You will be notified when complete.")
+                        ->info()
+                        ->send();
                 })
                 ->icon('heroicon-o-arrow-up-on-square-stack'),
 

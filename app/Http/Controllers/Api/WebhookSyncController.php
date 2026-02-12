@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
-use Throwable;
 use App\Http\Controllers\Controller;
 use App\Models\IntegrationConnection;
-use App\Models\IntegrationSyncLog;
+use App\Models\SystemLog;
 use App\Services\Integrations\IntegrationSyncEngine;
 use App\Services\Integrations\PaceApiClient;
 use Illuminate\Http\JsonResponse;
+use Throwable;
 
 class WebhookSyncController extends Controller
 {
@@ -18,13 +18,15 @@ class WebhookSyncController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$connection) {
+        if (! $connection) {
             return response()->json(['error' => 'Invalid or inactive webhook token.'], 404);
         }
 
-        $syncLog = IntegrationSyncLog::start(
-            connectionId: $connection->id,
+        $syncLog = SystemLog::startIntegrationSync(
+            connection: $connection,
             operation: 'webhook_sync',
+            object: null,
+            requestData: ['object_filter' => $object]
         );
 
         try {
@@ -32,7 +34,8 @@ class WebhookSyncController extends Controller
             if ($connection->driver === 'pace') {
                 $client = new PaceApiClient($connection);
             } else {
-                $syncLog->markFailed('Unsupported driver for webhook sync: ' . $connection->driver);
+                $syncLog->markFailed('Unsupported driver for webhook sync: '.$connection->driver);
+
                 return response()->json(['error' => 'Unsupported driver.'], 422);
             }
 
@@ -51,6 +54,7 @@ class WebhookSyncController extends Controller
                     : 'No sync-enabled objects found.';
 
                 $syncLog->markFailed($msg);
+
                 return response()->json(['error' => $msg], 404);
             }
 
@@ -80,8 +84,8 @@ class WebhookSyncController extends Controller
 
             $connection->markSynced();
 
-            if (!empty($errors)) {
-                $syncLog->markPartial($aggregated, implode('; ', $errors));
+            if (! empty($errors)) {
+                $syncLog->markPartial(implode('; ', $errors), $aggregated, ['errors' => $errors]);
             } else {
                 $syncLog->markSuccess($aggregated);
             }

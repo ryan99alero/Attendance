@@ -94,9 +94,15 @@ class IntegrationObject extends Model
         return $this->hasMany(IntegrationQueryTemplate::class, 'object_id');
     }
 
-    public function syncLogs(): HasMany
+    /**
+     * Get sync logs for this object from the system_logs table
+     */
+    public function syncLogs()
     {
-        return $this->hasMany(IntegrationSyncLog::class, 'object_id');
+        return SystemLog::query()
+            ->where('category', SystemLog::CATEGORY_INTEGRATION)
+            ->where('type', 'sync')
+            ->whereJsonContains('metadata->object_id', $this->id);
     }
 
     // Scopes

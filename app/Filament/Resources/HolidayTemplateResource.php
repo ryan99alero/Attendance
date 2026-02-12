@@ -2,48 +2,45 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Schemas\Components\Grid;
-use Filament\Forms\Components\Toggle;
+use App\Filament\Resources\HolidayTemplateResource\Pages\CreateHolidayTemplate;
+use App\Filament\Resources\HolidayTemplateResource\Pages\EditHolidayTemplate;
+use App\Filament\Resources\HolidayTemplateResource\Pages\ListHolidayTemplates;
+use App\Models\HolidayTemplate;
+use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Schemas\Components\Group;
-use Filament\Schemas\Components\Utilities\Get;
-use Exception;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\Action;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\HolidayTemplateResource\Pages\ListHolidayTemplates;
-use App\Filament\Resources\HolidayTemplateResource\Pages\CreateHolidayTemplate;
-use App\Filament\Resources\HolidayTemplateResource\Pages\EditHolidayTemplate;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\HolidayTemplateResource\Pages;
-use App\Models\HolidayTemplate;
-use Filament\Forms;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class HolidayTemplateResource extends Resource
 {
     protected static ?string $model = HolidayTemplate::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
+
     protected static ?string $navigationLabel = 'Holidays';
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Off Management';
+
     protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
@@ -132,7 +129,7 @@ class HolidayTemplateResource extends Resource
                                 ->options([
                                     1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
                                     5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
                                 ])
                                 ->required(),
 
@@ -141,8 +138,8 @@ class HolidayTemplateResource extends Resource
                                 ->options(array_combine(range(1, 31), range(1, 31)))
                                 ->required(),
                         ])
-                        ->columns(2)
-                        ->visible(fn (Get $get) => $get('type') === 'fixed_date'),
+                            ->columns(2)
+                            ->visible(fn (Get $get) => $get('type') === 'fixed_date'),
 
                         // Relative Date Configuration
                         Group::make([
@@ -151,7 +148,7 @@ class HolidayTemplateResource extends Resource
                                 ->options([
                                     1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
                                     5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
                                 ])
                                 ->required(),
 
@@ -159,7 +156,7 @@ class HolidayTemplateResource extends Resource
                                 ->label('Day of Week')
                                 ->options([
                                     0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
-                                    4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'
+                                    4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday',
                                 ])
                                 ->required(),
 
@@ -167,13 +164,13 @@ class HolidayTemplateResource extends Resource
                                 ->label('Occurrence')
                                 ->options([
                                     1 => '1st (First)', 2 => '2nd (Second)', 3 => '3rd (Third)',
-                                    4 => '4th (Fourth)', 5 => '5th (Fifth)', -1 => 'Last'
+                                    4 => '4th (Fourth)', 5 => '5th (Fifth)', -1 => 'Last',
                                 ])
                                 ->required()
                                 ->helperText('e.g., "4th" Thursday for Thanksgiving'),
                         ])
-                        ->columns(3)
-                        ->visible(fn (Get $get) => $get('type') === 'relative'),
+                            ->columns(3)
+                            ->visible(fn (Get $get) => $get('type') === 'relative'),
 
                         // Custom Date Configuration
                         Group::make([
@@ -190,8 +187,71 @@ class HolidayTemplateResource extends Resource
                                 ->default(0)
                                 ->helperText('Days before (-) or after (+) the base holiday'),
                         ])
-                        ->columns(2)
-                        ->visible(fn (Get $get) => $get('type') === 'custom'),
+                            ->columns(2)
+                            ->visible(fn (Get $get) => $get('type') === 'custom'),
+                    ]),
+
+                Section::make('Holiday Pay & Overtime')
+                    ->description('Configure how employees are paid for this holiday')
+                    ->schema([
+                        Grid::make(3)
+                            ->schema([
+                                TextInput::make('holiday_multiplier')
+                                    ->label('Holiday Pay Multiplier')
+                                    ->numeric()
+                                    ->default(2.00)
+                                    ->step(0.01)
+                                    ->suffix('x')
+                                    ->helperText('Pay multiplier for hours worked on this holiday (e.g., 2.0 for double-time)'),
+
+                                TextInput::make('standard_holiday_hours')
+                                    ->label('Standard Holiday Hours')
+                                    ->numeric()
+                                    ->default(8.00)
+                                    ->step(0.5)
+                                    ->suffix('hours')
+                                    ->helperText('Hours credited for this holiday when not worked'),
+
+                                Toggle::make('paid_if_not_worked')
+                                    ->label('Paid If Not Worked')
+                                    ->default(true)
+                                    ->helperText('Employees receive holiday pay even if they do not work'),
+                            ]),
+
+                        Grid::make(2)
+                            ->schema([
+                                Toggle::make('require_day_before')
+                                    ->label('Require Day Before Worked')
+                                    ->default(false)
+                                    ->helperText('Employee must work the scheduled day before the holiday to qualify for holiday pay'),
+
+                                Toggle::make('require_day_after')
+                                    ->label('Require Day After Worked')
+                                    ->default(false)
+                                    ->helperText('Employee must work the scheduled day after the holiday to qualify for holiday pay'),
+                            ]),
+
+                        Placeholder::make('qualification_note')
+                            ->label('Qualification Requirements')
+                            ->content(function (Get $get): string {
+                                $requireBefore = $get('require_day_before');
+                                $requireAfter = $get('require_day_after');
+
+                                if (! $requireBefore && ! $requireAfter) {
+                                    return 'No additional requirements - all eligible employees receive holiday pay.';
+                                }
+
+                                $requirements = [];
+                                if ($requireBefore) {
+                                    $requirements[] = 'work the day before';
+                                }
+                                if ($requireAfter) {
+                                    $requirements[] = 'work the day after';
+                                }
+
+                                return 'Employees must '.implode(' AND ', $requirements).' the holiday to qualify for holiday pay.';
+                            })
+                            ->extraAttributes(['class' => 'text-sm text-amber-600']),
                     ]),
 
                 Section::make('Preview')
@@ -202,7 +262,7 @@ class HolidayTemplateResource extends Resource
                                 $type = $get('type');
                                 $rule = $get('calculation_rule');
 
-                                if (!$type || !$rule) {
+                                if (! $type || ! $rule) {
                                     return 'Configure the holiday type and calculation rule to see preview dates.';
                                 }
 
@@ -220,7 +280,7 @@ class HolidayTemplateResource extends Resource
 
                                     return implode("\n", $dates);
                                 } catch (Exception $e) {
-                                    return "Error calculating dates: " . $e->getMessage();
+                                    return 'Error calculating dates: '.$e->getMessage();
                                 }
                             })
                             ->extraAttributes(['style' => 'white-space: pre-line;']),
@@ -256,6 +316,7 @@ class HolidayTemplateResource extends Resource
                             if ($date->isPast()) {
                                 $date = $record->calculateDateForYear(now()->year + 1);
                             }
+
                             return $date->format('M j, Y');
                         } catch (Exception $e) {
                             return 'Error';
@@ -308,6 +369,7 @@ class HolidayTemplateResource extends Resource
                                 $date = $record->calculateDateForYear($year);
                                 $dates[] = "{$year}: {$date->format('l, F j, Y')}";
                             }
+
                             return view('filament.components.holiday-preview', ['dates' => $dates]);
                         } catch (Exception $e) {
                             return view('filament.components.holiday-preview', ['error' => $e->getMessage()]);

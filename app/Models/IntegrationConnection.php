@@ -5,17 +5,33 @@ namespace App\Models;
 use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Crypt;
 
 class IntegrationConnection extends Model
 {
     use HasFactory;
 
+    // Integration method constants
+    public const METHOD_API = 'api';
+
+    public const METHOD_FLATFILE = 'flatfile';
+
+    // Driver constants
+    public const DRIVER_PACE = 'pace';
+
+    public const DRIVER_ADP = 'adp';
+
+    public const DRIVER_QUICKBOOKS = 'quickbooks';
+
+    public const DRIVER_GENERIC_REST = 'generic_rest';
+
     protected $fillable = [
         'name',
         'driver',
+        'integration_method',
         'base_url',
         'api_version',
         'auth_type',
@@ -32,6 +48,15 @@ class IntegrationConnection extends Model
         'webhook_token',
         'created_by',
         'updated_by',
+        // Payroll provider fields
+        'is_payroll_provider',
+        'export_formats',
+        'export_destination',
+        'export_path',
+        'export_filename_pattern',
+        // ADP-specific fields
+        'adp_company_code',
+        'adp_batch_format',
     ];
 
     protected $casts = [
@@ -43,6 +68,9 @@ class IntegrationConnection extends Model
         'rate_limit_per_minute' => 'integer',
         'sync_interval_minutes' => 'integer',
         'last_synced_at' => 'datetime',
+        // Payroll provider casts
+        'is_payroll_provider' => 'boolean',
+        'export_formats' => 'array',
     ];
 
     protected $hidden = [
@@ -122,7 +150,7 @@ class IntegrationConnection extends Model
 
     public function isDueForSync(): bool
     {
-        if (!$this->isPollingEnabled()) {
+        if (! $this->isPollingEnabled()) {
             return false;
         }
 
@@ -147,12 +175,13 @@ class IntegrationConnection extends Model
     {
         $token = bin2hex(random_bytes(32));
         $this->update(['webhook_token' => $token]);
+
         return $token;
     }
 
     public function getOrCreateWebhookToken(): string
     {
-        if (!empty($this->webhook_token)) {
+        if (! empty($this->webhook_token)) {
             return $this->webhook_token;
         }
 
@@ -184,9 +213,10 @@ class IntegrationConnection extends Model
         return $this->hasMany(IntegrationQueryTemplate::class, 'connection_id');
     }
 
-    public function syncLogs(): HasMany
+    public function syncLogs(): MorphMany
     {
-        return $this->hasMany(IntegrationSyncLog::class, 'connection_id');
+        return $this->morphMany(SystemLog::class, 'loggable')
+            ->where('category', SystemLog::CATEGORY_INTEGRATION);
     }
 
     public function creator(): BelongsTo
@@ -209,5 +239,114 @@ class IntegrationConnection extends Model
     public function scopeByDriver($query, string $driver)
     {
         return $query->where('driver', $driver);
+    }
+
+    public function scopePayrollProviders($query)
+    {
+        return $query->where('is_payroll_provider', true);
+    }
+
+    // Payroll provider relationships
+
+    public function employees(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'payroll_provider_id');
+    }
+
+    public function payrollExports(): HasMany
+    {
+        return $this->hasMany(PayrollExport::class);
+    }
+
+    // Payroll provider helper methods
+
+    public function supportsFormat(string $format): bool
+    {
+        return in_array($format, $this->export_formats ?? []);
+    }
+
+    public function getEnabledFormats(): array
+    {
+        return $this->export_formats ?? [];
+    }
+
+    // Integration method helpers
+
+    public function isApiMethod(): bool
+    {
+        return $this->integration_method === self::METHOD_API;
+    }
+
+    public function isFlatFileMethod(): bool
+    {
+        return $this->integration_method === self::METHOD_FLATFILE;
+    }
+
+    public static function getIntegrationMethods(): array
+    {
+        return [
+            self::METHOD_API => 'API Integration',
+            self::METHOD_FLATFILE => 'Flat File Export',
+        ];
+    }
+
+    /**
+     * Get all integration types as a single unified list.
+     * Each entry sets both driver and integration_method internally.
+     */
+    public static function getIntegrationTypes(): array
+    {
+        return [
+            // API integrations
+            'pace_api' => 'Pace / ePace ERP (API)',
+            'adp_api' => 'ADP Workforce Now (API)',
+            'quickbooks_api' => 'QuickBooks Online (API)',
+            'generic_api' => 'Generic REST API',
+
+            // Flat file exports
+            'adp_file' => 'ADP File Export',
+            'csv_export' => 'CSV Export',
+            'excel_export' => 'Excel Export',
+        ];
+    }
+
+    /**
+     * Parse integration type into driver and method.
+     */
+    public static function parseIntegrationType(string $type): array
+    {
+        return match ($type) {
+            'pace_api' => ['driver' => self::DRIVER_PACE, 'method' => self::METHOD_API],
+            'adp_api' => ['driver' => self::DRIVER_ADP, 'method' => self::METHOD_API],
+            'quickbooks_api' => ['driver' => self::DRIVER_QUICKBOOKS, 'method' => self::METHOD_API],
+            'generic_api' => ['driver' => self::DRIVER_GENERIC_REST, 'method' => self::METHOD_API],
+            'adp_file' => ['driver' => self::DRIVER_ADP, 'method' => self::METHOD_FLATFILE],
+            'csv_export' => ['driver' => 'csv', 'method' => self::METHOD_FLATFILE],
+            'excel_export' => ['driver' => 'excel', 'method' => self::METHOD_FLATFILE],
+            default => ['driver' => $type, 'method' => self::METHOD_API],
+        };
+    }
+
+    /**
+     * Get the combined integration type key from driver + method.
+     */
+    public function getIntegrationType(): string
+    {
+        if ($this->integration_method === self::METHOD_FLATFILE) {
+            return match ($this->driver) {
+                self::DRIVER_ADP => 'adp_file',
+                'csv' => 'csv_export',
+                'excel' => 'excel_export',
+                default => 'csv_export',
+            };
+        }
+
+        return match ($this->driver) {
+            self::DRIVER_PACE => 'pace_api',
+            self::DRIVER_ADP => 'adp_api',
+            self::DRIVER_QUICKBOOKS => 'quickbooks_api',
+            self::DRIVER_GENERIC_REST => 'generic_api',
+            default => 'generic_api',
+        };
     }
 }

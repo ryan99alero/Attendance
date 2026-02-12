@@ -2,16 +2,15 @@
 
 namespace App\Services\Integrations;
 
-use InvalidArgumentException;
-use Exception;
 use App\Models\IntegrationConnection;
-use App\Models\IntegrationSyncLog;
 use App\Models\IntegrationQueryTemplate;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Http\Client\Response;
+use Exception;
 use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Collection;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use InvalidArgumentException;
 
 /**
  * Pace/ePace REST API Client
@@ -24,7 +23,6 @@ use Illuminate\Support\Carbon;
 class PaceApiClient
 {
     protected IntegrationConnection $connection;
-    protected ?IntegrationSyncLog $currentLog = null;
 
     public function __construct(IntegrationConnection $connection)
     {
@@ -41,6 +39,7 @@ class PaceApiClient
     public static function fromConnection(int $connectionId): self
     {
         $connection = IntegrationConnection::findOrFail($connectionId);
+
         return new self($connection);
     }
 
@@ -83,14 +82,14 @@ class PaceApiClient
      * - Including child objects in a single request
      * - Filtering and pagination
      *
-     * @param string $objectName Root object type (Job, Customer, Employee, etc.)
-     * @param array $fields Array of field definitions [['name' => 'fieldName', 'xpath' => '@fieldPath']]
-     * @param array $children Child objects to include (empty array if none)
-     * @param string|null $primaryKey Fetch a specific record by primary key
-     * @param string|null $xpathFilter XPath filter expression
-     * @param string|null $xpathSorts XPath sort expression
-     * @param int $offset Pagination offset
-     * @param int|null $limit Number of records to return (null = omit from request, 0 = 1 record)
+     * @param  string  $objectName  Root object type (Job, Customer, Employee, etc.)
+     * @param  array  $fields  Array of field definitions [['name' => 'fieldName', 'xpath' => '@fieldPath']]
+     * @param  array  $children  Child objects to include (empty array if none)
+     * @param  string|null  $primaryKey  Fetch a specific record by primary key
+     * @param  string|null  $xpathFilter  XPath filter expression
+     * @param  string|null  $xpathSorts  XPath sort expression
+     * @param  int  $offset  Pagination offset
+     * @param  int|null  $limit  Number of records to return (null = omit from request, 0 = 1 record)
      * @return array Response containing valueObjects array and totalRecords
      */
     public function loadValueObjects(
@@ -147,10 +146,10 @@ class PaceApiClient
      * Load all matching records.
      * Probes for totalRecords first, then fetches all in one call.
      *
-     * @param string $objectName Object type
-     * @param array $fields Fields to fetch
-     * @param array $children Child objects (empty array if none)
-     * @param string|null $xpathFilter XPath filter expression
+     * @param  string  $objectName  Object type
+     * @param  array  $fields  Fields to fetch
+     * @param  array  $children  Child objects (empty array if none)
+     * @param  string|null  $xpathFilter  XPath filter expression
      * @return Collection Collection of value objects
      */
     public function loadAllValueObjects(
@@ -208,11 +207,11 @@ class PaceApiClient
         }
 
         // Parse children
-        if (!empty($valueObject['children'])) {
+        if (! empty($valueObject['children'])) {
             foreach ($valueObject['children'] as $childGroup) {
                 $childName = $childGroup['objectName'];
                 $result['_children'][$childName] = collect($childGroup['valueObjects'] ?? [])
-                    ->map(fn($child) => $this->parseValueObject($child))
+                    ->map(fn ($child) => $this->parseValueObject($child))
                     ->all();
             }
         }
@@ -225,7 +224,7 @@ class PaceApiClient
      */
     public function parseValueObjects(array $valueObjects): Collection
     {
-        return collect($valueObjects)->map(fn($vo) => $this->parseValueObject($vo));
+        return collect($valueObjects)->map(fn ($vo) => $this->parseValueObject($vo));
     }
 
     /**
@@ -243,7 +242,7 @@ class PaceApiClient
 
         $swaggerPath = base_path('docs/Pace RestFul/swagger.json');
 
-        if (!file_exists($swaggerPath)) {
+        if (! file_exists($swaggerPath)) {
             // Fallback if swagger file is missing
             $cache = [
                 'Customer' => 'Customer',
@@ -256,6 +255,7 @@ class PaceApiClient
                 'PurchaseOrder' => 'PurchaseOrder',
                 'Vendor' => 'Vendor',
             ];
+
             return $cache;
         }
 
@@ -333,15 +333,15 @@ class PaceApiClient
         if ($this->connection->auth_type === 'api_key' &&
             $this->connection->getCredential('api_key_location') === 'query') {
             $name = $this->connection->getCredential('api_key_name', 'api_key');
-            $endpoint .= (str_contains($endpoint, '?') ? '&' : '?') .
-                         $name . '=' . urlencode($this->connection->getCredential('api_key'));
+            $endpoint .= (str_contains($endpoint, '?') ? '&' : '?').
+                         $name.'='.urlencode($this->connection->getCredential('api_key'));
         }
 
         $response = $client->post($endpoint, $data);
 
         if ($response->failed()) {
             $this->connection->markError($response->body());
-            throw new Exception('Pace API Error: ' . $response->body());
+            throw new Exception('Pace API Error: '.$response->body());
         }
 
         $this->connection->markConnected();
@@ -367,7 +367,7 @@ class PaceApiClient
 
         if ($response->failed()) {
             $this->connection->markError($response->body());
-            throw new Exception('Pace API Error: ' . $response->body());
+            throw new Exception('Pace API Error: '.$response->body());
         }
 
         $this->connection->markConnected();

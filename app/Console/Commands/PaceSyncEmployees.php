@@ -2,16 +2,16 @@
 
 namespace App\Console\Commands;
 
-use Exception;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\IntegrationConnection;
 use App\Models\IntegrationObject;
-use App\Models\IntegrationSyncLog;
+use App\Models\SystemLog;
 use App\Models\User;
 use App\Services\Integrations\IntegrationSyncEngine;
 use App\Services\Integrations\PaceApiClient;
 use App\Services\Integrations\SyncResult;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -39,10 +39,15 @@ class PaceSyncEmployees extends Command
      * Counters for summary
      */
     protected int $created = 0;
+
     protected int $updated = 0;
+
     protected int $skipped = 0;
+
     protected int $deactivated = 0;
+
     protected int $errors = 0;
+
     protected array $errorMessages = [];
 
     /**
@@ -79,7 +84,7 @@ class PaceSyncEmployees extends Command
     public function handle(): int
     {
         $connection = $this->resolveConnection();
-        if (!$connection) {
+        if (! $connection) {
             return 1;
         }
 
@@ -87,10 +92,17 @@ class PaceSyncEmployees extends Command
         $this->syncedExternalIds = collect();
 
         // Start sync log
-        $syncLog = IntegrationSyncLog::start($connection->id, 'sync_employees');
+        $syncLog = SystemLog::logEvent(
+            type: 'sync_employees',
+            summary: "Syncing employees from {$connection->name}",
+            level: SystemLog::LEVEL_INFO,
+            metadata: ['connection_id' => $connection->id],
+            context: $connection
+        );
+        $syncLog->update(['status' => SystemLog::STATUS_RUNNING, 'started_at' => now()]);
 
         $this->info('Pace Employee Sync');
-        $this->info('Connection: ' . $connection->name);
+        $this->info('Connection: '.$connection->name);
 
         if ($this->option('dry-run')) {
             $this->warn('DRY RUN - no changes will be saved');
@@ -105,7 +117,7 @@ class PaceSyncEmployees extends Command
             ->first();
 
         try {
-            if ($integrationObject && !$this->option('employee') && !$this->option('dry-run')) {
+            if ($integrationObject && ! $this->option('employee') && ! $this->option('dry-run')) {
                 // Config-driven path via IntegrationSyncEngine
                 $this->info('Using config-driven sync engine');
                 $this->newLine();
@@ -126,7 +138,7 @@ class PaceSyncEmployees extends Command
                 $this->syncSupervisorFlags($result);
             } else {
                 // Legacy fallback path (also used for --employee and --dry-run)
-                if (!$integrationObject) {
+                if (! $integrationObject) {
                     $this->info('No config-driven Employee object found, using legacy sync');
                 }
                 $this->newLine();
@@ -141,8 +153,9 @@ class PaceSyncEmployees extends Command
                 }
             }
         } catch (Exception $e) {
-            $this->error('Sync failed: ' . $e->getMessage());
+            $this->error('Sync failed: '.$e->getMessage());
             $syncLog->markFailed($e->getMessage());
+
             return 1;
         }
 
@@ -160,14 +173,14 @@ class PaceSyncEmployees extends Command
             ]
         );
 
-        if (!empty($this->errorMessages)) {
+        if (! empty($this->errorMessages)) {
             $this->newLine();
             $this->warn('Errors:');
             foreach (array_slice($this->errorMessages, 0, 10) as $msg) {
                 $this->line("  - {$msg}");
             }
             if (count($this->errorMessages) > 10) {
-                $this->line('  ... and ' . (count($this->errorMessages) - 10) . ' more');
+                $this->line('  ... and '.(count($this->errorMessages) - 10).' more');
             }
         }
 
@@ -181,9 +194,9 @@ class PaceSyncEmployees extends Command
         ];
 
         if ($this->errors > 0 && ($this->created + $this->updated) > 0) {
-            $syncLog->markPartial($stats, $this->errors . ' errors during sync', $this->errorMessages);
+            $syncLog->markPartial($this->errors.' errors during sync', $stats, ['errors' => $this->errorMessages]);
         } elseif ($this->errors > 0) {
-            $syncLog->markFailed('All records failed', ['errors' => $this->errorMessages], $this->errorMessages);
+            $syncLog->markFailed('All records failed', ['errors' => $this->errorMessages]);
         } else {
             $syncLog->markSuccess($stats);
         }
@@ -207,7 +220,7 @@ class PaceSyncEmployees extends Command
             // Compute full_names from first_name + last_name
             $firstName = $attributes['first_name'] ?? $parsedRecord['first_name'] ?? '';
             $lastName = $attributes['last_name'] ?? $parsedRecord['last_name'] ?? '';
-            $attributes['full_names'] = trim($firstName . ' ' . $lastName);
+            $attributes['full_names'] = trim($firstName.' '.$lastName);
         };
 
         $this->info('Fetching employees via sync engine...');
@@ -259,6 +272,7 @@ class PaceSyncEmployees extends Command
 
         if ($totalRecords === 0) {
             $this->warn('No active employees found in Pace.');
+
             return;
         }
 
@@ -271,7 +285,7 @@ class PaceSyncEmployees extends Command
         );
 
         $valueObjects = $response['valueObjects'] ?? [];
-        $this->info("Records returned: " . count($valueObjects));
+        $this->info('Records returned: '.count($valueObjects));
         $this->newLine();
 
         $bar = $this->output->createProgressBar(count($valueObjects));
@@ -340,6 +354,7 @@ class PaceSyncEmployees extends Command
         if (empty($valueObjects)) {
             $this->error("Employee {$paceId} not found in Pace");
             $this->errors++;
+
             return;
         }
 
@@ -350,7 +365,7 @@ class PaceSyncEmployees extends Command
             $this->table(
                 ['Field', 'Value'],
                 collect($parsed)->except(['_primaryKey', '_objectName'])->map(
-                    fn($v, $k) => [$k, is_null($v) ? '(null)' : (string) $v]
+                    fn ($v, $k) => [$k, is_null($v) ? '(null)' : (string) $v]
                 )->values()->toArray()
             );
         }
@@ -365,9 +380,10 @@ class PaceSyncEmployees extends Command
     {
         $externalId = $data['external_id'] ?? null;
 
-        if (!$externalId) {
+        if (! $externalId) {
             $this->errors++;
             $this->errorMessages[] = 'Record missing external_id (Pace ID), skipping';
+
             return;
         }
 
@@ -382,15 +398,15 @@ class PaceSyncEmployees extends Command
                 $existing = Employee::where('external_id', $externalId)->first();
                 if ($existing) {
                     $changes = array_diff_assoc(
-                        array_map('strval', array_filter($attributes, fn($v) => $v !== null)),
-                        array_map('strval', array_filter($existing->only(array_keys($attributes)), fn($v) => $v !== null))
+                        array_map('strval', array_filter($attributes, fn ($v) => $v !== null)),
+                        array_map('strval', array_filter($existing->only(array_keys($attributes)), fn ($v) => $v !== null))
                     );
                     if (empty($changes)) {
                         $this->skipped++;
                     } else {
                         $this->updated++;
                         if ($this->getOutput()->isVerbose()) {
-                            $this->line("  Would update {$externalId} ({$data['first_name']} {$data['last_name']}): " . implode(', ', array_keys($changes)));
+                            $this->line("  Would update {$externalId} ({$data['first_name']} {$data['last_name']}): ".implode(', ', array_keys($changes)));
                         }
                     }
                 } else {
@@ -399,6 +415,7 @@ class PaceSyncEmployees extends Command
                         $this->line("  Would create {$externalId} ({$data['first_name']} {$data['last_name']})");
                     }
                 }
+
                 return;
             }
 
@@ -438,7 +455,7 @@ class PaceSyncEmployees extends Command
 
         } catch (Exception $e) {
             $this->errors++;
-            $this->errorMessages[] = "Employee {$externalId}: " . $e->getMessage();
+            $this->errorMessages[] = "Employee {$externalId}: ".$e->getMessage();
         }
     }
 
@@ -452,7 +469,7 @@ class PaceSyncEmployees extends Command
         // Direct string fields
         $attributes['first_name'] = $data['first_name'] ?? null;
         $attributes['last_name'] = $data['last_name'] ?? null;
-        $attributes['full_names'] = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
+        $attributes['full_names'] = trim(($data['first_name'] ?? '').' '.($data['last_name'] ?? ''));
         $attributes['email'] = $data['email'] ?? null;
         $attributes['phone'] = $data['phone'] ?? null;
         $attributes['address'] = $data['address'] ?? null;
@@ -549,7 +566,7 @@ class PaceSyncEmployees extends Command
             ->pluck('id', 'external_department_id')
             ->toArray();
 
-        $this->info('Department map loaded: ' . count($this->departmentMap) . ' departments');
+        $this->info('Department map loaded: '.count($this->departmentMap).' departments');
     }
 
     /**
@@ -559,8 +576,9 @@ class PaceSyncEmployees extends Command
     {
         if ($this->option('connection')) {
             $connection = IntegrationConnection::find($this->option('connection'));
-            if (!$connection) {
-                $this->error('Connection ID ' . $this->option('connection') . ' not found');
+            if (! $connection) {
+                $this->error('Connection ID '.$this->option('connection').' not found');
+
                 return null;
             }
         } else {
@@ -568,14 +586,16 @@ class PaceSyncEmployees extends Command
                 ->where('is_active', true)
                 ->first();
 
-            if (!$connection) {
+            if (! $connection) {
                 $this->error('No active Pace connection found. Create one in Integrations settings.');
+
                 return null;
             }
         }
 
         if ($connection->driver !== 'pace') {
             $this->error("Connection '{$connection->name}' is not a Pace integration (driver: {$connection->driver})");
+
             return null;
         }
 

@@ -2,20 +2,18 @@
 
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
-use Filament\Forms\Components\FileUpload;
-use Exception;
-use App\Filament\Resources\EmployeeResource;
-use App\Models\Employee;
-use App\Models\Department;
-use App\Imports\DataImport;
 use App\Exports\DataExport;
+use App\Filament\Resources\EmployeeResource;
+use App\Jobs\ProcessDataImportJob;
+use App\Models\Employee;
+use Exception;
 use Filament\Actions\Action;
-use Filament\Resources\Pages\ListRecords;
-use Filament\Tables\Filters\Filter;
-use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
-use Maatwebsite\Excel\Facades\Excel;
+use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ListEmployees extends ListRecords
 {
@@ -37,56 +35,32 @@ class ListEmployees extends ListRecords
                     FileUpload::make('file')
                         ->label('Import File')
                         ->required()
+                        ->disk('local')
+                        ->directory('imports')
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
                 ])
                 ->action(function (array $data) {
-                    $fileName = $data['file'];
-                    $filePath = storage_path("app/public/{$fileName}");
+                    $filePath = $data['file'];
+                    $fileName = basename($filePath);
 
-                    Log::info("Resolved file path for import: {$filePath}");
+                    Log::info("Queuing import job for file: {$filePath}");
 
-                    // Initialize the import service
-                    $importService = new DataImport(Employee::class, function (array $row) {
-                        // Department lookup logic
-                        if (isset($row['external_department_id'])) {
-                            $externalDepartmentId = str_pad((string) $row['external_department_id'], 3, '0', STR_PAD_LEFT);
-                            $mappedDepartment = Department::where('external_department_id', $externalDepartmentId)->first();
-                            $row['department_id'] = $mappedDepartment?->id ?? null;
+                    // Create import record and dispatch job
+                    $import = ProcessDataImportJob::createAndDispatch(
+                        $filePath,
+                        Employee::class,
+                        ProcessDataImportJob::PROCESSOR_EMPLOYEE,
+                        auth()->id(),
+                        $fileName
+                    );
 
-                            if ($row['department_id'] === null) {
-                                Log::warning("No department found for external_department_id: {$externalDepartmentId}");
-                            } else {
-                                Log::info("Mapped external_department_id {$externalDepartmentId} to department_id {$row['department_id']}");
-                            }
-                        } else {
-                            Log::warning("external_department_id is missing in the input data: " . json_encode($row));
-                        }
+                    $rowInfo = $import->total_rows ? " ({$import->total_rows} rows)" : '';
 
-                        return $row; // Ensure the updated row is returned
-                    });
-
-                    try {
-                        Excel::import($importService, $filePath);
-
-                        if ($failedRecords = $importService->getFailedRecords()) {
-                            // Export failed records if any errors occurred
-                            return $importService->exportFailedRecords();
-                        }
-
-                        Notification::make()
-                            ->title('Import Success')
-                            ->body('Employees imported successfully!')
-                            ->success()
-                            ->send();
-                    } catch (Exception $e) {
-                        Log::error("Import failed: {$e->getMessage()}");
-
-                        Notification::make()
-                            ->title('Import Failed')
-                            ->body("An error occurred during the import: {$e->getMessage()}")
-                            ->danger()
-                            ->send();
-                    }
+                    Notification::make()
+                        ->title('Import Queued')
+                        ->body("Your employee import{$rowInfo} has been queued. You will be notified when complete.")
+                        ->info()
+                        ->send();
                 })
                 ->icon('heroicon-o-arrow-up-on-square-stack'),
 
@@ -109,11 +83,11 @@ class ListEmployees extends ListRecords
                 ->icon('heroicon-o-arrow-down-on-square'),
 
             Action::make('toggle_active')
-                ->label(fn() => $this->tableFilters['hide_inactive']['isActive'] ?? true ? 'Show All' : 'Hide Inactive')
+                ->label(fn () => $this->tableFilters['hide_inactive']['isActive'] ?? true ? 'Show All' : 'Hide Inactive')
                 ->color('gray')
-                ->icon(fn() => $this->tableFilters['hide_inactive']['isActive'] ?? true ? 'heroicon-o-eye' : 'heroicon-o-eye-slash')
+                ->icon(fn () => $this->tableFilters['hide_inactive']['isActive'] ?? true ? 'heroicon-o-eye' : 'heroicon-o-eye-slash')
                 ->action(function () {
-                    $this->tableFilters['hide_inactive']['isActive'] = !($this->tableFilters['hide_inactive']['isActive'] ?? true);
+                    $this->tableFilters['hide_inactive']['isActive'] = ! ($this->tableFilters['hide_inactive']['isActive'] ?? true);
                 }),
         ];
     }
@@ -121,11 +95,11 @@ class ListEmployees extends ListRecords
     public function getTableQuery(): Builder
     {
         $query = parent::getTableQuery();
-        
+
         if ($this->tableFilters['hide_inactive']['isActive'] ?? true) {
             $query->where('is_active', true);
         }
-        
+
         return $query;
     }
 }

@@ -2,39 +2,37 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Textarea;
-use App\Models\ShiftSchedule;
-use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
 use App\Filament\Resources\EmployeeResource\Pages\CreateEmployee;
 use App\Filament\Resources\EmployeeResource\Pages\EditEmployee;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\EmployeeResource\Pages;
+use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
 use App\Models\Employee;
-use App\Models\Department;
-use App\Models\Shift;
-use Filament\Resources\Resource;
-use Filament\Tables\Table;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
+use App\Models\IntegrationConnection;
+use App\Models\ShiftSchedule;
 use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'Employee Management';
+    protected static string|\UnitEnum|null $navigationGroup = 'Employee Management';
+
     protected static ?string $navigationLabel = 'Employees';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
+
     protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
@@ -166,6 +164,7 @@ class EmployeeResource extends Resource
                                             ->get()
                                             ->mapWithKeys(function ($schedule) {
                                                 $shiftName = $schedule->shift ? $schedule->shift->shift_name : 'No Shift';
+
                                                 return [$schedule->id => "{$schedule->schedule_name} ({$shiftName})"];
                                             })
                                             ->toArray())
@@ -250,6 +249,18 @@ class EmployeeResource extends Resource
                                         ->nullable()
                                         ->helperText('Leave empty to use company default'),
                                 ]),
+
+                            Section::make('Payroll Provider')
+                                ->description('Payroll export destination for this employee')
+                                ->schema([
+                                    Select::make('payroll_provider_id')
+                                        ->label('Payroll Provider')
+                                        ->options(fn () => IntegrationConnection::where('is_payroll_provider', true)
+                                            ->pluck('name', 'id'))
+                                        ->searchable()
+                                        ->nullable()
+                                        ->helperText('Select which payroll system to export this employee\'s time to'),
+                                ]),
                         ]),
                 ])
                 ->columnSpanFull()
@@ -275,7 +286,7 @@ class EmployeeResource extends Resource
                     ->label('Shift')
                     ->sortable(),
                 TextColumn::make('roundGroup.group_name') // Ensure the relationship is defined in the Employee model
-                ->label('Payroll Rounding')
+                    ->label('Payroll Rounding')
                     ->sortable(),
                 TextColumn::make('external_id')
                     ->label('Payroll ID')

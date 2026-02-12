@@ -2,14 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
- *
- *
  * @property int $id
  * @property int|null $attendance_flexibility_minutes Number of minutes allowed before/after a shift for attendance matching
  * @property string|null $logging_level Defines the level of logging in the system
@@ -20,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $max_shift_length Maximum shift length in hours before requiring admin approval
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ *
  * @method static Builder<static>|CompanySetup newModelQuery()
  * @method static Builder<static>|CompanySetup newQuery()
  * @method static Builder<static>|CompanySetup query()
@@ -33,6 +32,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder<static>|CompanySetup whereMaxShiftLength($value)
  * @method static Builder<static>|CompanySetup whereUpdatedAt($value)
  * @method static Builder<static>|CompanySetup whereUseMlForPunchMatching($value)
+ *
  * @mixin \Eloquent
  */
 class CompanySetup extends Model
@@ -44,6 +44,9 @@ class CompanySetup extends Model
     protected $fillable = [
         'attendance_flexibility_minutes',
         'logging_level',
+        'log_retention_days',
+        'log_request_payloads',
+        'log_response_data',
         'debug_punch_assignment_mode',
         'auto_adjust_punches',
         'heuristic_min_punch_gap',
@@ -53,6 +56,7 @@ class CompanySetup extends Model
         'max_shift_length',
         'payroll_frequency_id',
         'payroll_start_date',
+        'pay_period_naming_pattern',
         'vacation_accrual_method',
         'allow_carryover',
         'max_carryover_hours',
@@ -97,6 +101,8 @@ class CompanySetup extends Model
     ];
 
     protected $casts = [
+        'log_request_payloads' => 'boolean',
+        'log_response_data' => 'boolean',
         'auto_adjust_punches' => 'boolean',
         'use_ml_for_punch_matching' => 'boolean',
         'enforce_shift_schedules' => 'boolean',

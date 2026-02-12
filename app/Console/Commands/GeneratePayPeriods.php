@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
-use Exception;
-use App\Services\Payroll\PayPeriodGeneratorService;
 use App\Models\CompanySetup;
+use App\Services\Payroll\PayPeriodGeneratorService;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Console\Command;
 
 class GeneratePayPeriods extends Command
@@ -37,8 +37,9 @@ class GeneratePayPeriods extends Command
         // Get company setup to ensure payroll frequency is configured
         $companySetup = CompanySetup::first();
 
-        if (!$companySetup || !$companySetup->payroll_frequency_id) {
+        if (! $companySetup || ! $companySetup->payroll_frequency_id) {
             $this->error('❌ Company payroll frequency not configured. Please set up payroll frequency first.');
+
             return Command::FAILURE;
         }
 
@@ -73,24 +74,27 @@ class GeneratePayPeriods extends Command
 
                 // Show summary
                 $this->table(
-                    ['Start Date', 'End Date', 'Days'],
+                    ['Name', 'Start Date', 'End Date', 'Days'],
                     $createdPeriods->map(function ($period) {
                         $days = $period->start_date->diffInDays($period->end_date) + 1;
+
                         return [
+                            $period->name ?? '-',
                             $period->start_date->format('M j, Y'),
                             $period->end_date->format('M j, Y'),
-                            $days . ' days',
+                            $days.' days',
                         ];
                     })->toArray()
                 );
             } else {
-                $this->info("ℹ️  No new PayPeriods needed - all periods already exist");
+                $this->info('ℹ️  No new PayPeriods needed - all periods already exist');
             }
 
             return Command::SUCCESS;
 
         } catch (Exception $e) {
             $this->error("❌ Error generating PayPeriods: {$e->getMessage()}");
+
             return Command::FAILURE;
         }
     }

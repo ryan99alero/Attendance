@@ -2,15 +2,14 @@
 
 namespace App\Console\Commands;
 
-use Exception;
-use App\Models\Employee;
 use App\Models\CompanySetup;
+use App\Models\Employee;
+use App\Models\VacationBalance;
 use App\Models\VacationPolicy;
 use App\Models\VacationTransaction;
-use App\Models\VacationBalance;
-use App\Models\EmployeeVacationAssignment;
 use App\Services\ConfigurableVacationAccrualService;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -31,14 +30,36 @@ class ProcessVacationAccruals extends Command
      */
     protected $description = 'Process vacation accruals for employees based on anniversary dates and company policy';
 
-    protected ConfigurableVacationAccrualService $accrualService;
-    protected CompanySetup $companySetup;
+    protected ?ConfigurableVacationAccrualService $accrualService = null;
+
+    protected ?CompanySetup $companySetup = null;
 
     public function __construct()
     {
         parent::__construct();
-        $this->accrualService = new ConfigurableVacationAccrualService();
-        $this->companySetup = CompanySetup::first() ?? new CompanySetup();
+        // Lazy load to avoid DB queries during kernel boot (breaks migrations)
+    }
+
+    protected function getAccrualService(): ConfigurableVacationAccrualService
+    {
+        if ($this->accrualService === null) {
+            $this->accrualService = new ConfigurableVacationAccrualService;
+        }
+
+        return $this->accrualService;
+    }
+
+    protected function getCompanySetup(): CompanySetup
+    {
+        if ($this->companySetup === null) {
+            try {
+                $this->companySetup = CompanySetup::first() ?? new CompanySetup;
+            } catch (\Exception $e) {
+                $this->companySetup = new CompanySetup;
+            }
+        }
+
+        return $this->companySetup;
     }
 
     /**
@@ -51,14 +72,15 @@ class ProcessVacationAccruals extends Command
         $force = $this->option('force');
         $dryRun = $this->option('dry-run');
 
-        $this->info("🗓️  Processing vacation accruals for: " . $processDate->toDateString());
+        $this->info('🗓️  Processing vacation accruals for: '.$processDate->toDateString());
 
         if ($dryRun) {
-            $this->warn("🧪 DRY RUN MODE - No changes will be made");
+            $this->warn('🧪 DRY RUN MODE - No changes will be made');
         }
 
-        if ($this->companySetup->vacation_accrual_method !== 'anniversary') {
-            $this->error("❌ Company vacation accrual method is not set to 'anniversary'. Current method: " . ($this->companySetup->vacation_accrual_method ?? 'not set'));
+        if ($this->getCompanySetup()->vacation_accrual_method !== 'anniversary') {
+            $this->error("❌ Company vacation accrual method is not set to 'anniversary'. Current method: ".($this->getCompanySetup()->vacation_accrual_method ?? 'not set'));
+
             return 1;
         }
 
@@ -66,11 +88,12 @@ class ProcessVacationAccruals extends Command
         $employees = $this->getEmployeesToProcess($processDate, $specificEmployee);
 
         if ($employees->isEmpty()) {
-            $this->info("✅ No employees need vacation accrual processing for " . $processDate->toDateString());
+            $this->info('✅ No employees need vacation accrual processing for '.$processDate->toDateString());
+
             return 0;
         }
 
-        $this->info("👥 Found " . $employees->count() . " employee(s) to process");
+        $this->info('👥 Found '.$employees->count().' employee(s) to process');
 
         $processed = 0;
         $skipped = 0;
@@ -98,8 +121,8 @@ class ProcessVacationAccruals extends Command
             } catch (Exception $e) {
                 $errors++;
                 $this->newLine();
-                $this->error("❌ {$employee->full_names}: " . $e->getMessage());
-                Log::error("Vacation accrual processing error for employee {$employee->id}: " . $e->getMessage());
+                $this->error("❌ {$employee->full_names}: ".$e->getMessage());
+                Log::error("Vacation accrual processing error for employee {$employee->id}: ".$e->getMessage());
             }
 
             $progressBar->advance();
@@ -109,7 +132,7 @@ class ProcessVacationAccruals extends Command
         $this->newLine(2);
 
         // Summary
-        $this->info("📊 Processing Summary:");
+        $this->info('📊 Processing Summary:');
         $this->table(
             ['Status', 'Count'],
             [
@@ -121,7 +144,7 @@ class ProcessVacationAccruals extends Command
         );
 
         if ($dryRun && $processed > 0) {
-            $this->warn("🧪 This was a dry run. Run without --dry-run to actually process accruals.");
+            $this->warn('🧪 This was a dry run. Run without --dry-run to actually process accruals.');
         }
 
         return $errors > 0 ? 1 : 0;
@@ -144,7 +167,7 @@ class ProcessVacationAccruals extends Command
             $query->where(function ($q) use ($processDate) {
                 $q->whereRaw('DATE(DATE_ADD(date_of_hire, INTERVAL FLOOR(DATEDIFF(?, date_of_hire) / 365.25) YEAR)) <= ?',
                     [$processDate->toDateString(), $processDate->toDateString()])
-                ->whereRaw('FLOOR(DATEDIFF(?, date_of_hire) / 365.25) >= 1', [$processDate->toDateString()]);
+                    ->whereRaw('FLOOR(DATEDIFF(?, date_of_hire) / 365.25) >= 1', [$processDate->toDateString()]);
             });
         }
 
@@ -158,12 +181,12 @@ class ProcessVacationAccruals extends Command
     {
         // Check if employee has been with company for at least 1 year
         $yearsOfService = $employee->date_of_hire->diffInYears($processDate);
-        if ($yearsOfService < 1 && !$this->companySetup->anniversary_allow_partial_year) {
+        if ($yearsOfService < 1 && ! $this->getCompanySetup()->anniversary_allow_partial_year) {
             return [
                 'processed' => false,
                 'reason' => 'Not eligible yet (less than 1 year of service)',
                 'hours' => 0,
-                'days' => 0
+                'days' => 0,
             ];
         }
 
@@ -177,31 +200,31 @@ class ProcessVacationAccruals extends Command
         }
 
         // Check if already processed for this anniversary
-        if (!$force) {
+        if (! $force) {
             $existingTransaction = VacationTransaction::where('employee_id', $employee->id)
                 ->where('transaction_type', 'accrual')
                 ->whereDate('transaction_date', $anniversaryThisYear)
-                ->where('accrual_period', $anniversaryThisYear->year . '-Anniversary')
+                ->where('accrual_period', $anniversaryThisYear->year.'-Anniversary')
                 ->exists();
 
             if ($existingTransaction) {
                 return [
                     'processed' => false,
-                    'reason' => 'Already processed for ' . $anniversaryThisYear->toDateString(),
+                    'reason' => 'Already processed for '.$anniversaryThisYear->toDateString(),
                     'hours' => 0,
-                    'days' => 0
+                    'days' => 0,
                 ];
             }
         }
 
         // Get vacation policy for this employee
         $policy = $this->getVacationPolicyForEmployee($employee, $anniversaryThisYear);
-        if (!$policy) {
+        if (! $policy) {
             return [
                 'processed' => false,
                 'reason' => 'No vacation policy found',
                 'hours' => 0,
-                'days' => 0
+                'days' => 0,
             ];
         }
 
@@ -210,11 +233,11 @@ class ProcessVacationAccruals extends Command
         $vacationDays = $policy->vacation_days_per_year;
 
         // Apply company max days cap if configured
-        if ($this->companySetup->anniversary_max_days_cap) {
-            $maxHours = $this->companySetup->anniversary_max_days_cap * 8;
+        if ($this->getCompanySetup()->anniversary_max_days_cap) {
+            $maxHours = $this->getCompanySetup()->anniversary_max_days_cap * 8;
             if ($vacationHours > $maxHours) {
                 $vacationHours = $maxHours;
-                $vacationDays = $this->companySetup->anniversary_max_days_cap;
+                $vacationDays = $this->getCompanySetup()->anniversary_max_days_cap;
             }
         }
 
@@ -223,7 +246,7 @@ class ProcessVacationAccruals extends Command
                 'processed' => true,
                 'reason' => 'Would award vacation',
                 'hours' => $vacationHours,
-                'days' => $vacationDays
+                'days' => $vacationDays,
             ];
         }
 
@@ -236,7 +259,7 @@ class ProcessVacationAccruals extends Command
                 'hours' => $vacationHours,
                 'transaction_date' => $processDate,
                 'effective_date' => $anniversaryThisYear,
-                'accrual_period' => $anniversaryThisYear->year . '-Anniversary',
+                'accrual_period' => $anniversaryThisYear->year.'-Anniversary',
                 'description' => "Anniversary accrual - Year {$yearsOfService} ({$vacationDays} days)",
                 'metadata' => [
                     'years_of_service' => $yearsOfService,
@@ -244,8 +267,8 @@ class ProcessVacationAccruals extends Command
                     'policy_name' => $policy->policy_name,
                     'anniversary_date' => $anniversaryThisYear->toDateString(),
                     'method' => 'anniversary',
-                    'processed_by' => 'system'
-                ]
+                    'processed_by' => 'system',
+                ],
             ]);
 
             // Update or create vacation balance
@@ -256,7 +279,7 @@ class ProcessVacationAccruals extends Command
             'processed' => true,
             'reason' => 'Successfully processed',
             'hours' => $vacationHours,
-            'days' => $vacationDays
+            'days' => $vacationDays,
         ];
     }
 
@@ -289,7 +312,7 @@ class ProcessVacationAccruals extends Command
                 'accrued_hours' => 0,
                 'used_hours' => 0,
                 'carry_over_hours' => 0,
-                'cap_hours' => $this->companySetup->max_accrual_balance ?? ($policy->vacation_hours_per_year * 2),
+                'cap_hours' => $this->getCompanySetup()->max_accrual_balance ?? ($policy->vacation_hours_per_year * 2),
                 'is_anniversary_based' => true,
                 'policy_effective_date' => $anniversaryDate,
             ]
@@ -311,8 +334,8 @@ class ProcessVacationAccruals extends Command
                 'days_awarded' => $vacationDays,
                 'hours_awarded' => $vacationHours,
                 'policy_id' => $policy->id,
-                'type' => 'anniversary_accrual'
-            ])
+                'type' => 'anniversary_accrual',
+            ]),
         ]);
     }
 

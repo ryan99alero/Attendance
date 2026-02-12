@@ -54,6 +54,7 @@ class IntegrationFieldMapping extends Model
             'uppercase' => strtoupper($value),
             'lowercase' => strtolower($value),
             'fk_lookup' => $this->foreignKeyLookup($value),
+            'value_map' => $this->valueMap($value),
             default => $value,
         };
     }
@@ -108,12 +109,38 @@ class IntegrationFieldMapping extends Model
 
         $modelClass = $options['model'];
 
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return null;
         }
 
         return $modelClass::where($options['match_column'], $value)
             ->value($options['return_column']);
+    }
+
+    /**
+     * Map values using a configurable mapping table
+     *
+     * Expected transform_options format:
+     * {"map": {"A": true, "I": false}, "default": null}
+     *
+     * Or for string values:
+     * {"map": {"active": "Active", "inactive": "Inactive"}, "default": "Unknown"}
+     */
+    protected function valueMap($value)
+    {
+        $options = $this->transform_options;
+
+        if (empty($options['map']) || ! is_array($options['map'])) {
+            return $value;
+        }
+
+        $stringValue = (string) $value;
+
+        if (array_key_exists($stringValue, $options['map'])) {
+            return $options['map'][$stringValue];
+        }
+
+        return $options['default'] ?? $value;
     }
 
     /**
@@ -124,6 +151,7 @@ class IntegrationFieldMapping extends Model
         if ($value instanceof Carbon) {
             return $value->getTimestampMs();
         }
+
         return Carbon::parse($value)->getTimestampMs();
     }
 

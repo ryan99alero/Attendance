@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IntegrationQueryTemplate extends Model
 {
@@ -81,9 +80,14 @@ class IntegrationQueryTemplate extends Model
         return $this->belongsTo(IntegrationObject::class, 'object_id');
     }
 
-    public function syncLogs(): HasMany
+    /**
+     * Get sync logs for this template from the system_logs table
+     */
+    public function syncLogs()
     {
-        return $this->hasMany(IntegrationSyncLog::class, 'template_id');
+        return SystemLog::query()
+            ->where('category', SystemLog::CATEGORY_INTEGRATION)
+            ->whereJsonContains('metadata->template_id', $this->id);
     }
 
     public function creator(): BelongsTo

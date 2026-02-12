@@ -2,29 +2,28 @@
 
 namespace App\Filament\Resources\IntegrationConnectionResource\RelationManagers;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Hidden;
-use Filament\Schemas\Components\Utilities\Get;
 use App\Models\IntegrationFieldMapping;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Actions\CreateAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use App\Services\Integrations\PaceApiClient;
 use App\Services\ModelDiscoveryService;
-use Filament\Forms;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class IntegrationObjectsRelationManager extends RelationManager
@@ -33,45 +32,123 @@ class IntegrationObjectsRelationManager extends RelationManager
 
     protected static ?string $title = 'Objects';
 
-    protected static string | \BackedEnum | null $icon = 'heroicon-o-cube';
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-cube';
 
     public function form(Schema $schema): Schema
     {
-        $discoveryService = new ModelDiscoveryService();
+        $discoveryService = new ModelDiscoveryService;
 
         return $schema
             ->columns(1)
             ->components([
                 // Section 1: Object Definition
-                Section::make('Object Definition')
+                Section::make(function () {
+                    $connection = $this->getOwnerRecord();
+
+                    return $connection->isFlatFileMethod() ? 'Export Definition' : 'Object Definition';
+                })
+                    ->description(function () {
+                        $connection = $this->getOwnerRecord();
+
+                        return $connection->isFlatFileMethod()
+                            ? 'Define what data to export and from which table'
+                            : 'Define the API object and local mapping';
+                    })
                     ->columnSpanFull()
                     ->schema([
                         Select::make('object_name')
-                            ->label('Object Name')
+                            ->label(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod() ? 'Export Type' : 'Object Name';
+                            })
                             ->options(function () {
                                 /** @var \App\Models\IntegrationConnection $connection */
                                 $connection = $this->getOwnerRecord();
-                                return (new PaceApiClient($connection))->getCommonObjectTypes();
+
+                                // Only use PaceApiClient for Pace API integrations
+                                if ($connection->driver === 'pace' && $connection->isApiMethod()) {
+                                    return (new PaceApiClient($connection))->getCommonObjectTypes();
+                                }
+
+                                // For flat file exports and other integrations, provide common object types
+                                return [
+                                    'Employee' => 'Employee Data',
+                                    'TimeEntry' => 'Time Entries',
+                                    'PayPeriodSummary' => 'Pay Period Summary',
+                                    'Department' => 'Departments',
+                                    'custom' => '-- Custom --',
+                                ];
                             })
                             ->searchable()
                             ->required()
-                            ->helperText('Select a Pace object type or enter a custom name'),
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, ?string $state) {
+                                $connection = $this->getOwnerRecord();
+                                if (! $connection->isFlatFileMethod()) {
+                                    return;
+                                }
+
+                                // Auto-set the model based on export type selection
+                                $modelMap = [
+                                    'Employee' => \App\Models\Employee::class,
+                                    'TimeEntry' => \App\Models\TimeEntry::class,
+                                    'PayPeriodSummary' => \App\Models\PayPeriodEmployeeSummary::class,
+                                    'Department' => \App\Models\Department::class,
+                                ];
+
+                                if (isset($modelMap[$state])) {
+                                    $model = $modelMap[$state];
+                                    $set('local_model', $model);
+                                    if (class_exists($model)) {
+                                        $set('local_table', (new $model)->getTable());
+                                    }
+                                } else {
+                                    $set('local_model', null);
+                                    $set('local_table', null);
+                                }
+                            })
+                            ->helperText(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod()
+                                    ? 'What type of data to export'
+                                    : 'Select an API object type';
+                            }),
+
+                        TextInput::make('custom_object_name')
+                            ->label('Custom Name')
+                            ->visible(fn (Get $get) => $get('object_name') === 'custom')
+                            ->required(fn (Get $get) => $get('object_name') === 'custom')
+                            ->helperText('Enter a custom name'),
 
                         TextInput::make('display_name')
                             ->label('Display Name')
                             ->required()
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->helperText('Friendly name shown in the UI'),
 
                         Textarea::make('description')
                             ->label('Description')
                             ->rows(2)
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->visible(function () {
+                                $connection = $this->getOwnerRecord();
 
+                                return $connection->isApiMethod();
+                            }),
+
+                        // API-only fields
                         TextInput::make('primary_key_field')
                             ->label('API Primary Key XPath')
                             ->default('@id')
                             ->required()
-                            ->helperText('XPath to the source API\'s primary key (e.g. @id). Used when fetching a single record.'),
+                            ->visible(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isApiMethod();
+                            })
+                            ->helperText('XPath to the source API\'s primary key (e.g. @id)'),
 
                         Select::make('primary_key_type')
                             ->label('API Primary Key Type')
@@ -81,49 +158,108 @@ class IntegrationObjectsRelationManager extends RelationManager
                             ])
                             ->default('String')
                             ->required()
-                            ->helperText('Data type as returned by the source API'),
+                            ->visible(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isApiMethod();
+                            })
+                            ->helperText('Data type as returned by the API'),
 
                         Select::make('local_model')
-                            ->label('Local Model')
+                            ->label(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod() ? 'Data Source (Model)' : 'Local Model';
+                            })
                             ->options(fn () => $discoveryService->getModelOptionsForSelect())
                             ->searchable()
+                            ->required(fn (Get $get) => $get('object_name') === 'custom')
                             ->reactive()
                             ->afterStateUpdated(function (Set $set, ?string $state) {
                                 if ($state && class_exists($state)) {
                                     $model = new $state;
                                     $set('local_table', $model->getTable());
                                 }
+                            })
+                            ->visible(function (Get $get) {
+                                $connection = $this->getOwnerRecord();
+
+                                // Show for API integrations OR custom flat file exports
+                                return $connection->isApiMethod() || $get('object_name') === 'custom';
+                            })
+                            ->helperText(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod()
+                                    ? 'Select which data to export'
+                                    : 'Local model to sync data to';
                             }),
 
                         TextInput::make('local_table')
-                            ->label('Local Table')
+                            ->label(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod() ? 'Source Table' : 'Local Table';
+                            })
                             ->disabled()
-                            ->dehydrated(),
+                            ->dehydrated()
+                            ->visible(function (Get $get) {
+                                $connection = $this->getOwnerRecord();
+
+                                // Show for API integrations OR custom flat file exports
+                                return $connection->isApiMethod() || $get('object_name') === 'custom';
+                            }),
 
                         TextInput::make('default_filter')
                             ->label('Default Filter')
                             ->placeholder("@status = 'A'")
                             ->helperText('Default XPath filter expression for syncs')
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->visible(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isApiMethod();
+                            }),
                     ])
                     ->columns(2),
 
-                // Section 2: Sync Settings
-                Section::make('Sync Settings')
+                // Section 2: Sync/Export Settings
+                Section::make(function () {
+                    $connection = $this->getOwnerRecord();
+
+                    return $connection->isFlatFileMethod() ? 'Export Settings' : 'Sync Settings';
+                })
                     ->columnSpanFull()
                     ->schema([
                         Toggle::make('sync_enabled')
-                            ->label('Sync Enabled')
-                            ->default(false),
+                            ->label(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod() ? 'Export Enabled' : 'Sync Enabled';
+                            })
+                            ->default(true),
 
                         Select::make('sync_direction')
-                            ->label('Sync Direction')
-                            ->options([
-                                'pull' => 'Pull (API → Local)',
-                                'push' => 'Push (Local → API)',
-                                'bidirectional' => 'Bidirectional',
-                            ])
-                            ->default('pull')
+                            ->label('Direction')
+                            ->options(function () {
+                                $connection = $this->getOwnerRecord();
+                                if ($connection->isFlatFileMethod()) {
+                                    return [
+                                        'push' => 'Export (Local → File)',
+                                    ];
+                                }
+
+                                return [
+                                    'pull' => 'Pull (API → Local)',
+                                    'push' => 'Push (Local → API)',
+                                    'bidirectional' => 'Bidirectional',
+                                ];
+                            })
+                            ->default(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod() ? 'push' : 'pull';
+                            })
                             ->required(),
 
                         Select::make('api_method')
@@ -135,11 +271,19 @@ class IntegrationObjectsRelationManager extends RelationManager
                                 'updateObject' => 'Update Object',
                             ])
                             ->default('loadValueObjects')
-                            ->required()
+                            ->visible(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isApiMethod() && $connection->driver === 'pace';
+                            })
                             ->helperText('Pace API method to use for this object'),
 
                         Select::make('sync_frequency')
-                            ->label('Sync Frequency')
+                            ->label(function () {
+                                $connection = $this->getOwnerRecord();
+
+                                return $connection->isFlatFileMethod() ? 'Export Frequency' : 'Sync Frequency';
+                            })
                             ->options([
                                 'manual' => 'Manual',
                                 'hourly' => 'Hourly',
@@ -151,7 +295,18 @@ class IntegrationObjectsRelationManager extends RelationManager
                     ->columns(4),
 
                 // Section 3: Field Mappings (Repeater)
-                Section::make('Field Mappings')
+                Section::make(function () {
+                    $connection = $this->getOwnerRecord();
+
+                    return $connection->isFlatFileMethod() ? 'Export Field Mappings' : 'Field Mappings';
+                })
+                    ->description(function () {
+                        $connection = $this->getOwnerRecord();
+
+                        return $connection->isFlatFileMethod()
+                            ? 'Define which local fields to export and their column names in the output file'
+                            : 'Map external API fields to local database fields';
+                    })
                     ->columnSpanFull()
                     ->schema([
                         Repeater::make('fieldMappings')
@@ -170,8 +325,26 @@ class IntegrationObjectsRelationManager extends RelationManager
                                         'return_column' => $data['lookup_return_column'] ?? 'id',
                                     ];
                                 }
-                                // Remove temporary lookup fields
+                                // Build transform_options for value_map
+                                if (($data['transform'] ?? null) === 'value_map') {
+                                    $map = $data['value_map_entries'] ?? [];
+                                    // Convert string booleans to actual booleans
+                                    foreach ($map as $key => $value) {
+                                        if ($value === 'true') {
+                                            $map[$key] = true;
+                                        } elseif ($value === 'false') {
+                                            $map[$key] = false;
+                                        }
+                                    }
+                                    $data['transform_options'] = [
+                                        'map' => $map,
+                                        'default' => $data['value_map_default'] ?? null,
+                                    ];
+                                }
+                                // Remove temporary fields
                                 unset($data['lookup_model'], $data['lookup_match_column'], $data['lookup_return_column']);
+                                unset($data['value_map_entries'], $data['value_map_default']);
+
                                 return $data;
                             })
                             ->mutateRelationshipDataBeforeSaveUsing(function (array $data): array {
@@ -187,26 +360,61 @@ class IntegrationObjectsRelationManager extends RelationManager
                                         'match_column' => $data['lookup_match_column'] ?? null,
                                         'return_column' => $data['lookup_return_column'] ?? 'id',
                                     ];
+                                    // Build transform_options for value_map
+                                } elseif (($data['transform'] ?? null) === 'value_map') {
+                                    $map = $data['value_map_entries'] ?? [];
+                                    // Convert string booleans to actual booleans
+                                    foreach ($map as $key => $value) {
+                                        if ($value === 'true') {
+                                            $map[$key] = true;
+                                        } elseif ($value === 'false') {
+                                            $map[$key] = false;
+                                        }
+                                    }
+                                    $data['transform_options'] = [
+                                        'map' => $map,
+                                        'default' => $data['value_map_default'] ?? null,
+                                    ];
                                 } else {
-                                    // Clear transform_options if not fk_lookup
+                                    // Clear transform_options if not fk_lookup or value_map
                                     $data['transform_options'] = null;
                                 }
-                                // Remove temporary lookup fields
+                                // Remove temporary fields
                                 unset($data['lookup_model'], $data['lookup_match_column'], $data['lookup_return_column']);
+                                unset($data['value_map_entries'], $data['value_map_default']);
+
                                 return $data;
                             })
                             ->schema([
                                 TextInput::make('external_xpath')
-                                    ->label('API Field (XPath)')
-                                    ->placeholder('@firstName')
+                                    ->label(function () {
+                                        $connection = $this->getOwnerRecord();
+
+                                        return $connection->isFlatFileMethod() ? 'Export Column Name' : 'API Field (XPath)';
+                                    })
+                                    ->placeholder(function () {
+                                        $connection = $this->getOwnerRecord();
+
+                                        return $connection->isFlatFileMethod() ? 'EmployeeID' : '@firstName';
+                                    })
                                     ->required()
                                     ->maxLength(255)
-                                    ->helperText('Pace field path (e.g. @firstName, /country/@isoCountry)'),
+                                    ->helperText(function () {
+                                        $connection = $this->getOwnerRecord();
+
+                                        return $connection->isFlatFileMethod()
+                                            ? 'Column header name in the exported file'
+                                            : 'API field path (e.g. @firstName, /country/@isoCountry)';
+                                    }),
 
                                 Hidden::make('external_field'),
 
                                 Select::make('external_type')
-                                    ->label('External Type')
+                                    ->label(function () {
+                                        $connection = $this->getOwnerRecord();
+
+                                        return $connection->isFlatFileMethod() ? 'Output Type' : 'External Type';
+                                    })
                                     ->options([
                                         'String' => 'String',
                                         'Integer' => 'Integer',
@@ -228,9 +436,10 @@ class IntegrationObjectsRelationManager extends RelationManager
                                             $localModel = $record->object?->local_model;
                                         }
 
-                                        if (!$localModel || !class_exists($localModel)) {
+                                        if (! $localModel || ! class_exists($localModel)) {
                                             return [];
                                         }
+
                                         return $discoveryService->getTableOptionsForModel($localModel);
                                     })
                                     ->reactive()
@@ -254,6 +463,7 @@ class IntegrationObjectsRelationManager extends RelationManager
 
                                         if ($localModel && class_exists($localModel)) {
                                             $primaryTable = (new $localModel)->getTable();
+
                                             return $discoveryService->getTableColumns($primaryTable);
                                         }
 
@@ -287,6 +497,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                                         'string_to_bool' => 'String → Boolean',
                                         'cents_to_dollars' => 'Cents → Dollars',
                                         'fk_lookup' => 'FK Lookup',
+                                        'value_map' => 'Value Map',
                                         'trim' => 'Trim',
                                         'uppercase' => 'Uppercase',
                                         'lowercase' => 'Lowercase',
@@ -307,7 +518,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->required(fn (Get $get) => $get('transform') === 'fk_lookup')
                                     ->afterStateHydrated(function ($state, $record, Set $set) {
                                         // Pre-populate from transform_options when editing
-                                        if (!$state && $record instanceof IntegrationFieldMapping) {
+                                        if (! $state && $record instanceof IntegrationFieldMapping) {
                                             $options = $record->transform_options ?? [];
                                             $set('lookup_model', $options['model'] ?? null);
                                         }
@@ -320,8 +531,10 @@ class IntegrationObjectsRelationManager extends RelationManager
                                         $model = $get('lookup_model');
                                         if ($model && class_exists($model)) {
                                             $table = (new $model)->getTable();
+
                                             return $discoveryService->getTableColumns($table);
                                         }
+
                                         return [];
                                     })
                                     ->searchable()
@@ -329,7 +542,7 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->required(fn (Get $get) => $get('transform') === 'fk_lookup')
                                     ->afterStateHydrated(function ($state, $record, Set $set) {
                                         // Pre-populate from transform_options when editing
-                                        if (!$state && $record instanceof IntegrationFieldMapping) {
+                                        if (! $state && $record instanceof IntegrationFieldMapping) {
                                             $options = $record->transform_options ?? [];
                                             $set('lookup_match_column', $options['match_column'] ?? null);
                                         }
@@ -342,8 +555,10 @@ class IntegrationObjectsRelationManager extends RelationManager
                                         $model = $get('lookup_model');
                                         if ($model && class_exists($model)) {
                                             $table = (new $model)->getTable();
+
                                             return $discoveryService->getTableColumns($table);
                                         }
+
                                         return [];
                                     })
                                     ->searchable()
@@ -352,22 +567,62 @@ class IntegrationObjectsRelationManager extends RelationManager
                                     ->required(fn (Get $get) => $get('transform') === 'fk_lookup')
                                     ->afterStateHydrated(function ($state, $record, Set $set) {
                                         // Pre-populate from transform_options when editing
-                                        if (!$state && $record instanceof IntegrationFieldMapping) {
+                                        if (! $state && $record instanceof IntegrationFieldMapping) {
                                             $options = $record->transform_options ?? [];
                                             $set('lookup_return_column', $options['return_column'] ?? 'id');
                                         }
                                     })
                                     ->helperText('Column value to return (usually id)'),
 
+                                // Value Map configuration fields
+                                KeyValue::make('value_map_entries')
+                                    ->label('Value Mappings')
+                                    ->keyLabel('API Value')
+                                    ->valueLabel('Local Value')
+                                    ->addActionLabel('Add Mapping')
+                                    ->visible(fn (Get $get) => $get('transform') === 'value_map')
+                                    ->required(fn (Get $get) => $get('transform') === 'value_map')
+                                    ->afterStateHydrated(function ($state, $record, Set $set) {
+                                        // Pre-populate from transform_options when editing
+                                        if (! $state && $record instanceof IntegrationFieldMapping) {
+                                            $options = $record->transform_options ?? [];
+                                            $set('value_map_entries', $options['map'] ?? []);
+                                        }
+                                    })
+                                    ->helperText('Map API values to local values (e.g., A → true, I → false)')
+                                    ->columnSpanFull(),
+
+                                TextInput::make('value_map_default')
+                                    ->label('Default Value')
+                                    ->visible(fn (Get $get) => $get('transform') === 'value_map')
+                                    ->afterStateHydrated(function ($state, $record, Set $set) {
+                                        // Pre-populate from transform_options when editing
+                                        if ($state === null && $record instanceof IntegrationFieldMapping) {
+                                            $options = $record->transform_options ?? [];
+                                            $set('value_map_default', $options['default'] ?? null);
+                                        }
+                                    })
+                                    ->helperText('Value to use when no mapping matches (leave empty to keep original)'),
+
                                 Toggle::make('sync_on_pull')
-                                    ->label('Pull')
+                                    ->label(function () {
+                                        $connection = $this->getOwnerRecord();
+
+                                        return $connection->isFlatFileMethod() ? 'Include' : 'Pull';
+                                    })
                                     ->default(true)
-                                    ->inline(false),
+                                    ->inline(false)
+                                    ->helperText(function () {
+                                        $connection = $this->getOwnerRecord();
+
+                                        return $connection->isFlatFileMethod() ? 'Include in export' : 'Pull from API';
+                                    }),
 
                                 Toggle::make('is_identifier')
-                                    ->label('Identifier')
+                                    ->label('Primary Key')
                                     ->default(false)
-                                    ->inline(false),
+                                    ->inline(false)
+                                    ->helperText('Mark as record identifier'),
                             ])
                             ->columns(4)
                             ->itemLabel(function (array $state): ?string {
@@ -377,11 +632,12 @@ class IntegrationObjectsRelationManager extends RelationManager
 
                                 if ($xpath && $local) {
                                     $target = $table ? "{$table}.{$local}" : $local;
+
                                     return "{$xpath} → {$target}";
                                 }
 
                                 if ($xpath) {
-                                    return $xpath . ' (fetch only)';
+                                    return $xpath.' (fetch only)';
                                 }
 
                                 return null;
@@ -410,8 +666,7 @@ class IntegrationObjectsRelationManager extends RelationManager
 
                 TextColumn::make('local_model')
                     ->label('Local Model')
-                    ->formatStateUsing(fn (?string $state): string =>
-                        $state ? class_basename($state) : '—'
+                    ->formatStateUsing(fn (?string $state): string => $state ? class_basename($state) : '—'
                     ),
 
                 IconColumn::make('sync_enabled')

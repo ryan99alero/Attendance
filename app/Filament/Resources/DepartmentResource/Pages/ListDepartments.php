@@ -2,17 +2,16 @@
 
 namespace App\Filament\Resources\DepartmentResource\Pages;
 
-use Filament\Forms\Components\FileUpload;
-use Exception;
-use App\Filament\Resources\DepartmentResource;
-use Illuminate\Support\Facades\Log;
-use App\Imports\DataImport;
 use App\Exports\DataExport;
+use App\Filament\Resources\DepartmentResource;
+use App\Jobs\ProcessDataImportJob;
+use Exception;
 use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Storage;
 
 class ListDepartments extends ListRecords
 {
@@ -20,8 +19,6 @@ class ListDepartments extends ListRecords
 
     /**
      * Define the header actions for the resource.
-     *
-     * @return array
      */
     protected function getHeaderActions(): array
     {
@@ -30,7 +27,7 @@ class ListDepartments extends ListRecords
                 ->label('New Department')
                 ->color('success')
                 ->icon('heroicon-o-plus')
-                ->url(DepartmentResource::getUrl('create')), // Redirect to the create form
+                ->url(DepartmentResource::getUrl('create')),
 
             Action::make('Import Departments')
                 ->label('Import')
@@ -39,44 +36,32 @@ class ListDepartments extends ListRecords
                     FileUpload::make('file')
                         ->label('Import File')
                         ->required()
+                        ->disk('local')
+                        ->directory('imports')
                         ->acceptedFileTypes(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
                 ])
                 ->action(function (array $data) {
-                    try {
-                        Log::info('TACO: Starting the import process.');
+                    $filePath = $data['file'];
+                    $fileName = basename($filePath);
 
-                        // Store file to public disk and get the path
-                        $fileName = $data['file'];
-                        Log::info("TACO1: File received: {$fileName}");
+                    Log::info("Queuing department import job for file: {$filePath}");
 
-                        $filePath = Storage::disk('public')->path($fileName);
-                        Log::info("TACO2: Resolved file path: {$filePath}");
+                    // Create import record and dispatch job
+                    $import = ProcessDataImportJob::createAndDispatch(
+                        $filePath,
+                        DepartmentResource::getModel(),
+                        ProcessDataImportJob::PROCESSOR_DEPARTMENT,
+                        auth()->id(),
+                        $fileName
+                    );
 
-                        // Check if file exists
-                        if (!Storage::disk('public')->exists($fileName)) {
-                            Log::error("TACO3: File does not exist in public storage: {$fileName}");
-                            throw new Exception('File does not exist.');
-                        }
+                    $rowInfo = $import->total_rows ? " ({$import->total_rows} rows)" : '';
 
-                        // Perform the import
-                        Log::info('TACO4: Starting Excel import process.');
-                        Excel::import(new DataImport(DepartmentResource::getModel()), $filePath);
-                        Log::info('TACO5: Excel import completed.');
-
-                        Notification::make()
-                            ->title('Success')
-                            ->body('Departments imported successfully!')
-                            ->success()
-                            ->send();
-                    } catch (Exception $e) {
-                        Log::error('TACO6: Import failed: ' . $e->getMessage());
-
-                        Notification::make()
-                            ->title('Error')
-                            ->body('Import failed: ' . $e->getMessage())
-                            ->danger()
-                            ->send();
-                    }
+                    Notification::make()
+                        ->title('Import Queued')
+                        ->body("Your department import{$rowInfo} has been queued. You will be notified when complete.")
+                        ->info()
+                        ->send();
                 })
                 ->icon('heroicon-o-arrow-up-on-square-stack'),
 
@@ -84,9 +69,17 @@ class ListDepartments extends ListRecords
                 ->label('Export')
                 ->color('warning')
                 ->action(function () {
-                    Log::info('TACO7: Starting the export process.');
+                    try {
+                        return Excel::download(new DataExport(DepartmentResource::getModel()), 'departments.xlsx');
+                    } catch (Exception $e) {
+                        Log::error("Export failed: {$e->getMessage()}");
 
-                    return Excel::download(new DataExport(DepartmentResource::getModel()), 'departments.xlsx');
+                        Notification::make()
+                            ->title('Export Failed')
+                            ->body("An error occurred during the export: {$e->getMessage()}")
+                            ->danger()
+                            ->send();
+                    }
                 })
                 ->icon('heroicon-o-arrow-down-on-square'),
         ];

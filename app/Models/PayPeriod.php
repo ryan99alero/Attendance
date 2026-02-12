@@ -2,16 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
-use App\Services\ClockEventProcessing\ClockEventProcessingService;
-use Log;
 use App\Services\AttendanceProcessing\AttendanceProcessingService;
-use Illuminate\Support\Carbon;
+use App\Services\ClockEventProcessing\ClockEventProcessingService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Log;
 
 /**
  * Class PayPeriod
@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, Punch> $punches
  * @property-read int|null $punches_count
  * @property-read User|null $updater
+ *
  * @method static Builder|PayPeriod newModelQuery()
  * @method static Builder|PayPeriod newQuery()
  * @method static Builder|PayPeriod query()
@@ -42,8 +43,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static Builder|PayPeriod whereStartDate($value)
  * @method static Builder|PayPeriod whereUpdatedAt($value)
  * @method static Builder|PayPeriod whereUpdatedBy($value)
+ *
  * @property int $is_posted Indicates if the pay period has been processed
+ *
  * @method static Builder<static>|PayPeriod whereIsPosted($value)
+ *
  * @mixin \Eloquent
  */
 class PayPeriod extends Model
@@ -53,8 +57,17 @@ class PayPeriod extends Model
     protected $fillable = [
         'start_date',
         'end_date',
+        'name',
         'is_processed',
         'is_posted',
+        'processing_status',
+        'processing_progress',
+        'processing_message',
+        'total_employees',
+        'processed_employees',
+        'processing_error',
+        'processing_started_at',
+        'processing_completed_at',
         'processed_by',
         'created_by',
         'updated_by',
@@ -65,7 +78,58 @@ class PayPeriod extends Model
         'end_date' => 'date',
         'is_processed' => 'boolean',
         'is_posted' => 'boolean',
+        'processing_progress' => 'integer',
+        'total_employees' => 'integer',
+        'processed_employees' => 'integer',
+        'processing_started_at' => 'datetime',
+        'processing_completed_at' => 'datetime',
     ];
+
+    public function isProcessing(): bool
+    {
+        return $this->processing_status === 'processing';
+    }
+
+    public function hasProcessingFailed(): bool
+    {
+        return $this->processing_status === 'failed';
+    }
+
+    public function hasProcessingCompleted(): bool
+    {
+        return $this->processing_status === 'completed';
+    }
+
+    public function updateProgress(int $progress, string $message, ?int $processed = null): void
+    {
+        $data = [
+            'processing_progress' => min(100, max(0, $progress)),
+            'processing_message' => $message,
+        ];
+
+        if ($processed !== null) {
+            $data['processed_employees'] = $processed;
+        }
+
+        $this->update($data);
+    }
+
+    public function getProgressText(): string
+    {
+        if ($this->hasProcessingCompleted()) {
+            return 'Processing complete';
+        }
+
+        if ($this->hasProcessingFailed()) {
+            return "Failed: {$this->processing_error}";
+        }
+
+        if ($this->total_employees && $this->processed_employees) {
+            return "{$this->processing_message} ({$this->processed_employees}/{$this->total_employees})";
+        }
+
+        return $this->processing_message ?? 'Starting...';
+    }
 
     // Relationships
     public function processor(): BelongsTo
@@ -87,21 +151,32 @@ class PayPeriod extends Model
     {
         return $this->hasMany(Punch::class, 'pay_period_id');
     }
+
+    public function employeeSummaries(): HasMany
+    {
+        return $this->hasMany(PayPeriodEmployeeSummary::class);
+    }
+
+    public function payrollExports(): HasMany
+    {
+        return $this->hasMany(PayrollExport::class);
+    }
+
     public function attendanceIssues(): Builder
     {
         return Attendance::query()
             ->whereBetween('punch_time', [
                 $this->start_date->startOfDay(),
-                $this->end_date->endOfDay()
+                $this->end_date->endOfDay(),
             ])
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->where('status', 'NeedsReview')
-                      ->orWhere(function($subQuery) {
-                          // Only show Incomplete records that have been processed (have punch_type_id assigned)
-                          // but still have issues, not those that are simply unprocessed
-                          $subQuery->where('status', 'Incomplete')
-                                   ->whereNotNull('punch_type_id');
-                      });
+                    ->orWhere(function ($subQuery) {
+                        // Only show Incomplete records that have been processed (have punch_type_id assigned)
+                        // but still have issues, not those that are simply unprocessed
+                        $subQuery->where('status', 'Incomplete')
+                            ->whereNotNull('punch_type_id');
+                    });
             });
     }
 
@@ -117,21 +192,21 @@ class PayPeriod extends Model
         // This includes 'Complete', 'Migrated', and 'Posted' records
         return Attendance::whereBetween('punch_time', [
             $this->start_date->startOfDay(),
-            $this->end_date->endOfDay()
+            $this->end_date->endOfDay(),
         ])
-        ->whereNotNull('punch_type_id')
-        ->whereIn('status', ['Complete', 'Migrated', 'Posted'])
-        ->count();
+            ->whereNotNull('punch_type_id')
+            ->whereIn('status', ['Complete', 'Migrated', 'Posted'])
+            ->count();
     }
 
     public function consensusDisagreementCount(): int
     {
         return Attendance::whereBetween('punch_time', [
             $this->start_date->startOfDay(),
-            $this->end_date->endOfDay()
+            $this->end_date->endOfDay(),
         ])
-        ->where('status', 'Discrepancy')
-        ->count();
+            ->where('status', 'Discrepancy')
+            ->count();
     }
 
     public function processAttendance(): int
@@ -143,14 +218,14 @@ class PayPeriod extends Model
         $clockEventsInPeriod = ClockEvent::readyForProcessing()
             ->whereBetween('event_time', [
                 $this->start_date->startOfDay(),
-                $this->end_date->endOfDay()
+                $this->end_date->endOfDay(),
             ])
             ->count();
 
         if ($clockEventsInPeriod > 0) {
             Log::info("[PayPeriod] Processing {$clockEventsInPeriod} ClockEvents for PayPeriod {$this->id}");
             $clockEventResult = $clockEventService->processUnprocessedEvents(500); // Process all events
-            Log::info("[PayPeriod] ClockEvent processing result", $clockEventResult);
+            Log::info('[PayPeriod] ClockEvent processing result', $clockEventResult);
         }
 
         // Step 2: Process Attendance records (assign punch types, ML analysis, etc.)
@@ -159,6 +234,7 @@ class PayPeriod extends Model
 
         return $clockEventsInPeriod;
     }
+
     public static function current()
     {
         return self::where('start_date', '<=', now())

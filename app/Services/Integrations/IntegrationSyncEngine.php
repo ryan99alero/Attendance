@@ -2,10 +2,11 @@
 
 namespace App\Services\Integrations;
 
-use Exception;
 use App\Models\IntegrationFieldMapping;
 use App\Models\IntegrationObject;
+use App\Models\SystemLog;
 use App\Services\ModelDiscoveryService;
+use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -21,6 +22,11 @@ class IntegrationSyncEngine
      */
     protected array $fkCaches = [];
 
+    /**
+     * Current sync log entry
+     */
+    protected ?SystemLog $syncLog = null;
+
     public function __construct(PaceApiClient $client)
     {
         $this->client = $client;
@@ -29,141 +35,199 @@ class IntegrationSyncEngine
     /**
      * Sync records from the remote API into the local database using field mappings.
      *
-     * @param IntegrationObject $object The object definition with field mappings
-     * @param string|null $filterOverride Override the default XPath filter
-     * @param callable|null $enrichCallback Called per-record after mapping, before upsert: fn(array &$attributes, array $parsedRecord)
-     * @return SyncResult
+     * @param  IntegrationObject  $object  The object definition with field mappings
+     * @param  string|null  $filterOverride  Override the default XPath filter
+     * @param  callable|null  $enrichCallback  Called per-record after mapping, before upsert: fn(array &$attributes, array $parsedRecord)
      */
     public function sync(
         IntegrationObject $object,
         ?string $filterOverride = null,
         ?callable $enrichCallback = null,
     ): SyncResult {
-        $result = new SyncResult();
+        $result = new SyncResult;
 
-        // Load ALL field mappings (need all fields for the API call)
-        $mappings = $object->fieldMappings()->get();
-
-        if ($mappings->isEmpty()) {
-            $result->addError("No field mappings defined for {$object->object_name}");
-            return $result;
-        }
-
-        // Build the fields array for the API call
-        $fields = $mappings->map(fn(IntegrationFieldMapping $m) => [
-            'name' => $m->external_field,
-            'xpath' => $m->external_xpath,
-        ])->values()->toArray();
-
-        // Pre-build FK lookup caches
-        $this->buildFkCaches($mappings);
-
-        // Determine filter
-        $filter = $filterOverride ?? $object->default_filter;
-
-        // Determine API method (default to loadValueObjects for backward compatibility)
-        $apiMethod = $object->api_method ?? 'loadValueObjects';
-
-        if (in_array($apiMethod, ['createObject', 'updateObject'])) {
-            $result->addError("API method '{$apiMethod}' is not supported for pull sync. Use loadValueObjects or findObjects.");
-            return $result;
-        }
-
-        // Fetch all records from the API
-        $valueObjects = $this->client->loadAllValueObjects(
-            objectName: $object->object_name,
-            fields: $fields,
-            children: [],
-            xpathFilter: $filter,
+        // Start sync log
+        $this->syncLog = SystemLog::startIntegrationSync(
+            connection: $object->connection,
+            operation: 'pull',
+            object: $object,
+            requestData: [
+                'object_name' => $object->object_name,
+                'filter' => $filterOverride ?? $object->default_filter,
+            ]
         );
 
-        if ($valueObjects->isEmpty()) {
-            return $result;
-        }
+        try {
+            // Load ALL field mappings (need all fields for the API call)
+            $mappings = $object->fieldMappings()->get();
 
-        // Get pull-enabled mappings and identifier mappings
-        $pullMappings = $mappings->where('sync_on_pull', true);
-        $identifierMappings = $mappings->where('is_identifier', true);
+            if ($mappings->isEmpty()) {
+                $result->addError("No field mappings defined for {$object->object_name}");
+                $this->finalizeSyncLog($result);
 
-        // Resolve the local model class
-        $modelClass = $object->getLocalModelClass();
-        if (!$modelClass) {
-            $result->addError("Local model class not found: {$object->local_model}");
-            return $result;
-        }
+                return $result;
+            }
 
-        // Group pull mappings by effective table (null = primary)
-        $primaryTable = $object->local_table;
-        $primaryMappings = $pullMappings->filter(
-            fn(IntegrationFieldMapping $m) => empty($m->local_table) || $m->local_table === $primaryTable
-        );
-        $relatedMappingsByTable = $pullMappings->filter(
-            fn(IntegrationFieldMapping $m) => !empty($m->local_table) && $m->local_table !== $primaryTable
-        )->groupBy('local_table');
+            // Build the fields array for the API call
+            $fields = $mappings->map(fn (IntegrationFieldMapping $m) => [
+                'name' => $m->external_field,
+                'xpath' => $m->external_xpath,
+            ])->values()->toArray();
 
-        // Resolve relationship map for related tables
-        $relationshipMap = [];
-        if ($relatedMappingsByTable->isNotEmpty()) {
-            $relationshipMap = $this->resolveRelationships($modelClass, $relatedMappingsByTable->keys()->toArray());
-        }
+            // Pre-build FK lookup caches
+            $this->buildFkCaches($mappings);
 
-        foreach ($valueObjects as $vo) {
-            $parsed = $this->client->parseValueObject($vo);
-            $result->parsedRecords->push($parsed);
+            // Determine filter
+            $filter = $filterOverride ?? $object->default_filter;
 
-            try {
-                // Build attributes for the primary table
-                $attributes = $this->buildAttributes($primaryMappings, $parsed);
+            // Determine API method (default to loadValueObjects for backward compatibility)
+            $apiMethod = $object->api_method ?? 'loadValueObjects';
 
-                // Build identifier conditions for upsert matching
-                $identifierConditions = $this->buildIdentifierConditions($identifierMappings, $parsed);
+            if (in_array($apiMethod, ['createObject', 'updateObject'])) {
+                $result->addError("API method '{$apiMethod}' is not supported for pull sync. Use loadValueObjects or findObjects.");
+                $this->finalizeSyncLog($result);
 
-                if (empty($identifierConditions)) {
-                    $result->addError("Record missing identifier fields, skipping");
-                    continue;
-                }
+                return $result;
+            }
 
-                // Track synced identifiers
-                $identifierValue = reset($identifierConditions);
-                $result->syncedIdentifiers->push((string) $identifierValue);
+            // Fetch all records from the API
+            $valueObjects = $this->client->loadAllValueObjects(
+                objectName: $object->object_name,
+                fields: $fields,
+                children: [],
+                xpathFilter: $filter,
+            );
 
-                // Apply enrich callback
-                if ($enrichCallback) {
-                    $enrichCallback($attributes, $parsed);
-                }
+            if ($valueObjects->isEmpty()) {
+                $this->finalizeSyncLog($result);
 
-                // Upsert: find existing or create
-                $existing = $modelClass::where($identifierConditions)->first();
+                return $result;
+            }
 
-                if ($existing) {
-                    if ($this->hasChanges($existing, $attributes)) {
-                        $existing->update($attributes);
-                        $result->updated++;
-                    } else {
-                        $result->skipped++;
+            // Get pull-enabled mappings and identifier mappings
+            $pullMappings = $mappings->where('sync_on_pull', true);
+            $identifierMappings = $mappings->where('is_identifier', true);
+
+            // Resolve the local model class
+            $modelClass = $object->getLocalModelClass();
+            if (! $modelClass) {
+                $result->addError("Local model class not found: {$object->local_model}");
+                $this->finalizeSyncLog($result);
+
+                return $result;
+            }
+
+            // Group pull mappings by effective table (null = primary)
+            $primaryTable = $object->local_table;
+            $primaryMappings = $pullMappings->filter(
+                fn (IntegrationFieldMapping $m) => empty($m->local_table) || $m->local_table === $primaryTable
+            );
+            $relatedMappingsByTable = $pullMappings->filter(
+                fn (IntegrationFieldMapping $m) => ! empty($m->local_table) && $m->local_table !== $primaryTable
+            )->groupBy('local_table');
+
+            // Resolve relationship map for related tables
+            $relationshipMap = [];
+            if ($relatedMappingsByTable->isNotEmpty()) {
+                $relationshipMap = $this->resolveRelationships($modelClass, $relatedMappingsByTable->keys()->toArray());
+            }
+
+            foreach ($valueObjects as $vo) {
+                $parsed = $this->client->parseValueObject($vo);
+                $result->parsedRecords->push($parsed);
+
+                try {
+                    // Build attributes for the primary table
+                    $attributes = $this->buildAttributes($primaryMappings, $parsed);
+
+                    // Build identifier conditions for upsert matching
+                    $identifierConditions = $this->buildIdentifierConditions($identifierMappings, $parsed);
+
+                    if (empty($identifierConditions)) {
+                        $result->addError('Record missing identifier fields, skipping');
+
+                        continue;
                     }
 
-                    $primaryRecord = $existing;
-                } else {
-                    $createData = array_merge($identifierConditions, $attributes);
-                    $primaryRecord = $modelClass::create($createData);
-                    $result->created++;
-                }
+                    // Track synced identifiers
+                    $identifierValue = reset($identifierConditions);
+                    $result->syncedIdentifiers->push((string) $identifierValue);
 
-                // Sync related tables
-                foreach ($relatedMappingsByTable as $table => $tableMappings) {
-                    $this->syncRelatedTable($primaryRecord, $table, $tableMappings, $parsed, $relationshipMap);
+                    // Apply enrich callback
+                    if ($enrichCallback) {
+                        $enrichCallback($attributes, $parsed);
+                    }
+
+                    // Upsert: find existing or create
+                    $existing = $modelClass::where($identifierConditions)->first();
+
+                    if ($existing) {
+                        if ($this->hasChanges($existing, $attributes)) {
+                            $existing->update($attributes);
+                            $result->updated++;
+                        } else {
+                            $result->skipped++;
+                        }
+
+                        $primaryRecord = $existing;
+                    } else {
+                        $createData = array_merge($identifierConditions, $attributes);
+                        $primaryRecord = $modelClass::create($createData);
+                        $result->created++;
+                    }
+
+                    // Sync related tables
+                    foreach ($relatedMappingsByTable as $table => $tableMappings) {
+                        $this->syncRelatedTable($primaryRecord, $table, $tableMappings, $parsed, $relationshipMap);
+                    }
+                } catch (Exception $e) {
+                    $identifierDisplay = $identifierConditions[$identifierMappings->first()?->local_field ?? 'id'] ?? 'unknown';
+                    $result->addError("{$object->object_name} {$identifierDisplay}: ".$e->getMessage());
                 }
-            } catch (Exception $e) {
-                $identifierDisplay = $identifierConditions[$identifierMappings->first()?->local_field ?? 'id'] ?? 'unknown';
-                $result->addError("{$object->object_name} {$identifierDisplay}: " . $e->getMessage());
             }
+
+            // Update last_synced_at on the object
+            $object->update(['last_synced_at' => now()]);
+
+        } catch (Exception $e) {
+            $result->addError($e->getMessage());
         }
 
-        // Update last_synced_at on the object
-        $object->update(['last_synced_at' => now()]);
+        // Finalize sync log with results
+        $this->finalizeSyncLog($result);
 
         return $result;
+    }
+
+    /**
+     * Finalize the sync log entry based on results
+     */
+    protected function finalizeSyncLog(SyncResult $result): void
+    {
+        if (! $this->syncLog) {
+            return;
+        }
+
+        $counts = $result->toArray();
+
+        if (! $result->hasErrors()) {
+            $this->syncLog->markSuccess($counts);
+        } elseif ($result->created + $result->updated + $result->skipped === 0) {
+            // All records failed - mark as failed
+            $this->syncLog->markFailed(
+                implode('; ', array_slice($result->errorMessages, 0, 5)),
+                ['all_errors' => $result->errorMessages]
+            );
+        } else {
+            // Some records succeeded, some failed - mark as partial
+            $this->syncLog->markPartial(
+                count($result->errorMessages).' record(s) failed to sync',
+                $counts,
+                ['failed_records' => $result->errorMessages]
+            );
+        }
+
+        $this->syncLog = null;
     }
 
     /**
@@ -242,7 +306,7 @@ class IntegrationSyncEngine
      */
     protected function resolveRelationships(string $modelClass, array $tables): array
     {
-        $discovery = new ModelDiscoveryService();
+        $discovery = new ModelDiscoveryService;
         $relatedTables = $discovery->getRelatedTables($modelClass);
 
         $map = [];
@@ -266,7 +330,7 @@ class IntegrationSyncEngine
         array $parsed,
         array $relationshipMap,
     ): void {
-        if (!isset($relationshipMap[$table])) {
+        if (! isset($relationshipMap[$table])) {
             return;
         }
 
@@ -275,7 +339,7 @@ class IntegrationSyncEngine
         $relationName = $info['relationship'];
 
         // Only handle HasOne and BelongsTo for now
-        if (!in_array($relationType, ['HasOne', 'BelongsTo'])) {
+        if (! in_array($relationType, ['HasOne', 'BelongsTo'])) {
             return;
         }
 
@@ -315,7 +379,7 @@ class IntegrationSyncEngine
             ];
         }
 
-        $fields = $mappings->map(fn(IntegrationFieldMapping $m) => [
+        $fields = $mappings->map(fn (IntegrationFieldMapping $m) => [
             'name' => $m->external_field,
             'xpath' => $m->external_xpath,
         ])->values()->toArray();
@@ -332,7 +396,7 @@ class IntegrationSyncEngine
             $fieldsFound = [];
             $fieldsNull = [];
 
-            if (!empty($valueObjects)) {
+            if (! empty($valueObjects)) {
                 $rawFields = $valueObjects[0]['fields'] ?? [];
                 $parsed = $this->client->parseValueObject($valueObjects[0]);
 
@@ -400,14 +464,14 @@ class IntegrationSyncEngine
             }
 
             $modelClass = $options['model'];
-            if (!class_exists($modelClass)) {
+            if (! class_exists($modelClass)) {
                 continue;
             }
 
             // Build cache: match_column_value => return_column_value
             $this->fkCaches[$mapping->id] = $modelClass::whereNotNull($options['match_column'])
                 ->pluck($options['return_column'], $options['match_column'])
-                ->mapWithKeys(fn($val, $key) => [(string) $key => $val])
+                ->mapWithKeys(fn ($val, $key) => [(string) $key => $val])
                 ->toArray();
         }
     }

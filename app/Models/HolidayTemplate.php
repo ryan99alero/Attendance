@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use InvalidArgumentException;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
+use InvalidArgumentException;
 
 class HolidayTemplate extends Model
 {
@@ -20,6 +20,12 @@ class HolidayTemplate extends Model
         'eligible_pay_types',
         'is_active',
         'description',
+        // Overtime/pay fields
+        'holiday_multiplier',
+        'require_day_before',
+        'require_day_after',
+        'paid_if_not_worked',
+        'standard_holiday_hours',
     ];
 
     protected $casts = [
@@ -27,6 +33,12 @@ class HolidayTemplate extends Model
         'eligible_pay_types' => 'json',
         'applies_to_all_employees' => 'boolean',
         'is_active' => 'boolean',
+        // Overtime/pay field casts
+        'holiday_multiplier' => 'float',
+        'require_day_before' => 'boolean',
+        'require_day_after' => 'boolean',
+        'paid_if_not_worked' => 'boolean',
+        'standard_holiday_hours' => 'float',
     ];
 
     /**
@@ -100,6 +112,7 @@ class HolidayTemplate extends Model
         switch ($rule['base']) {
             case 'easter':
                 $easter = Carbon::createFromTimestamp(easter_date($year));
+
                 return $easter->addDays($rule['offset_days'] ?? 0);
 
             default:
@@ -108,7 +121,56 @@ class HolidayTemplate extends Model
     }
 
     /**
-     * Note: VacationCalendar entries are not directly linked to HolidayTemplates
-     * Holiday instances would be created in a separate holidays table when implemented
+     * Get the holiday instances generated from this template.
      */
+    public function instances(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(HolidayInstance::class, 'holiday_template_id');
+    }
+
+    /**
+     * Check if an employee is eligible for this holiday based on pay type.
+     */
+    public function appliesToEmployee(Employee $employee): bool
+    {
+        // If applies to all employees, return true
+        if ($this->applies_to_all_employees) {
+            return true;
+        }
+
+        // If no eligible pay types are specified, apply to all
+        if (empty($this->eligible_pay_types)) {
+            return true;
+        }
+
+        $employeePayType = $employee->pay_type ?? 'hourly';
+
+        // Handle full-time vs part-time hourly
+        if ($employeePayType === 'hourly') {
+            $isFullTime = $employee->full_time ?? false;
+            $effectiveType = $isFullTime ? 'hourly_fulltime' : 'hourly_parttime';
+
+            // Check both the specific type and generic 'hourly'
+            return in_array($effectiveType, $this->eligible_pay_types, true)
+                || in_array('hourly', $this->eligible_pay_types, true);
+        }
+
+        return in_array($employeePayType, $this->eligible_pay_types, true);
+    }
+
+    /**
+     * Get the effective multiplier for this holiday.
+     */
+    public function getEffectiveMultiplier(): float
+    {
+        return $this->holiday_multiplier ?? 2.00;
+    }
+
+    /**
+     * Get the standard hours for this holiday.
+     */
+    public function getStandardHours(): float
+    {
+        return $this->standard_holiday_hours ?? 8.00;
+    }
 }

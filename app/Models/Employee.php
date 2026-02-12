@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Support\Carbon;
 
 /**
  * Employee model
@@ -46,6 +46,7 @@ use Illuminate\Database\Eloquent\Relations\HasOneThrough;
  * @property string|null $full_names Concatenated full name of the employee
  * @property int|null $shift_schedule_id Foreign key referencing the shift schedules table
  * @property-read RoundGroup|null $roundGroup
+ *
  * @method static Builder<static>|Employee newModelQuery()
  * @method static Builder<static>|Employee newQuery()
  * @method static Builder<static>|Employee query()
@@ -75,6 +76,7 @@ use Illuminate\Database\Eloquent\Relations\HasOneThrough;
  * @method static Builder<static>|Employee whereUpdatedBy($value)
  * @method static Builder<static>|Employee whereVacationPay($value)
  * @method static Builder<static>|Employee whereZip($value)
+ *
  * @mixin \Eloquent
  */
 class Employee extends Model
@@ -117,6 +119,7 @@ class Employee extends Model
         'double_time_threshold',
         'pay_type',
         'pay_rate',
+        'payroll_provider_id',
     ];
 
     protected $casts = [
@@ -138,17 +141,26 @@ class Employee extends Model
         return $this->belongsTo(Department::class, 'department_id');
     }
 
+    public function payrollProvider(): BelongsTo
+    {
+        return $this->belongsTo(IntegrationConnection::class, 'payroll_provider_id');
+    }
+
+    public function paySummaries(): HasMany
+    {
+        return $this->hasMany(PayPeriodEmployeeSummary::class);
+    }
+
     public function roundGroup(): BelongsTo
     {
         return $this->belongsTo(RoundGroup::class, 'round_group_id');
     }
 
-
     public function shiftSchedule(): BelongsTo
     {
         return $this->belongsTo(ShiftSchedule::class, 'shift_schedule_id');
     }
-    
+
     /**
      * Get the shift through the shift schedule (source of truth)
      */
@@ -229,11 +241,11 @@ class Employee extends Model
             'id',          // Local key on employees table
             'vacation_policy_id' // Local key on employee_vacation_assignments table
         )->where('employee_vacation_assignments.is_active', true)
-         ->where('employee_vacation_assignments.effective_date', '<=', now())
-         ->where(function ($query) {
-             $query->whereNull('employee_vacation_assignments.end_date')
-                   ->orWhere('employee_vacation_assignments.end_date', '>=', now());
-         });
+            ->where('employee_vacation_assignments.effective_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('employee_vacation_assignments.end_date')
+                    ->orWhere('employee_vacation_assignments.end_date', '>=', now());
+            });
     }
 
     protected static function boot(): void

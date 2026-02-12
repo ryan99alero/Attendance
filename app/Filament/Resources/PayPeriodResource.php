@@ -2,48 +2,57 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
-use Filament\Notifications\Notification;
-use Exception;
-use App\Models\Attendance;
-use App\Models\VacationCalendar;
-use App\Models\VacationTransaction;
-use Illuminate\Support\Facades\Log;
-use App\Filament\Resources\PayPeriodResource\Pages\ListPayPeriods;
 use App\Filament\Resources\PayPeriodResource\Pages\CreatePayPeriod;
 use App\Filament\Resources\PayPeriodResource\Pages\EditPayPeriod;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\PayPeriodResource\Pages;
+use App\Filament\Resources\PayPeriodResource\Pages\ListPayPeriods;
+use App\Jobs\ProcessPayPeriodJob;
+use App\Jobs\ProcessPayrollExportJob;
+use App\Models\Attendance;
+use App\Models\IntegrationConnection;
 use App\Models\PayPeriod;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Toggle;
-use Filament\Resources\Resource;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Artisan;
-use App\Services\AttendanceProcessing\AttendanceProcessingService;
+use App\Models\PayrollExport;
+use App\Models\VacationCalendar;
+use App\Models\VacationTransaction;
+use App\Services\Payroll\PayrollAggregationService;
 use Carbon\Carbon;
-
+use Exception;
+use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PayPeriodResource extends Resource
 {
     protected static ?string $model = PayPeriod::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'Payroll & Overtime';
+    protected static string|\UnitEnum|null $navigationGroup = 'Payroll & Overtime';
+
     protected static ?string $navigationLabel = 'Pay Periods';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar';
+
     protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
+            TextInput::make('name')
+                ->label('Period Name')
+                ->placeholder('e.g., Week 12, Period 1')
+                ->maxLength(50)
+                ->helperText('Human-readable name for this pay period'),
+
             DatePicker::make('start_date')
                 ->label('Start Date')
                 ->required(),
@@ -62,6 +71,13 @@ class PayPeriodResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('name')
+                    ->label('Name')
+                    ->placeholder('—')
+                    ->size('sm')
+                    ->width('auto')
+                    ->searchable(),
+
                 TextColumn::make('start_date')
                     ->label('Start Date')
                     ->date()
@@ -87,6 +103,31 @@ class PayPeriodResource extends Resource
                     ->size('sm')
                     ->width('auto'),
 
+                TextColumn::make('processing_status')
+                    ->label('Job Status')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'processing' => 'warning',
+                        'completed' => 'success',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->icon(fn (?string $state): ?string => match ($state) {
+                        'processing' => 'heroicon-o-arrow-path',
+                        'completed' => 'heroicon-o-check-circle',
+                        'failed' => 'heroicon-o-x-circle',
+                        default => null,
+                    })
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'processing' => 'Processing',
+                        'completed' => 'Done',
+                        'failed' => 'Failed',
+                        default => '—',
+                    })
+                    ->tooltip(fn ($record): ?string => $record->processing_error)
+                    ->size('sm')
+                    ->width('auto'),
+
                 TextColumn::make('attendance_issues_count')
                     ->label('Issues')
                     ->state(fn ($record) => $record->attendanceIssuesCount())
@@ -109,7 +150,7 @@ class PayPeriodResource extends Resource
                     ->label('Engine Disc.')
                     ->state(fn ($record) => $record->consensusDisagreementCount())
                     ->sortable()
-                    ->url(fn ($record) => '/admin/attendance-summary?' . http_build_query([
+                    ->url(fn ($record) => '/admin/attendance-summary?'.http_build_query([
                         'payPeriodId' => $record->id,
                         'statusFilter' => 'all',
                         'duplicatesFilter' => 'consensus',
@@ -130,6 +171,8 @@ class PayPeriodResource extends Resource
             ])
             ->defaultSort('start_date', 'desc')
             ->striped()
+            ->poll(fn () => PayPeriod::where('processing_status', 'processing')->exists()
+                || PayrollExport::processing()->exists() ? '3s' : null)
             ->headerActions([
                 Action::make('generate_periods')
                     ->label('Generate PayPeriods')
@@ -180,36 +223,19 @@ class PayPeriodResource extends Resource
             ->recordActions([
                 // Process Time Button
                 Action::make('process_time')
-                    ->label('Process Time')
-                    ->color('primary')
-                    ->icon('heroicon-o-arrow-down-on-square')
+                    ->label(fn ($record) => $record->isProcessing() ? 'Processing...' : 'Process Time')
+                    ->color(fn ($record) => $record->isProcessing() ? 'gray' : 'primary')
+                    ->icon(fn ($record) => $record->isProcessing() ? 'heroicon-o-arrow-path' : 'heroicon-o-arrow-down-on-square')
                     ->size('sm')
-                    ->extraAttributes(['data-action' => 'process_time'])
+                    ->disabled(fn ($record) => $record->isProcessing())
                     ->action(function ($record) {
-                        set_time_limit(0); // Remove time limit for long operations
+                        ProcessPayPeriodJob::dispatch($record, auth()->id());
 
-                        $processingService = app(AttendanceProcessingService::class);
-
-                        try {
-                            $processingService->processAll($record);
-
-                            Notification::make()
-                                ->success()
-                                ->title('✅ Processing Complete')
-                                ->body("Successfully processed all attendance records for Pay Period ID: {$record->id}")
-                                ->duration(8000)
-                                ->send();
-
-                        } catch (Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('❌ Processing Failed')
-                                ->body("Error processing Pay Period ID: {$record->id}: " . substr($e->getMessage(), 0, 200))
-                                ->persistent()
-                                ->send();
-
-                            throw $e; // Re-throw for proper error handling
-                        }
+                        Notification::make()
+                            ->info()
+                            ->title('Processing Started')
+                            ->body("Pay Period '{$record->name}' is now being processed in the background. The page will refresh when complete.")
+                            ->send();
                     }),
 
                 // Post Time Button
@@ -220,15 +246,13 @@ class PayPeriodResource extends Resource
                     ->size('sm')
                     ->requiresConfirmation()
                     ->modalHeading('Post Time Records')
-                    ->modalDescription(fn ($record) =>
-                        $record->is_posted
+                    ->modalDescription(fn ($record) => $record->is_posted
                             ? 'This pay period has already been posted and cannot be posted again.'
                             : ($record->attendanceIssuesCount() > 0 || $record->consensusDisagreementCount() > 0
-                                ? 'Validation engine failed: There are punch type disagreements that require review. ' . ($record->attendanceIssuesCount() + $record->consensusDisagreementCount()) . ' unresolved issues (' . $record->attendanceIssuesCount() . ' attendance issues, ' . $record->consensusDisagreementCount() . ' engine discrepancies). Please review all issues before posting.'
+                                ? 'Validation engine failed: There are punch type disagreements that require review. '.($record->attendanceIssuesCount() + $record->consensusDisagreementCount()).' unresolved issues ('.$record->attendanceIssuesCount().' attendance issues, '.$record->consensusDisagreementCount().' engine discrepancies). Please review all issues before posting.'
                                 : 'This will finalize and archive all attendance records for this pay period. This action cannot be undone.')
                     )
-                    ->modalSubmitActionLabel(fn ($record) =>
-                        $record->consensusDisagreementCount() > 0 ? 'Close' : 'Post Time'
+                    ->modalSubmitActionLabel(fn ($record) => $record->consensusDisagreementCount() > 0 ? 'Close' : 'Post Time'
                     )
                     ->disabled(fn ($record) => $record->attendanceIssuesCount() > 0 || $record->is_posted)
                     ->action(function ($record) {
@@ -242,8 +266,9 @@ class PayPeriodResource extends Resource
                             Notification::make()
                                 ->danger()
                                 ->title('Cannot Post Time')
-                                ->body('There are ' . $record->attendanceIssuesCount() . ' unresolved attendance issues. Please resolve them first.')
+                                ->body('There are '.$record->attendanceIssuesCount().' unresolved attendance issues. Please resolve them first.')
                                 ->send();
+
                             return;
                         }
 
@@ -264,7 +289,7 @@ class PayPeriodResource extends Resource
                                 ->whereNotNull('punch_type_id')
                                 ->update([
                                     'status' => 'Posted',
-                                    'is_posted' => true
+                                    'is_posted' => true,
                                 ]);
 
                             // Also update corresponding punch records to set is_posted = true
@@ -305,6 +330,172 @@ class PayPeriodResource extends Resource
                     ->icon('heroicon-o-eye')
                     ->size('sm')
                     ->url(fn ($record) => route('filament.admin.resources.punches.index', ['pay_period_id' => $record->id])),
+
+                // Export Payroll Button
+                Action::make('export_payroll')
+                    ->label('Export Payroll')
+                    ->color('warning')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->size('sm')
+                    ->visible(fn ($record) => $record->is_posted)
+                    ->schema([
+                        Select::make('provider_id')
+                            ->label('Payroll Provider')
+                            ->options(fn () => IntegrationConnection::where('is_payroll_provider', true)
+                                ->where('is_active', true)
+                                ->pluck('name', 'id'))
+                            ->required()
+                            ->helperText('Select the payroll provider to export to'),
+
+                        Select::make('format')
+                            ->label('Export Format')
+                            ->options([
+                                'csv' => 'CSV',
+                                'xlsx' => 'Excel (XLSX)',
+                                'json' => 'JSON',
+                                'xml' => 'XML',
+                            ])
+                            ->default('csv')
+                            ->required(),
+                    ])
+                    ->action(function ($record, array $data) {
+                        try {
+                            $provider = IntegrationConnection::findOrFail($data['provider_id']);
+                            $format = $data['format'];
+
+                            // Validate format is supported
+                            if (! $provider->supportsFormat($format)) {
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Format Not Enabled')
+                                    ->body("The {$format} format is not enabled for {$provider->name}. Please enable it in the integration settings.")
+                                    ->send();
+
+                                return;
+                            }
+
+                            // Aggregate data first
+                            $aggregationService = app(PayrollAggregationService::class);
+                            $aggregationService->aggregatePayPeriod($record);
+
+                            // Create export record
+                            $export = PayrollExport::create([
+                                'pay_period_id' => $record->id,
+                                'integration_connection_id' => $provider->id,
+                                'format' => $format,
+                                'file_name' => PayrollExport::generateFileName($provider, $record, $format),
+                                'status' => PayrollExport::STATUS_PENDING,
+                                'progress' => 0,
+                                'progress_message' => 'Queued for processing...',
+                                'exported_by' => auth()->id(),
+                            ]);
+
+                            // Dispatch job
+                            ProcessPayrollExportJob::dispatch($export->id, auth()->id());
+
+                            Notification::make()
+                                ->info()
+                                ->title('Export Started')
+                                ->body("Export for {$provider->name} has been queued. You'll be notified when complete.")
+                                ->send();
+
+                        } catch (Exception $e) {
+                            Log::error('[PayrollExport] Error: '.$e->getMessage());
+                            Notification::make()
+                                ->danger()
+                                ->title('Export Error')
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    }),
+
+                // Export All Providers Button
+                Action::make('export_all')
+                    ->label('Export All')
+                    ->color('info')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->size('sm')
+                    ->visible(fn ($record) => $record->is_posted)
+                    ->requiresConfirmation()
+                    ->modalHeading('Export to All Payroll Providers')
+                    ->modalDescription('This will generate exports for all active payroll providers in their configured formats.')
+                    ->action(function ($record) {
+                        try {
+                            // Aggregate data first
+                            $aggregationService = app(PayrollAggregationService::class);
+                            $aggregationService->aggregatePayPeriod($record);
+
+                            // Get all active providers
+                            $providers = IntegrationConnection::payrollProviders()
+                                ->active()
+                                ->get();
+
+                            if ($providers->isEmpty()) {
+                                Notification::make()
+                                    ->warning()
+                                    ->title('No Providers')
+                                    ->body('No active payroll providers configured.')
+                                    ->send();
+
+                                return;
+                            }
+
+                            $exportCount = 0;
+
+                            foreach ($providers as $provider) {
+                                foreach ($provider->getEnabledFormats() as $format) {
+                                    // Create export record
+                                    $export = PayrollExport::create([
+                                        'pay_period_id' => $record->id,
+                                        'integration_connection_id' => $provider->id,
+                                        'format' => $format,
+                                        'file_name' => PayrollExport::generateFileName($provider, $record, $format),
+                                        'status' => PayrollExport::STATUS_PENDING,
+                                        'progress' => 0,
+                                        'progress_message' => 'Queued for processing...',
+                                        'exported_by' => auth()->id(),
+                                    ]);
+
+                                    // Dispatch job
+                                    ProcessPayrollExportJob::dispatch($export->id, auth()->id());
+                                    $exportCount++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->info()
+                                ->title('Exports Queued')
+                                ->body("{$exportCount} export job(s) have been queued. You'll be notified as they complete.")
+                                ->send();
+
+                        } catch (Exception $e) {
+                            Log::error('[PayrollExport] Bulk export error: '.$e->getMessage());
+                            Notification::make()
+                                ->danger()
+                                ->title('Export Error')
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    }),
+
+                // View Export Status / Downloads
+                Action::make('view_exports')
+                    ->label(fn ($record) => self::getExportStatusLabel($record))
+                    ->color(fn ($record) => self::getExportStatusColor($record))
+                    ->icon(fn ($record) => self::getExportStatusIcon($record))
+                    ->size('sm')
+                    ->visible(fn ($record) => PayrollExport::where('pay_period_id', $record->id)->exists())
+                    ->modalHeading('Payroll Exports')
+                    ->modalIcon(null)
+                    ->modalContent(fn ($record) => view('filament.modals.payroll-exports', [
+                        'exports' => PayrollExport::where('pay_period_id', $record->id)
+                            ->with('integrationConnection')
+                            ->orderBy('created_at', 'desc')
+                            ->get(),
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalWidth('6xl'),
             ]);
     }
 
@@ -318,9 +509,9 @@ class PayPeriodResource extends Resource
 
         // Find all vacation attendance records that were just posted
         $vacationRecords = Attendance::whereBetween('punch_time', [
-                Carbon::parse($payPeriod->start_date)->startOfDay(),
-                Carbon::parse($payPeriod->end_date)->endOfDay(),
-            ])
+            Carbon::parse($payPeriod->start_date)->startOfDay(),
+            Carbon::parse($payPeriod->end_date)->endOfDay(),
+        ])
             ->where('classification_id', $vacationClassificationId)
             ->where('status', 'Posted')
             ->with('employee.shiftSchedule')
@@ -337,14 +528,14 @@ class PayPeriodResource extends Resource
             $employeeId = $record->employee_id;
             $date = Carbon::parse($record->punch_time)->toDateString();
 
-            if (!isset($employeeVacationHours[$employeeId])) {
+            if (! isset($employeeVacationHours[$employeeId])) {
                 $employeeVacationHours[$employeeId] = [];
             }
 
-            if (!isset($employeeVacationHours[$employeeId][$date])) {
+            if (! isset($employeeVacationHours[$employeeId][$date])) {
                 // Calculate actual hours from punch times for this date
                 $vacationPunchesForDate = $vacationRecords->where('employee_id', $employeeId)
-                    ->filter(function($r) use ($date) {
+                    ->filter(function ($r) use ($date) {
                         return Carbon::parse($r->punch_time)->toDateString() === $date;
                     });
 
@@ -392,7 +583,7 @@ class PayPeriodResource extends Resource
                     // Create vacation usage transaction
                     $description = "Vacation usage - {$date}";
                     if ($hoursUsed < 8) {
-                        $description .= " (half day)";
+                        $description .= ' (half day)';
                     }
 
                     VacationTransaction::createUsageTransaction(
@@ -407,7 +598,7 @@ class PayPeriodResource extends Resource
                 }
             }
 
-            if (!empty($dailyHours)) {
+            if (! empty($dailyHours)) {
                 $employeesUpdated++;
             }
         }
@@ -422,5 +613,60 @@ class PayPeriodResource extends Resource
             'create' => CreatePayPeriod::route('/create'),
             'edit' => EditPayPeriod::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Get export status label for the action button
+     */
+    protected static function getExportStatusLabel(PayPeriod $record): string
+    {
+        $exports = PayrollExport::where('pay_period_id', $record->id)->get();
+
+        if ($exports->isEmpty()) {
+            return 'No Exports';
+        }
+
+        $processing = $exports->filter(fn ($e) => $e->isProcessing())->count();
+        $completed = $exports->filter(fn ($e) => $e->isCompleted())->count();
+
+        if ($processing > 0) {
+            $current = $exports->firstWhere('status', PayrollExport::STATUS_PROCESSING);
+
+            return $current ? "{$current->progress}%" : 'Processing...';
+        }
+
+        return "Downloads ({$completed})";
+    }
+
+    /**
+     * Get export status color for the action button
+     */
+    protected static function getExportStatusColor(PayPeriod $record): string
+    {
+        $exports = PayrollExport::where('pay_period_id', $record->id)->get();
+
+        if ($exports->contains(fn ($e) => $e->isProcessing())) {
+            return 'warning';
+        }
+
+        if ($exports->contains(fn ($e) => $e->isFailed())) {
+            return 'danger';
+        }
+
+        return 'success';
+    }
+
+    /**
+     * Get export status icon for the action button
+     */
+    protected static function getExportStatusIcon(PayPeriod $record): string
+    {
+        $exports = PayrollExport::where('pay_period_id', $record->id)->get();
+
+        if ($exports->contains(fn ($e) => $e->isProcessing())) {
+            return 'heroicon-o-arrow-path';
+        }
+
+        return 'heroicon-o-arrow-down-tray';
     }
 }
