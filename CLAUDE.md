@@ -270,6 +270,17 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - Filament is a Server-Driven UI (SDUI) framework for Laravel that lets you define user interfaces in PHP using structured configuration objects. Built on Livewire, Alpine.js, and Tailwind CSS.
 - Use the `search-docs` tool for official documentation on Artisan commands, code examples, testing, relationships, and idiomatic practices.
 
+### Native Components First (CRITICAL)
+
+- **ALWAYS use Filament's native components before writing custom Blade views.** This ensures visual consistency across the application.
+- For tables: Use Filament's Table Builder with `->records($collection)` - it works with any Collection, not just Eloquent models.
+- For stats/metrics: Use `StatsOverviewWidget` with `Stat::make()` cards.
+- For read-only data display: Use Infolists with entries like `TextEntry`, `IconEntry`, etc.
+- For modals with data: Use Actions with `->infolist()` or `->table()` instead of `->modalContent(view(...))`.
+- **Only use custom Blade as a last resort** when Filament genuinely cannot do what's needed.
+- **When custom Blade is unavoidable**: Use Filament's Blade components (`<x-filament::icon>`, `<x-filament::button>`, etc.) and CSS classes (`fi-*` prefixed classes) to maintain visual consistency.
+- Before writing any UI code, ask: "Does Filament have a native component for this?" Search docs if unsure.
+
 ### Artisan
 
 - Use Filament-specific Artisan commands to create files. Find them with `list-artisan-commands` or `php artisan --help`.
@@ -396,4 +407,40 @@ Authenticate before testing panel functionality. Filament uses Livewire, so use 
 **Recent breaking changes to Filament:**
 - File visibility is `private` by default. Use `->visibility('public')` for public access.
 - `Grid`, `Section`, and `Fieldset` no longer span all columns by default.
+
+### Import/Export Pattern
+
+All Filament resources with Import/Export functionality MUST follow this pattern:
+
+1. **Location**: Import/Export actions go in the ListRecords page's `getHeaderActions()` method, NOT in the resource's table `headerActions()`.
+
+2. **Structure**: Create separate Importer and Exporter classes in `app/Filament/Imports/` and `app/Filament/Exports/`.
+
+3. **Header Actions Order**: Actions should appear in a single row at the top: CreateAction, ImportAction, ExportAction, then any custom actions.
+
+<code-snippet name="Import/Export Header Actions" lang="php">
+// In app/Filament/Resources/YourResource/Pages/ListYourModels.php
+
+use App\Filament\Exports\YourModelExporter;
+use App\Filament\Imports\YourModelImporter;
+use Filament\Actions\CreateAction;
+use Filament\Actions\ExportAction;
+use Filament\Actions\ImportAction;
+
+protected function getHeaderActions(): array
+{
+    return [
+        CreateAction::make(),
+        ImportAction::make()
+            ->importer(YourModelImporter::class),
+        ExportAction::make()
+            ->exporter(YourModelExporter::class),
+        // Any additional custom actions follow...
+    ];
+}
+</code-snippet>
+
+4. **Bulk Export**: ExportBulkAction can still be used in table `toolbarActions()` for selected records.
+
+5. **DO NOT**: Place ImportAction or ExportAction in the resource's table `headerActions([])` method.
 </laravel-boost-guidelines>

@@ -2,53 +2,64 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Schema;
-use Carbon\Carbon;
-use Filament\Forms;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Actions\Action;
-use Filament\Pages\Page;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Collection;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use App\Models\PunchType;
+use Carbon\Carbon;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Pages\Page;
+use Filament\Schemas\Concerns\InteractsWithSchemas;
+use Filament\Schemas\Contracts\HasSchemas;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
-class AttendanceSummary extends Page implements HasForms
+class AttendanceSummary extends Page implements HasSchemas
 {
-    use InteractsWithForms;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table';
+    use InteractsWithSchemas;
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-table';
+
     protected string $view = 'filament.pages.attendance-summary';
+
     protected static ?string $navigationLabel = 'Attendance Summary';
+
     protected static bool $shouldRegisterNavigation = false;
 
     public ?array $data = [];
+
     public $groupedAttendances;
+
     public array $selectedAttendances = [];
+
     public bool $selectAll = false;
+
     public bool $autoProcess = false;
 
     public $sortColumn = 'shift_date';
+
     public $sortDirection = 'asc';
 
     public function mount(): void
     {
-        Log::info("[AttendanceSummary] mount() called - Initializing component.");
+        Log::info('[AttendanceSummary] mount() called - Initializing component.');
 
         $this->groupedAttendances = collect();
 
-        // Initialize data array directly first
+        // Initialize data array with URL parameters
         $this->data = [
             'payPeriodId' => request()->get('payPeriodId'),
             'search' => '',
-            'statusFilter' => request()->get('statusFilter', 'NeedsReview'),
+            'statusFilter' => request()->get('statusFilter', 'problem'),
             'duplicatesFilter' => request()->get('duplicatesFilter', 'all'),
         ];
+
+        // Fill the form with initial data
+        $this->form->fill($this->data);
 
         // If payPeriodId was set from URL, fetch attendances
         if (request()->has('payPeriodId')) {
@@ -64,33 +75,28 @@ class AttendanceSummary extends Page implements HasForms
                 Select::make('payPeriodId')
                     ->label('Select Pay Period')
                     ->options($this->getPayPeriods())
-                    ->live(onBlur: true)
-                    ->afterStateUpdated(function () {
-                        $this->groupedAttendances = $this->fetchAttendances();
-                    })
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateAttendances())
                     ->placeholder('All Pay Periods'),
 
                 TextInput::make('search')
                     ->label('Search')
                     ->placeholder('Search any value...')
-                    ->live(debounce: 500, onBlur: true)
-                    ->afterStateUpdated(function () {
-                        $this->groupedAttendances = $this->fetchAttendances();
-                    }),
+                    ->live(debounce: 500)
+                    ->afterStateUpdated(fn () => $this->updateAttendances()),
 
                 Select::make('statusFilter')
                     ->label('Filter by Status')
                     ->options([
                         'all' => 'All',
                         'Migrated' => 'Migrated',
+                        'NeedsReview' => 'Needs Review',
                         'problem' => 'Problem (All Except Migrated)',
                         'problem_with_migrated' => 'Problem (Including Migrated)',
                     ])
                     ->default('problem')
-                    ->live(onBlur: true)
-                    ->afterStateUpdated(function () {
-                        $this->groupedAttendances = $this->fetchAttendances();
-                    }),
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateAttendances()),
 
                 Select::make('duplicatesFilter')
                     ->label('Filter by Issues')
@@ -101,10 +107,8 @@ class AttendanceSummary extends Page implements HasForms
                         'consensus' => 'Engine Discrepancy',
                     ])
                     ->default('all')
-                    ->live(onBlur: true)
-                    ->afterStateUpdated(function () {
-                        $this->groupedAttendances = $this->fetchAttendances();
-                    }),
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateAttendances()),
             ])
             ->statePath('data');
     }
@@ -115,7 +119,7 @@ class AttendanceSummary extends Page implements HasForms
             ->select('id', 'start_date', 'end_date')
             ->get()
             ->mapWithKeys(fn ($period) => [
-                $period->id => $period->start_date . ' to ' . $period->end_date,
+                $period->id => $period->start_date.' to '.$period->end_date,
             ])
             ->toArray();
     }
@@ -132,6 +136,7 @@ class AttendanceSummary extends Page implements HasForms
         return $this->getPunchTypes()
             ->mapWithKeys(function ($punchType) {
                 $key = strtolower(str_replace(' ', '_', $punchType->name));
+
                 return [$punchType->id => $key];
             })
             ->toArray();
@@ -142,11 +147,13 @@ class AttendanceSummary extends Page implements HasForms
         $columns = $this->getPunchTypes()
             ->mapWithKeys(function ($punchType) {
                 $key = strtolower(str_replace(' ', '_', $punchType->name));
+
                 return [$key => $punchType->name];
             })
             ->toArray();
 
         $columns['unclassified'] = 'Unclassified';
+
         return $columns;
     }
 
@@ -158,7 +165,7 @@ class AttendanceSummary extends Page implements HasForms
             'lunch_start' => 'Lunch Start',
             'lunch_stop' => 'Lunch Stop',
             'clock_out' => 'Clock Out',
-            'unclassified' => 'Unclassified'
+            'unclassified' => 'Unclassified',
         ];
 
         // If no data loaded yet, return just core columns
@@ -170,7 +177,7 @@ class AttendanceSummary extends Page implements HasForms
         $columnsWithData = [];
         foreach ($this->groupedAttendances as $attendance) {
             foreach ($attendance['punches'] as $punchType => $punches) {
-                if (!empty($punches)) {
+                if (! empty($punches)) {
                     $columnsWithData[$punchType] = true;
                 }
             }
@@ -182,7 +189,7 @@ class AttendanceSummary extends Page implements HasForms
         // Add any additional columns that have data but aren't in core
         $allColumns = $this->getPunchTypeColumns();
         foreach (array_keys($columnsWithData) as $punchType) {
-            if (!isset($coreColumns[$punchType]) && isset($allColumns[$punchType])) {
+            if (! isset($coreColumns[$punchType]) && isset($allColumns[$punchType])) {
                 $visibleColumns[$punchType] = $allColumns[$punchType];
             }
         }
@@ -197,13 +204,14 @@ class AttendanceSummary extends Page implements HasForms
         $duplicatesFilter = $this->data['duplicatesFilter'] ?? 'all';
         $search = $this->data['search'] ?? '';
 
-        if (!$payPeriodId) {
+        if (! $payPeriodId) {
             return collect();
         }
 
         $payPeriod = PayPeriod::find($payPeriodId);
-        if (!$payPeriod) {
+        if (! $payPeriod) {
             $this->data['duplicatesFilter'] = 'all';
+
             return collect();
         }
 
@@ -221,17 +229,17 @@ class AttendanceSummary extends Page implements HasForms
                 'attendances.punch_state',
                 'employees.full_names as FullName',
                 'employees.external_id as PayrollID',
-                DB::raw("ANY_VALUE(attendances.status) as status"),
+                DB::raw('ANY_VALUE(attendances.status) as status'),
             ])
             ->join('employees', 'employees.id', '=', 'attendances.employee_id')
             ->whereBetween('attendances.shift_date', [$payPeriod->start_date, $payPeriod->end_date]);
 
         // Apply department filtering for managers
         $user = auth()->user();
-        if ($user && $user->hasRole('manager') && !$user->hasRole('super_admin')) {
+        if ($user && $user->hasRole('manager') && ! $user->hasRole('super_admin')) {
             $managedEmployeeIds = $user->getManagedEmployeeIds();
 
-            if (!empty($managedEmployeeIds)) {
+            if (! empty($managedEmployeeIds)) {
                 $attendancesQuery->whereIn('attendances.employee_id', $managedEmployeeIds);
             } else {
                 // If manager has no employees, show no records
@@ -240,17 +248,22 @@ class AttendanceSummary extends Page implements HasForms
         }
 
         // Handle different status filters
-        if ($statusFilter === 'problem') {
-            $attendancesQuery->where('attendances.status', '!=', 'Migrated');
-        } elseif ($statusFilter === 'problem_with_migrated') {
-            // Find employee/date combinations that have problem records
+        // Issue criteria matches PayPeriod::attendanceIssues():
+        // - status = 'NeedsReview'
+        // - OR status = 'Incomplete' with punch_type_id assigned
+        if ($statusFilter === 'problem' || $statusFilter === 'problem_with_migrated') {
+            // Find employee/date combinations that have actual issue records
             $problemDays = Attendance::select('employee_id', 'shift_date')
                 ->whereBetween('shift_date', [$payPeriod->start_date, $payPeriod->end_date])
-                ->where('status', '!=', 'Migrated')
-                ->get()
-                ->map(function ($record) {
-                    return $record->employee_id . '|' . $record->shift_date;
+                ->where(function ($query) {
+                    $query->where('status', 'NeedsReview')
+                        ->orWhere(function ($subQuery) {
+                            $subQuery->where('status', 'Incomplete')
+                                ->whereNotNull('punch_type_id');
+                        });
                 })
+                ->get()
+                ->map(fn ($record) => $record->employee_id.'|'.$record->shift_date)
                 ->unique()
                 ->values();
 
@@ -261,10 +274,16 @@ class AttendanceSummary extends Page implements HasForms
                         [$employeeId, $shiftDate] = explode('|', $day);
                         $query->orWhere(function ($subQuery) use ($employeeId, $shiftDate) {
                             $subQuery->where('attendances.employee_id', $employeeId)
-                                   ->where('attendances.shift_date', $shiftDate);
+                                ->where('attendances.shift_date', $shiftDate);
                         });
                     }
                 });
+
+                // For 'problem' filter, exclude Migrated records from the results
+                if ($statusFilter === 'problem') {
+                    $attendancesQuery->where('attendances.status', '!=', 'Migrated');
+                }
+                // For 'problem_with_migrated', show all records including Migrated
             } else {
                 // No problem days found, return empty result
                 $attendancesQuery->whereRaw('1 = 0');
@@ -278,14 +297,14 @@ class AttendanceSummary extends Page implements HasForms
             ->orderBy('attendances.shift_date')
             ->orderBy('attendances.punch_time')
             ->when($search, function ($query) use ($search) {
-                $searchTerm = '%' . $search . '%';
+                $searchTerm = '%'.$search.'%';
 
                 $query->where(function ($q) use ($searchTerm) {
                     $q->where('employees.full_names', 'like', $searchTerm)
-                      ->orWhere('employees.external_id', 'like', $searchTerm)
-                      ->orWhere('attendances.punch_state', 'like', $searchTerm)
-                      ->orWhere(DB::raw("DATE_FORMAT(attendances.shift_date, '%Y-%m-%d')"), 'like', $searchTerm)
-                      ->orWhere(DB::raw("DATE_FORMAT(attendances.punch_time, '%H:%i')"), 'like', $searchTerm);
+                        ->orWhere('employees.external_id', 'like', $searchTerm)
+                        ->orWhere('attendances.punch_state', 'like', $searchTerm)
+                        ->orWhere(DB::raw("DATE_FORMAT(attendances.shift_date, '%Y-%m-%d')"), 'like', $searchTerm)
+                        ->orWhere(DB::raw("DATE_FORMAT(attendances.punch_time, '%H:%i')"), 'like', $searchTerm);
                 });
             })
             ->get();
@@ -310,9 +329,9 @@ class AttendanceSummary extends Page implements HasForms
             ->mapWithKeys(fn ($punches, $key) => [$key => $punches->pluck('attendance_id')->toArray()]);
 
         if ($duplicates->isNotEmpty()) {
-            Log::info("[AttendanceSummary] Duplicate punches detected:", $duplicates->toArray());
+            Log::info('[AttendanceSummary] Duplicate punches detected:', $duplicates->toArray());
         } else {
-            Log::info("[AttendanceSummary] No duplicates found.");
+            Log::info('[AttendanceSummary] No duplicates found.');
         }
 
         // Get dynamic punch type mapping
@@ -364,7 +383,7 @@ class AttendanceSummary extends Page implements HasForms
             // Check for flexibility issues (multiple unclassified punches indicating timing problems)
             $unclassifiedCount = count($punchesSorted['unclassified']);
             $hasFlexibilityIssue = $unclassifiedCount >= 2;
-            
+
             return [
                 'employee' => [
                     'employee_id' => $punchesPerDay->first()->employee_id,
@@ -397,9 +416,17 @@ class AttendanceSummary extends Page implements HasForms
 
     public function updateAttendances(): void
     {
-        Log::info("[AttendanceSummary] updateAttendances() called.");
+        // Sync form state to data array
+        $this->data = $this->form->getState();
+
+        Log::info('[AttendanceSummary] updateAttendances() called with filters:', [
+            'payPeriodId' => $this->data['payPeriodId'] ?? null,
+            'statusFilter' => $this->data['statusFilter'] ?? null,
+            'duplicatesFilter' => $this->data['duplicatesFilter'] ?? null,
+        ]);
+
         $this->groupedAttendances = $this->fetchAttendances();
-        Log::info("[AttendanceSummary] updateAttendances() completed. Records: " . $this->groupedAttendances->count());
+        Log::info('[AttendanceSummary] updateAttendances() completed. Records: '.$this->groupedAttendances->count());
     }
 
     public function sortBy($field): void
@@ -413,7 +440,7 @@ class AttendanceSummary extends Page implements HasForms
             'stop_time' => 'stop_time',
         ];
 
-        if (!isset($columnMap[$field])) {
+        if (! isset($columnMap[$field])) {
             return;
         }
 

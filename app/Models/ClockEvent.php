@@ -2,12 +2,11 @@
 
 namespace App\Models;
 
+use App\Jobs\ProcessClockEventJob;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
-use App\Jobs\ProcessClockEventJob;
-use App\Models\CompanySetup;
 
 class ClockEvent extends Model
 {
@@ -35,7 +34,7 @@ class ClockEvent extends Model
         $companySetup = CompanySetup::first();
 
         // If no company setup, default to queue processing
-        if (!$companySetup) {
+        if (! $companySetup) {
             return true;
         }
 
@@ -56,9 +55,6 @@ class ClockEvent extends Model
         'notes',
         'created_by',
         'updated_by',
-        'is_processed',
-        'processed_at',
-        'attendance_id',
         'batch_id',
         'processing_error',
     ];
@@ -68,8 +64,6 @@ class ClockEvent extends Model
         'shift_date' => 'date',
         'confidence' => 'integer',
         'raw_payload' => 'array',
-        'is_processed' => 'boolean',
-        'processed_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo
@@ -87,12 +81,6 @@ class ClockEvent extends Model
         return $this->belongsTo(Credential::class);
     }
 
-
-    public function attendance(): BelongsTo
-    {
-        return $this->belongsTo(Attendance::class);
-    }
-
     /**
      * Check for duplicate events within a time window
      */
@@ -103,12 +91,12 @@ class ClockEvent extends Model
         int $windowSeconds = 10
     ): bool {
         return static::where('device_id', $deviceId)
-                    ->where('credential_id', $credentialId)
-                    ->whereBetween('event_time', [
-                        $eventTime->copy()->subSeconds($windowSeconds),
-                        $eventTime->copy()->addSeconds($windowSeconds)
-                    ])
-                    ->exists();
+            ->where('credential_id', $credentialId)
+            ->whereBetween('event_time', [
+                $eventTime->copy()->subSeconds($windowSeconds),
+                $eventTime->copy()->addSeconds($windowSeconds),
+            ])
+            ->exists();
     }
 
     /**
@@ -118,7 +106,7 @@ class ClockEvent extends Model
     {
         return $query->whereBetween('event_time', [
             Carbon::parse($startDate)->startOfDay(),
-            Carbon::parse($endDate)->endOfDay()
+            Carbon::parse($endDate)->endOfDay(),
         ]);
     }
 
@@ -131,22 +119,6 @@ class ClockEvent extends Model
     }
 
     /**
-     * Scope for unprocessed events
-     */
-    public function scopeUnprocessed($query)
-    {
-        return $query->where('is_processed', false);
-    }
-
-    /**
-     * Scope for processed events
-     */
-    public function scopeProcessed($query)
-    {
-        return $query->where('is_processed', true);
-    }
-
-    /**
      * Scope for events with processing errors
      */
     public function scopeWithErrors($query)
@@ -155,12 +127,14 @@ class ClockEvent extends Model
     }
 
     /**
-     * Scope for events ready for processing (unprocessed and has employee)
+     * Scope for events ready for processing (has employee and no error)
+     *
+     * Note: All events in this table are "unprocessed" by definition.
+     * Successfully processed events are deleted from this table.
      */
     public function scopeReadyForProcessing($query)
     {
-        return $query->unprocessed()
-                    ->whereNotNull('employee_id')
-                    ->whereNull('processing_error');
+        return $query->whereNotNull('employee_id')
+            ->whereNull('processing_error');
     }
 }

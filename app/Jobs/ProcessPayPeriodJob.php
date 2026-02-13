@@ -14,15 +14,27 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class ProcessPayPeriodJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, TracksSystemTask;
 
+    /**
+     * The number of seconds the job can run before timing out.
+     */
     public int $timeout = 600; // 10 minutes
 
+    /**
+     * The number of times the job may be attempted.
+     */
     public int $tries = 1;
+
+    /**
+     * Delete the job if its models no longer exist.
+     */
+    public bool $deleteWhenMissingModels = true;
 
     public function __construct(
         public PayPeriod $payPeriod,
@@ -31,6 +43,9 @@ class ProcessPayPeriodJob implements ShouldQueue
 
     public function handle(AttendanceProcessingService $processingService): void
     {
+        // Disable query logging to prevent memory exhaustion
+        DB::disableQueryLog();
+
         // Create system task for tracking
         $this->initializeSystemTask(
             type: SystemTask::TYPE_PROCESSING,

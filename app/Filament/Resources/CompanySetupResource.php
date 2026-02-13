@@ -466,6 +466,21 @@ class CompanySetupResource extends Resource
                         Tab::make('System')
                             ->icon('heroicon-o-cog-6-tooth')
                             ->schema([
+                                Section::make('Developer Tools')
+                                    ->description('Enable debugging tools for development and troubleshooting')
+                                    ->schema([
+                                        Toggle::make('debugbar_enabled')
+                                            ->label('Enable Debugbar')
+                                            ->default(false)
+                                            ->helperText('Shows debug toolbar at bottom of page with queries, views, timing info. Disable in production for performance.'),
+
+                                        Toggle::make('telescope_enabled')
+                                            ->label('Enable Telescope')
+                                            ->default(true)
+                                            ->helperText('Dashboard for viewing exceptions, queries, jobs, and more. Access at /telescope'),
+                                    ])
+                                    ->columns(2),
+
                                 Section::make('Logging Level')
                                     ->description('Configure system logging level for all components')
                                     ->schema([
@@ -478,7 +493,7 @@ class CompanySetupResource extends Resource
                                                 'info' => 'Info - General information',
                                                 'debug' => 'Debug - Detailed debugging',
                                             ])
-                                            ->default('error')
+                                            ->default('warning')
                                             ->required()
                                             ->helperText('Controls verbosity of application logging'),
                                     ]),

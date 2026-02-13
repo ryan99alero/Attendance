@@ -2,80 +2,83 @@
 
 namespace App\Services\ML;
 
-use Exception;
 use App\Models\Attendance;
+use App\Services\Shift\ShiftScheduleService;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Phpml\Classification\KNearestNeighbors;
 use Phpml\ModelManager;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use App\Services\Shift\ShiftScheduleService;
 
 class MLPunchTypePredictorService
 {
     private KNearestNeighbors $classifier;
+
     private string $modelPath;
+
     protected ShiftScheduleService $shiftScheduleService;
+
+    protected array $punchTypeCache = [];
+
+    protected array $punchTypeNameCache = [];
 
     public function __construct(ShiftScheduleService $shiftScheduleService)
     {
-        Log::info("[ML] Initializing MLPunchTypePredictorService...");
-
         $this->modelPath = storage_path('ml/punch_model.serialized');
-        $this->classifier = new KNearestNeighbors(3); // Default classifier with k=3
+        $this->classifier = new KNearestNeighbors(3);
         $this->shiftScheduleService = $shiftScheduleService;
-
+        $this->cachePunchTypes();
         $this->loadOrTrainModel();
+    }
+
+    protected function cachePunchTypes(): void
+    {
+        $punchTypes = DB::table('punch_types')->get();
+        foreach ($punchTypes as $punchType) {
+            $this->punchTypeCache[$punchType->name] = $punchType->id;
+            $this->punchTypeNameCache[$punchType->id] = $punchType->name;
+        }
     }
 
     private function loadOrTrainModel(): void
     {
-        $modelManager = new ModelManager();
+        $modelManager = new ModelManager;
 
         if (file_exists($this->modelPath)) {
-            Log::info("[ML] Model file found. Attempting to restore...");
-
             $model = $modelManager->restoreFromFile($this->modelPath);
 
             if ($model instanceof KNearestNeighbors) {
                 $this->classifier = $model;
-                Log::info("[ML] Model successfully restored.");
             } else {
-                Log::warning("[ML] Invalid model detected. Retraining...");
                 $this->trainModel();
             }
         } else {
-            Log::warning("[ML] No saved model found. Training a new one...");
             $this->trainModel();
         }
     }
 
     public function trainModel(): void
     {
-        Log::info("[ML] Training model...");
+        DB::disableQueryLog();
 
-        if (!File::exists(storage_path('ml'))) {
+        if (! File::exists(storage_path('ml'))) {
             File::makeDirectory(storage_path('ml'), 0755, true);
-            Log::info("[ML] Created missing ML model directory.");
         }
 
-        $punchData = Attendance::whereNotNull('punch_type_id')
-            ->where('status', 'Complete')
-            ->orderBy('punch_time', 'asc')
-            ->get();
-
-        Log::info("[ML] Training on " . $punchData->count() . " punch records.");
-
-        if ($punchData->isEmpty()) {
-            Log::warning("[ML] Insufficient data for training.");
-            return;
-        }
-
+        // Limit training data to prevent memory exhaustion
+        $maxTrainingRecords = 1000;
         $samples = [];
         $labels = [];
 
-        foreach ($punchData as $record) {
+        // Use cursor to avoid loading all records into memory
+        $query = Attendance::whereNotNull('punch_type_id')
+            ->where('status', 'Complete')
+            ->orderBy('punch_time', 'desc')
+            ->limit($maxTrainingRecords);
+
+        foreach ($query->cursor() as $record) {
             $timeValue = strtotime($record->punch_time) % 86400;
             $shiftDateValue = $record->shift_date ? strtotime($record->shift_date) % 86400 : 0;
 
@@ -84,50 +87,42 @@ class MLPunchTypePredictorService
         }
 
         if (empty($samples) || empty($labels)) {
-            Log::warning("[ML] No valid samples found for training.");
             return;
         }
 
         $this->classifier->train($samples, $labels);
 
-        $modelManager = new ModelManager();
+        $modelManager = new ModelManager;
         $modelManager->saveToFile($this->classifier, $this->modelPath);
 
-        Log::info("[ML] Model trained and saved.");
+        Log::info('[ML] Model trained with '.count($samples).' records.');
     }
 
     public function assignPunchTypes($punches, int $employeeId, &$punchEvaluations): void
     {
-        // ✅ Skip ML if no training data exists
+        DB::disableQueryLog();
+
         if ($this->isTrainingDataInsufficient()) {
-            Log::warning("⚠️ [ML] Skipping ML Processing for Employee ID: {$employeeId} due to insufficient training data.");
             return;
         }
 
-        Log::info("🤖 [ML] Processing Punch Assignments...");
-
         $groupedPunches = $punches->groupBy(['employee_id', 'shift_date']);
 
-        foreach ($groupedPunches as $employeeId => $days) {
+        foreach ($groupedPunches as $empId => $days) {
             foreach ($days as $shiftDate => $dayPunches) {
                 $sortedPunches = $dayPunches->sortBy('punch_time')->values();
 
-                Log::info("🤖 [ML] Processing {$sortedPunches->count()} punches for Employee {$employeeId} on {$shiftDate}");
+                $shiftSchedule = $this->shiftScheduleService->getShiftScheduleForEmployee($empId);
+                if (! $shiftSchedule) {
+                    $this->assignIndividualPredictions($sortedPunches, $empId, $punchEvaluations);
 
-                // Fetch shift schedule for lunch/break detection
-                $shiftSchedule = $this->shiftScheduleService->getShiftScheduleForEmployee($employeeId);
-                if (!$shiftSchedule) {
-                    Log::warning("🤖 [ML] No Shift Schedule Found for Employee: {$employeeId}");
-                    // Fall back to individual predictions without context
-                    $this->assignIndividualPredictions($sortedPunches, $employeeId, $punchEvaluations);
                     continue;
                 }
 
                 $lunchStart = Carbon::parse($shiftSchedule->lunch_start_time);
                 $lunchStop = Carbon::parse($shiftSchedule->lunch_stop_time);
 
-                // Assign Punch Types using ML + pattern logic
-                $assignedTypes = $this->determinePunchTypesML($sortedPunches, $lunchStart, $lunchStop, $shiftSchedule, $employeeId);
+                $assignedTypes = $this->determinePunchTypesML($sortedPunches, $lunchStart, $lunchStop, $shiftSchedule, $empId);
 
                 foreach ($sortedPunches as $index => $punch) {
                     $predictedTypeId = $assignedTypes[$index] ?? null;
@@ -136,33 +131,26 @@ class MLPunchTypePredictorService
                         $punchEvaluations[$punch->id]['ml'] = [
                             'punch_type_id' => $predictedTypeId,
                             'punch_state' => $this->determinePunchState($predictedTypeId),
-                            'source' => 'ML Engine'
+                            'source' => 'ML Engine',
                         ];
-                        Log::info("🤖 [ML] Assigned Punch ID: {$punch->id} -> Type: {$predictedTypeId}");
-                    } else {
-                        Log::warning("🤖 [ML] No confident prediction for Punch ID: {$punch->id}");
                     }
                 }
             }
         }
     }
 
-// ✅ New Function: Check if Training Data Exists
     private function isTrainingDataInsufficient(): bool
     {
-        $trainingDataCount = \DB::table('attendances')
-            ->whereNotNull('punch_type_id')
-            ->where('status', 'Complete')
-            ->count();
+        static $cachedCount = null;
 
-        Log::info("[ML] Found {$trainingDataCount} training records in attendances table");
-
-        if ($trainingDataCount < 50) {
-            Log::info("[ML] Insufficient training data. Need at least 50 complete records, have {$trainingDataCount}");
-            Log::info("[ML] Suggestion: Run processing in 'heuristic' or 'shift_schedule' mode first to build training data");
+        if ($cachedCount === null) {
+            $cachedCount = DB::table('attendances')
+                ->whereNotNull('punch_type_id')
+                ->where('status', 'Complete')
+                ->count();
         }
 
-        return $trainingDataCount < 50; // Need at least 50 records for meaningful ML
+        return $cachedCount < 50;
     }
 
     public function predictPunchType(int $employeeId, string $punchTime, ?string $shiftDate = null, ?string $externalGroupId = null): ?int
@@ -171,19 +159,11 @@ class MLPunchTypePredictorService
         $shiftDateValue = $shiftDate ? strtotime($shiftDate) % 86400 : 0;
 
         try {
-            if (empty($this->classifier)) {
-                Log::warning("[ML] Classifier is uninitialized. Training now...");
-                $this->trainModel();
-            }
-
             $inputData = [$employeeId, $shiftDateValue, $timeValue];
             $predicted = $this->classifier->predict($inputData);
 
-            Log::info("🤖 [ML] Prediction: Employee ID: {$employeeId}, Punch Time: {$punchTime}, Shift Date: {$shiftDate}, Group: {$externalGroupId} -> Predicted Type ID: " . ($predicted ?? 'NULL'));
-
             return is_numeric($predicted) ? (int) $predicted : null;
         } catch (Exception $e) {
-            Log::error("[ML] Prediction failed. Error: " . $e->getMessage());
             return null;
         }
     }
@@ -193,7 +173,7 @@ class MLPunchTypePredictorService
         $startTypes = ['Clock In', 'Lunch Start', 'Break Start', 'Shift Start', 'Manual Start'];
         $stopTypes = ['Clock Out', 'Lunch Stop', 'Break End', 'Shift Stop', 'Manual Stop'];
 
-        $punchTypeName = DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+        $punchTypeName = $this->punchTypeNameCache[$punchTypeId] ?? null;
 
         if (in_array($punchTypeName, $startTypes)) {
             return 'start';
@@ -205,17 +185,15 @@ class MLPunchTypePredictorService
     }
 
     /**
-     * Determine punch types using ML predictions combined with pattern logic for 6+ punches
+     * Determine punch types using ML predictions combined with pattern logic
      */
     private function determinePunchTypesML($punches, $lunchStart, $lunchStop, $shiftSchedule, $employeeId): array
     {
         $punchCount = count($punches);
         $assignedTypes = array_fill(0, $punchCount, null);
 
-        Log::info("🤖 [ML] Determining types for {$punchCount} punches with ML + pattern logic");
-
         if ($punchCount === 1) {
-            return [null]; // Needs Review
+            return [null];
         }
 
         if ($punchCount === 2) {
@@ -226,7 +204,7 @@ class MLPunchTypePredictorService
             return [
                 $this->getPunchTypeId('Clock In'),
                 $this->getPunchTypeId('Break Start'),
-                $this->getPunchTypeId('Clock Out')
+                $this->getPunchTypeId('Clock Out'),
             ];
         }
 
@@ -239,44 +217,34 @@ class MLPunchTypePredictorService
             ];
         }
 
-        // For 5+ punches, use ML + pattern logic
         if ($punchCount >= 5) {
-            // Always assign Clock In / Clock Out
             $assignedTypes[0] = $this->getPunchTypeId('Clock In');
             $assignedTypes[$punchCount - 1] = $this->getPunchTypeId('Clock Out');
 
             if ($punchCount >= 6) {
                 $innerPunches = $punches->slice(1, -1);
-
-                // Find best lunch pair using ML + schedule logic
                 $bestLunchPair = $this->findBestLunchPairML($innerPunches, $lunchStart, $lunchStop, $shiftSchedule, $employeeId);
 
                 if ($bestLunchPair) {
-                    Log::info("🤖 [ML] Found best lunch pair - Start: {$bestLunchPair['start']->id}, Stop: {$bestLunchPair['stop']->id}");
-
-                    // Find the indices of the lunch punches in the original array
-                    $startIndex = $punches->search(function($punch) use ($bestLunchPair) {
+                    $startIndex = $punches->search(function ($punch) use ($bestLunchPair) {
                         return $punch->id === $bestLunchPair['start']->id;
                     });
-                    $stopIndex = $punches->search(function($punch) use ($bestLunchPair) {
+                    $stopIndex = $punches->search(function ($punch) use ($bestLunchPair) {
                         return $punch->id === $bestLunchPair['stop']->id;
                     });
 
                     $assignedTypes[$startIndex] = $this->getPunchTypeId('Lunch Start');
                     $assignedTypes[$stopIndex] = $this->getPunchTypeId('Lunch Stop');
 
-                    // Assign remaining punches as breaks
                     $remainingPunches = $innerPunches->reject(function ($punch) use ($bestLunchPair) {
                         return $punch->id === $bestLunchPair['start']->id || $punch->id === $bestLunchPair['stop']->id;
                     })->values();
 
                     $this->assignBreakPunchTypesML($remainingPunches, $assignedTypes, $punches, $employeeId);
                 } else {
-                    Log::info("🤖 [ML] No optimal lunch pair found, assigning all middle punches as breaks");
                     $this->assignBreakPunchTypesML($innerPunches, $assignedTypes, $punches, $employeeId);
                 }
             } else {
-                // Handle 5 punches
                 $innerPunches = $punches->slice(1, -1);
                 $this->assignBreakPunchTypesML($innerPunches, $assignedTypes, $punches, $employeeId);
             }
@@ -296,15 +264,12 @@ class MLPunchTypePredictorService
         $flexibility = 30;
         $expectedDuration = $shiftSchedule->lunch_duration ?? 30;
 
-        Log::info("🤖 [ML] Finding best lunch pair from {$punchCount} punches using ML + schedule logic");
-
-        // Try all possible pairs (not just consecutive)
         for ($i = 0; $i < $punchCount - 1; $i++) {
             for ($j = $i + 1; $j < $punchCount; $j++) {
                 $startPunch = $innerPunches->get($i);
                 $stopPunch = $innerPunches->get($j);
 
-                if (!$startPunch || !$stopPunch) {
+                if (! $startPunch || ! $stopPunch) {
                     continue;
                 }
 
@@ -315,7 +280,7 @@ class MLPunchTypePredictorService
                     $bestPair = [
                         'start' => $startPunch,
                         'stop' => $stopPunch,
-                        'score' => $score
+                        'score' => $score,
                     ];
                 }
             }
@@ -331,9 +296,6 @@ class MLPunchTypePredictorService
     {
         $score = 0;
 
-        Log::info("🤖 [ML] Scoring pair: {$startPunch->punch_time} -> {$stopPunch->punch_time}");
-
-        // ML Prediction Bonus: If ML predicts these as lunch types, boost score
         $startPrediction = $this->predictPunchType($employeeId, $startPunch->punch_time, $startPunch->shift_date);
         $stopPrediction = $this->predictPunchType($employeeId, $stopPunch->punch_time, $stopPunch->shift_date);
 
@@ -342,94 +304,78 @@ class MLPunchTypePredictorService
 
         if ($startPrediction == $lunchStartId && $stopPrediction == $lunchStopId) {
             $score += 20;
-            Log::info("🤖 [ML] ML predictions match lunch pattern (+20)");
         } elseif ($startPrediction == $lunchStartId || $stopPrediction == $lunchStopId) {
             $score += 10;
-            Log::info("🤖 [ML] One ML prediction matches lunch (+10)");
         }
 
-        // Schedule-based scoring (same as other engines)
         if ($this->isWithinFlexibility($startPunch->punch_time, $lunchStart, $flexibility)) {
             $score += 10;
-            Log::info("🤖 [ML] Start time matches scheduled lunch start (+10)");
         }
 
         if ($this->isWithinFlexibility($stopPunch->punch_time, $lunchEnd, $flexibility)) {
             $score += 10;
-            Log::info("🤖 [ML] End time matches scheduled lunch end (+10)");
         }
 
-        // Duration scoring
         $actualDuration = Carbon::parse($startPunch->punch_time)->diffInMinutes(Carbon::parse($stopPunch->punch_time));
         $durationDiff = abs($actualDuration - $expectedDuration);
 
         if ($durationDiff <= 5) {
             $score += 15;
-            Log::info("🤖 [ML] Perfect duration match: {$actualDuration}min vs expected {$expectedDuration}min (+15)");
         } elseif ($durationDiff <= 15) {
             $score += 10;
-            Log::info("🤖 [ML] Good duration match: {$actualDuration}min vs expected {$expectedDuration}min (+10)");
         } elseif ($durationDiff <= 30) {
             $score += 5;
-            Log::info("🤖 [ML] Acceptable duration match: {$actualDuration}min vs expected {$expectedDuration}min (+5)");
         } elseif ($actualDuration >= 15 && $actualDuration <= 120) {
             $score += 2;
-            Log::info("🤖 [ML] Within reasonable lunch range: {$actualDuration}min (+2)");
         }
 
-        // Typical lunch hours bonus
         $startHour = Carbon::parse($startPunch->punch_time)->hour;
         if ($startHour >= 11 && $startHour <= 14) {
             $score += 5;
-            Log::info("🤖 [ML] Within typical lunch hours ({$startHour}:xx) (+5)");
         } elseif ($startHour >= 10 && $startHour <= 15) {
             $score += 2;
-            Log::info("🤖 [ML] Within extended lunch hours ({$startHour}:xx) (+2)");
         }
 
-        Log::info("🤖 [ML] Total score for pair: {$score}");
         return $score;
     }
 
     /**
-     * Assign break punch types using ML predictions + chronological logic
+     * Assign break punch types
      */
     private function assignBreakPunchTypesML($punches, &$assignedTypes, $originalPunches, $employeeId): void
     {
-        Log::info("🤖 [ML] Assigning {$punches->count()} punches as breaks with ML guidance");
-
         $punchCount = $punches->count();
 
         for ($i = 0; $i < $punchCount; $i += 2) {
-            if ($i >= $punchCount) break;
+            if ($i >= $punchCount) {
+                break;
+            }
 
             $startPunch = $punches->get($i);
-            if (!$startPunch) {
+            if (! $startPunch) {
                 continue;
             }
 
-            $startIndex = $originalPunches->search(function($punch) use ($startPunch) {
+            $startIndex = $originalPunches->search(function ($punch) use ($startPunch) {
                 return $punch && $punch->id === $startPunch->id;
             });
 
             if ($startIndex !== false) {
                 $assignedTypes[$startIndex] = $this->getPunchTypeId('Break Start');
-                Log::info("🤖 [ML] Assigned Break Start to Punch ID: {$startPunch->id}");
             }
 
             if ($i + 1 < $punchCount) {
                 $endPunch = $punches->get($i + 1);
-                if (!$endPunch) {
+                if (! $endPunch) {
                     continue;
                 }
 
-                $endIndex = $originalPunches->search(function($punch) use ($endPunch) {
+                $endIndex = $originalPunches->search(function ($punch) use ($endPunch) {
                     return $punch && $punch->id === $endPunch->id;
                 });
 
                 if ($endIndex !== false) {
                     $assignedTypes[$endIndex] = $this->getPunchTypeId('Break End');
-                    Log::info("🤖 [ML] Assigned Break End to Punch ID: {$endPunch->id}");
                 }
             }
         }
@@ -457,8 +403,6 @@ class MLPunchTypePredictorService
      */
     private function assignIndividualPredictions($punches, $employeeId, &$punchEvaluations): void
     {
-        Log::info("🤖 [ML] Using fallback individual predictions for Employee {$employeeId}");
-
         foreach ($punches as $punch) {
             $predictedTypeId = $this->predictPunchType($employeeId, $punch->punch_time, $punch->shift_date, $punch->external_group_id);
 
@@ -466,23 +410,14 @@ class MLPunchTypePredictorService
                 $punchEvaluations[$punch->id]['ml'] = [
                     'punch_type_id' => $predictedTypeId,
                     'punch_state' => $this->determinePunchState($predictedTypeId),
-                    'source' => 'ML Engine (Fallback)'
+                    'source' => 'ML Engine (Fallback)',
                 ];
-                Log::info("🤖 [ML] Assigned Predicted Punch Type ID: {$predictedTypeId} to Punch ID: {$punch->id}");
-            } else {
-                Log::warning("🤖 [ML] No reliable prediction for Punch ID: {$punch->id}");
             }
         }
     }
 
     private function getPunchTypeId(string $type): ?int
     {
-        $id = \DB::table('punch_types')->where('name', $type)->value('id');
-
-        if (!$id) {
-            Log::warning("🤖 [ML] Punch Type '{$type}' not found.");
-        }
-
-        return $id;
+        return $this->punchTypeCache[$type] ?? null;
     }
 }

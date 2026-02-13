@@ -2,32 +2,28 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\ClockEventResource\Pages\ListClockEvents;
+use App\Filament\Exports\ClockEventExporter;
 use App\Filament\Resources\ClockEventResource\Pages\CreateClockEvent;
 use App\Filament\Resources\ClockEventResource\Pages\EditClockEvent;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\ClockEventResource\Pages;
+use App\Filament\Resources\ClockEventResource\Pages\ListClockEvents;
 use App\Models\ClockEvent;
-use Filament\Forms;
+use App\Models\Credential;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ExportBulkAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -36,9 +32,12 @@ class ClockEventResource extends Resource
     protected static ?string $model = ClockEvent::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Tracking';
+
     protected static ?string $navigationLabel = 'Clock Events';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clock';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
+
     protected static ?int $navigationSort = -95;
 
     public static function form(Schema $schema): Schema
@@ -49,6 +48,8 @@ class ClockEventResource extends Resource
                     ->label('Employee')
                     ->relationship('employee', 'full_names')
                     ->searchable()
+                    ->live()
+                    ->afterStateUpdated(fn ($set) => $set('credential_id', null))
                     ->nullable(),
 
                 Select::make('device_id')
@@ -60,10 +61,20 @@ class ClockEventResource extends Resource
 
                 Select::make('credential_id')
                     ->label('Credential')
-                    ->relationship('credential', 'id')
-                    ->searchable()
-                    ->required(),
+                    ->options(function (Get $get) {
+                        $employeeId = $get('employee_id');
+                        if (! $employeeId) {
+                            return [];
+                        }
 
+                        return Credential::where('employee_id', $employeeId)
+                            ->where('is_active', true)
+                            ->get()
+                            ->mapWithKeys(fn ($cred) => [$cred->id => "{$cred->identifier} {$cred->label}"]);
+                    })
+                    ->searchable()
+                    ->preload()
+                    ->required(),
 
                 DateTimePicker::make('event_time')
                     ->label('Event Time')
@@ -73,9 +84,16 @@ class ClockEventResource extends Resource
                     ->label('Shift Date')
                     ->nullable(),
 
-                TextInput::make('event_source')
+                Select::make('event_source')
                     ->label('Event Source')
-                    ->maxLength(50),
+                    ->options([
+                        'device' => 'Device',
+                        'api' => 'API',
+                        'backfill' => 'Backfill',
+                        'admin' => 'Admin',
+                    ])
+                    ->default('admin')
+                    ->required(),
 
                 TextInput::make('location')
                     ->label('Location')
@@ -113,10 +131,11 @@ class ClockEventResource extends Resource
                     ->sortable()
                     ->searchable(),
 
-                TextColumn::make('credential.id')
-                    ->label('Credential ID')
-                    ->sortable(),
-
+                TextColumn::make('credential')
+                    ->label('Credential')
+                    ->state(fn ($record) => $record->credential ? "{$record->credential->identifier} {$record->credential->label}" : null)
+                    ->placeholder('None')
+                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy('credential_id', $direction)),
 
                 TextColumn::make('event_time')
                     ->label('Event Time')
@@ -136,23 +155,6 @@ class ClockEventResource extends Resource
                     ->label('Confidence')
                     ->suffix('%')
                     ->sortable(),
-
-                IconColumn::make('is_processed')
-                    ->label('Processed')
-                    ->boolean()
-                    ->trueColor('success')
-                    ->falseColor('warning')
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-clock')
-                    ->sortable(),
-
-                TextColumn::make('attendance.id')
-                    ->label('Attendance ID')
-                    ->placeholder('Not processed')
-                    ->url(fn ($record) => $record->attendance_id ? route('filament.admin.resources.attendances.edit', $record->attendance_id) : null)
-                    ->color('info')
-                    ->sortable()
-                    ->toggleable(),
 
                 TextColumn::make('processing_error')
                     ->label('Error')
@@ -178,17 +180,6 @@ class ClockEventResource extends Resource
                 SelectFilter::make('employee_id')
                     ->label('Employee')
                     ->relationship('employee', 'full_names'),
-
-                TernaryFilter::make('is_processed')
-                    ->label('Processing Status')
-                    ->placeholder('All Events')
-                    ->trueLabel('Processed Only')
-                    ->falseLabel('Unprocessed Only')
-                    ->queries(
-                        true: fn (Builder $query) => $query->where('is_processed', true),
-                        false: fn (Builder $query) => $query->where('is_processed', false),
-                        blank: fn (Builder $query) => $query,
-                    ),
 
                 Filter::make('has_errors')
                     ->label('Has Processing Errors')
@@ -226,6 +217,8 @@ class ClockEventResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    ExportBulkAction::make()
+                        ->exporter(ClockEventExporter::class),
                     DeleteBulkAction::make(),
                 ]),
             ])

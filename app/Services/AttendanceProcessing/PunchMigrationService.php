@@ -2,20 +2,35 @@
 
 namespace App\Services\AttendanceProcessing;
 
-use DateTime;
-use Exception;
 use App\Models\Attendance;
 use App\Models\PayPeriod;
 use App\Models\Punch;
 use App\Services\RoundingRuleService;
 use App\Services\TimeGrouping\AttendanceTimeGroupService;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use DateTime;
+use Exception;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PunchMigrationService
 {
     protected RoundingRuleService $roundingRuleService;
+
+    protected ?int $vacationClassificationId = null;
+
+    protected ?int $clockInTypeId = null;
+
+    protected ?int $clockOutTypeId = null;
+
+    protected ?int $unknownTypeId = null;
+
+    protected ?int $holidayClassificationId = null;
+
+    /**
+     * Cache for employee round_group_id lookups
+     */
+    protected array $employeeRoundGroupCache = [];
 
     public function __construct(RoundingRuleService $roundingRuleService)
     {
@@ -23,11 +38,43 @@ class PunchMigrationService
     }
 
     /**
+     * Cache lookup values to avoid repeated queries.
+     */
+    protected function cacheLookupValues(): void
+    {
+        $this->vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
+        $this->holidayClassificationId = DB::table('classifications')->where('name', 'Holiday')->value('id');
+        $this->clockInTypeId = DB::table('punch_types')->where('name', 'Clock In')->value('id');
+        $this->clockOutTypeId = DB::table('punch_types')->where('name', 'Clock Out')->value('id');
+        $this->unknownTypeId = DB::table('punch_types')->where('name', 'Unknown')->value('id');
+    }
+
+    /**
+     * Get employee round_group_id from cache or database.
+     */
+    protected function getEmployeeRoundGroupId(int $employeeId): ?int
+    {
+        if (! isset($this->employeeRoundGroupCache[$employeeId])) {
+            $this->employeeRoundGroupCache[$employeeId] = DB::table('employees')
+                ->where('id', $employeeId)
+                ->value('round_group_id');
+        }
+
+        return $this->employeeRoundGroupCache[$employeeId];
+    }
+
+    /**
      * Migrate punches to the Punches table and mark as migrated.
      */
     public function migratePunchesWithinPayPeriod(PayPeriod $payPeriod): void
     {
-        Log::info("PunchMigrationService ✅ Starting migratePunchesWithinPayPeriod for PayPeriod ID: {$payPeriod->id}");
+        // Disable query logging to prevent memory exhaustion
+        DB::disableQueryLog();
+
+        // Cache lookup values once
+        $this->cacheLookupValues();
+
+        Log::info("PunchMigrationService: Starting migration for PayPeriod ID: {$payPeriod->id}");
 
         $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
         $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
@@ -36,130 +83,109 @@ class PunchMigrationService
             $endDate = $endDate->subDay();
         }
 
-        // ✅ Fetch completed attendance records (including Holidays)
-        $attendances = Attendance::whereBetween('punch_time', [$startDate, $endDate])
+        // Count for logging
+        $totalCount = Attendance::whereBetween('punch_time', [$startDate, $endDate])
             ->where('status', 'Complete')
-            ->get();
+            ->count();
 
-        Log::info("PunchMigrationService ✅ Found {$attendances->count()} completed attendance records for PayPeriod ID: {$payPeriod->id}");
+        Log::info("PunchMigrationService: Found {$totalCount} records for PayPeriod ID: {$payPeriod->id}");
 
-        foreach ($attendances as $attendance) {
+        $processed = 0;
+        $errors = 0;
+
+        // Use cursor() to iterate one record at a time - prevents memory exhaustion
+        foreach (Attendance::whereBetween('punch_time', [$startDate, $endDate])
+            ->where('status', 'Complete')
+            ->cursor() as $attendance) {
             try {
-                Log::info("PunchMigrationService ✅ Processing Attendance ID: {$attendance->id} for Employee ID: {$attendance->employee_id}");
-
-                // ✅ Identify Holiday and Vacation Attendance
-                $isHolidayRecord = !is_null($attendance->holiday_id);
-                $vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
-                $isVacationRecord = $attendance->classification_id === $vacationClassificationId;
-
-                $roundGroupId = $attendance->employee->round_group_id ?? null;
-                $roundedPunchTime = $roundGroupId
-                    ? $this->roundingRuleService->getRoundedTime(new DateTime($attendance->punch_time), $roundGroupId)
-                    : new DateTime($attendance->punch_time);
-
-                Log::info("PunchMigrationService ✅ Rounded punch time for Attendance ID {$attendance->id}: {$roundedPunchTime->format('Y-m-d H:i:s')}");
-
-                $externalGroupId = $attendance->external_group_id;
-
-                Log::info("PunchMigrationService ✅ Calling getOrCreateGroupAndAssign for Attendance ID: {$attendance->id}");
-                Log::debug("PunchMigrationService 🧪 DEBUG: Checking AttendanceTimeGroupService execution path for Attendance ID: {$attendance->id}");
-                Log::info("PunchMigrationService ✅ [Step 11] About to execute AttendanceTimeGroupService::getOrCreateGroupAndAssign for Attendance ID: {$attendance->id}");
-                app(AttendanceTimeGroupService::class)->getOrCreateGroupAndAssign($attendance, auth()->id() ?? 0);
-                Log::info("PunchMigrationService ✅ [Step 11] Completed AttendanceTimeGroupService::getOrCreateGroupAndAssign for Attendance ID: {$attendance->id}");
-                Log::debug("PunchMigrationService 🧪 DEBUG: Post-Assignment Check - shift_date: {$attendance->shift_date}, external_group_id: {$attendance->external_group_id}");
-
-                if (empty($attendance->shift_date)) {
-                    Log::warning("PunchMigrationService ⚠️ Still missing shift_date after group assignment for Attendance ID {$attendance->id}");
-                    continue;
-                }
-
-                if (!$isHolidayRecord && !$isVacationRecord && !$this->hasStartAndStopTime($attendance->employee_id, $attendance->punch_time)) {
-                    Log::warning("PunchMigrationService ⚠️ Skipping migration for Attendance ID {$attendance->id} due to missing Clock In or Clock Out.");
-                    continue;
-                }
-
-                // Skip individual unpaired punches (marked as NeedsReview during processing)
-                if ($attendance->status === 'NeedsReview' && str_contains($attendance->issue_notes ?? '', 'Unpaired punch')) {
-                    Log::warning("PunchMigrationService ⚠️ Skipping migration for Attendance ID {$attendance->id} - marked as unpaired punch.");
-                    continue;
-                }
-
-                // ✅ Begin Database Transaction
-                DB::beginTransaction();
-
-                // Ensure proper punch_type_id assignment, especially for holiday records
-                $punchTypeId = $attendance->punch_type_id;
-                if (is_null($punchTypeId)) {
-                    // Fallback to Unknown punch type if punch_type_id is missing
-                    $punchTypeId = $this->getPunchTypeId('Unknown');
-                    Log::warning("PunchMigrationService ⚠️ Missing punch_type_id for Attendance ID {$attendance->id}, using Unknown punch type");
-                }
-
-                // Ensure proper classification for holiday and vacation records
-                $classificationId = $attendance->classification_id;
-                if ($isHolidayRecord && is_null($classificationId)) {
-                    $classificationId = $this->getClassificationId('Holiday');
-                    Log::info("PunchMigrationService ✅ Setting Holiday classification for Attendance ID {$attendance->id}");
-                } elseif ($isVacationRecord && is_null($classificationId)) {
-                    $classificationId = $vacationClassificationId;
-                    Log::info("PunchMigrationService ✅ Setting Vacation classification for Attendance ID {$attendance->id}");
-                }
-
-                $punchData = [
-                    'employee_id'       => $attendance->employee_id,
-                    'device_id'         => $attendance->device_id,
-                    'punch_type_id'     => $punchTypeId,
-                    'punch_state'       => $attendance->punch_state,
-                    'punch_time'        => $roundedPunchTime->format('Y-m-d H:i:s'),
-                    'is_altered'        => true,
-                    'pay_period_id'     => $payPeriod->id,
-                    'attendance_id'     => $attendance->id,
-                    'external_group_id' => $externalGroupId,
-                    'shift_date'        => $attendance->shift_date,
-                    'classification_id' => $classificationId,
-                ];
-
-                Log::info("PunchMigrationService ✅ Inserting punch record: " . json_encode($punchData));
-
-                $punch = Punch::create($punchData);
-
-                if ($punch) {
-                    Log::info("PunchMigrationService ✅ Punch record created successfully: Punch ID {$punch->id} for Attendance ID {$attendance->id}");
-                } else {
-                    Log::error("PunchMigrationService ❌ Punch insert failed for Attendance ID {$attendance->id}");
-                    DB::rollBack();
-                    continue;
-                }
-
-                $attendance->update([
-                    'status' => 'Migrated',
-                    'is_migrated' => true,
-                ]);
-
-                Log::info("PunchMigrationService ✅ Updated Attendance ID {$attendance->id} status to 'Migrated'");
-
-                DB::commit();
-
+                $this->processAttendanceRecord($attendance, $payPeriod);
+                $processed++;
             } catch (Exception $e) {
-                DB::rollBack();
-                Log::error("PunchMigrationService ❌ Error in migratePunchesWithinPayPeriod for Attendance ID {$attendance->id}: " . $e->getMessage());
+                $errors++;
+                Log::error("PunchMigrationService: Error for Attendance ID {$attendance->id}: ".$e->getMessage());
             }
         }
 
-        Log::info("PunchMigrationService ✅ Completed migratePunchesWithinPayPeriod for PayPeriod ID: {$payPeriod->id}");
+        Log::info("PunchMigrationService: Completed for PayPeriod ID: {$payPeriod->id} - Processed: {$processed}, Errors: {$errors}");
 
-        // ✅ Check if all records are properly migrated and update PayPeriod if needed
+        // Check if all records are properly migrated
         $this->checkAndUpdatePayPeriodProcessedStatus($payPeriod);
     }
 
-    private function getPunchTypeId(string $type): ?int
+    /**
+     * Process a single attendance record.
+     */
+    protected function processAttendanceRecord(Attendance $attendance, PayPeriod $payPeriod): void
     {
-        return DB::table('punch_types')->where('name', $type)->value('id');
-    }
+        // Identify Holiday and Vacation Attendance
+        $isHolidayRecord = ! is_null($attendance->holiday_id);
+        $isVacationRecord = $attendance->classification_id === $this->vacationClassificationId;
 
-    private function getClassificationId(string $classification): ?int
-    {
-        return DB::table('classifications')->where('name', $classification)->value('id');
+        // Get employee round_group_id from cache to avoid N+1
+        $roundGroupId = $this->getEmployeeRoundGroupId($attendance->employee_id);
+        $roundedPunchTime = $roundGroupId
+            ? $this->roundingRuleService->getRoundedTime(new DateTime($attendance->punch_time), $roundGroupId)
+            : new DateTime($attendance->punch_time);
+
+        $externalGroupId = $attendance->external_group_id;
+
+        app(AttendanceTimeGroupService::class)->getOrCreateGroupAndAssign($attendance, auth()->id() ?? 0);
+
+        if (empty($attendance->shift_date)) {
+            return;
+        }
+
+        if (! $isHolidayRecord && ! $isVacationRecord && ! $this->hasStartAndStopTime($attendance->employee_id, $attendance->punch_time)) {
+            return;
+        }
+
+        // Skip individual unpaired punches
+        if ($attendance->status === 'NeedsReview' && str_contains($attendance->issue_notes ?? '', 'Unpaired punch')) {
+            return;
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $punchTypeId = $attendance->punch_type_id ?? $this->unknownTypeId;
+
+            $classificationId = $attendance->classification_id;
+            if ($isHolidayRecord && is_null($classificationId)) {
+                $classificationId = $this->holidayClassificationId;
+            } elseif ($isVacationRecord && is_null($classificationId)) {
+                $classificationId = $this->vacationClassificationId;
+            }
+
+            $punch = Punch::create([
+                'employee_id' => $attendance->employee_id,
+                'device_id' => $attendance->device_id,
+                'punch_type_id' => $punchTypeId,
+                'punch_state' => $attendance->punch_state,
+                'punch_time' => $roundedPunchTime->format('Y-m-d H:i:s'),
+                'is_altered' => true,
+                'pay_period_id' => $payPeriod->id,
+                'attendance_id' => $attendance->id,
+                'external_group_id' => $externalGroupId,
+                'shift_date' => $attendance->shift_date,
+                'classification_id' => $classificationId,
+            ]);
+
+            if (! $punch) {
+                DB::rollBack();
+
+                return;
+            }
+
+            $attendance->update([
+                'status' => 'Migrated',
+                'is_migrated' => true,
+            ]);
+
+            DB::commit();
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     /**
@@ -169,78 +195,64 @@ class PunchMigrationService
     {
         $date = Carbon::parse($punchTime)->toDateString();
 
-        // Check for holiday records
-        $holidayRecords = Attendance::where('employee_id', $employeeId)
+        // Check for holiday records using count instead of get
+        $hasHolidayRecords = Attendance::where('employee_id', $employeeId)
             ->whereDate('punch_time', $date)
             ->whereNotNull('holiday_id')
             ->whereIn('status', ['Complete', 'Migrated'])
-            ->get();
+            ->exists();
 
-        // Check for vacation records (classification_id = 2 for VACATION)
-        $vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
-        $vacationRecords = Attendance::where('employee_id', $employeeId)
+        if ($hasHolidayRecords) {
+            return true;
+        }
+
+        // Check for vacation records
+        $vacationCount = Attendance::where('employee_id', $employeeId)
             ->whereDate('punch_time', $date)
-            ->where('classification_id', $vacationClassificationId)
+            ->where('classification_id', $this->vacationClassificationId)
             ->whereIn('status', ['Complete', 'Migrated'])
-            ->whereIn('punch_type_id', [$this->getPunchTypeId('Clock In'), $this->getPunchTypeId('Clock Out')])
-            ->get();
+            ->whereIn('punch_type_id', [$this->clockInTypeId, $this->clockOutTypeId])
+            ->count();
 
-        // Return true if we have holiday records, complete vacation pair, or regular clock in/out pair
-        return $holidayRecords->isNotEmpty()
-            || $vacationRecords->count() >= 2
-            || Attendance::where('employee_id', $employeeId)
-                ->whereDate('punch_time', $date)
-                ->whereIn('status', ['Complete', 'Migrated'])
-                ->whereIn('punch_type_id', [$this->getPunchTypeId('Clock In'), $this->getPunchTypeId('Clock Out')])
-                ->count() >= 2;
+        if ($vacationCount >= 2) {
+            return true;
+        }
+
+        // Check for regular clock in/out pair
+        return Attendance::where('employee_id', $employeeId)
+            ->whereDate('punch_time', $date)
+            ->whereIn('status', ['Complete', 'Migrated'])
+            ->whereIn('punch_type_id', [$this->clockInTypeId, $this->clockOutTypeId])
+            ->count() >= 2;
     }
 
     /**
-     * Check if all attendance records within the pay period are properly migrated
-     * and update PayPeriod.is_processed = true if conditions are met.
+     * Check if all attendance records within the pay period are properly migrated.
      */
     public function checkAndUpdatePayPeriodProcessedStatus(PayPeriod $payPeriod): void
     {
-        Log::info("PunchMigrationService ✅ Checking PayPeriod processed status for PayPeriod ID: {$payPeriod->id}");
-
         $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
         $endDate = Carbon::parse($payPeriod->end_date)->endOfDay();
 
-        // Get all attendance records within the pay period
-        $allRecords = Attendance::whereBetween('punch_time', [$startDate, $endDate])->get();
-        $totalRecords = $allRecords->count();
+        // Use count queries instead of loading all records
+        $totalRecords = Attendance::whereBetween('punch_time', [$startDate, $endDate])->count();
 
         if ($totalRecords === 0) {
-            Log::info("PunchMigrationService ℹ️ No attendance records found for PayPeriod ID: {$payPeriod->id}");
+            Log::info("PunchMigrationService: No attendance records found for PayPeriod ID: {$payPeriod->id}");
+
             return;
         }
 
-        // Check if all records have punch_type_id and status = 'Migrated'
-        $properlyMigratedRecords = $allRecords->filter(function ($record) {
-            return !is_null($record->punch_type_id) && $record->status === 'Migrated';
-        });
+        $migratedCount = Attendance::whereBetween('punch_time', [$startDate, $endDate])
+            ->whereNotNull('punch_type_id')
+            ->where('status', 'Migrated')
+            ->count();
 
-        $migratedCount = $properlyMigratedRecords->count();
+        Log::info("PunchMigrationService: PayPeriod ID {$payPeriod->id}: {$migratedCount}/{$totalRecords} migrated");
 
-        Log::info("PunchMigrationService ✅ Migration Status for PayPeriod ID {$payPeriod->id}: {$migratedCount}/{$totalRecords} records properly migrated");
-
-        // If all records are properly migrated, set PayPeriod.is_processed = true
         if ($migratedCount === $totalRecords) {
             $payPeriod->update(['is_processed' => true]);
-            Log::info("PunchMigrationService ✅ Set PayPeriod ID {$payPeriod->id} is_processed = true - All {$totalRecords} records are properly migrated");
-        } else {
-            $unmigratedRecords = $totalRecords - $migratedCount;
-            Log::info("PunchMigrationService ⚠️ PayPeriod ID {$payPeriod->id} NOT marked as processed - {$unmigratedRecords} records still need migration");
-
-            // Optional: Log details about unmigrated records for debugging
-            $unmigrated = $allRecords->filter(function ($record) {
-                return is_null($record->punch_type_id) || $record->status !== 'Migrated';
-            });
-
-            foreach ($unmigrated as $record) {
-                Log::debug("PunchMigrationService 🔍 Unmigrated record - Attendance ID: {$record->id}, Status: {$record->status}, PunchType: " . ($record->punch_type_id ?? 'NULL'));
-            }
+            Log::info("PunchMigrationService: PayPeriod ID {$payPeriod->id} marked as processed");
         }
     }
-
 }

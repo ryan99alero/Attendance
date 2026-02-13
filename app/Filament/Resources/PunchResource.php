@@ -2,23 +2,19 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use App\Filament\Resources\PunchResource\Pages\ListPunches;
 use App\Filament\Resources\PunchResource\Pages\CreatePunch;
 use App\Filament\Resources\PunchResource\Pages\EditPunch;
-use Exception;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\PunchResource\Pages;
+use App\Filament\Resources\PunchResource\Pages\ListPunches;
 use App\Models\Punch;
-use Filament\Resources\Resource;
-use Filament\Forms\Components\Select;
+use Exception;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextInputColumn;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 
@@ -27,11 +23,13 @@ class PunchResource extends Resource
     protected static ?string $model = Punch::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
-    protected static ?string $navigationLabel = 'Punches';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-finger-print';
-    protected static ?int $navigationSort = -90;
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Tracking';
 
+    protected static ?string $navigationLabel = 'Punches';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-finger-print';
+
+    protected static ?int $navigationSort = -90;
 
     public static function form(Schema $schema): Schema
     {
@@ -62,6 +60,16 @@ class PunchResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function ($query) {
+                // Hide archived records by default unless show_archived filter is enabled
+                $tableFilters = request()->input('tableFilters', []);
+                $showArchived = $tableFilters['show_archived']['value'] ?? false;
+                if (! $showArchived) {
+                    $query->where(function ($q) {
+                        $q->where('is_archived', false)->orWhereNull('is_archived');
+                    });
+                }
+            })
             ->columns([
                 TextColumn::make('employee.first_name')
                     ->label('Employee')
@@ -99,8 +107,14 @@ class PunchResource extends Resource
                     ->label('Pay Period')
                     ->query(fn ($query, $value) => $query->where('pay_period_id', $value))
                     ->default(fn () => request()->input('tableFilters.pay_period_id.value')),
+
+                Filter::make('show_archived')
+                    ->toggle()
+                    ->label('Show Archived Records')
+                    ->query(fn ($query) => $query), // Query handled in modifyQueryUsing
             ]);
     }
+
     public static function getPages(): array
     {
         return [

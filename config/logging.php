@@ -52,15 +52,16 @@ return [
 
     'channels' => [
 
-        'view_log' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/view.log'),
-            'level' => 'debug',
-        ],
-
+        /*
+        |--------------------------------------------------------------------------
+        | Default Stack (Production)
+        |--------------------------------------------------------------------------
+        | Combines daily file logging. Telescope handles viewing.
+        | Critical alerts are handled by AlertService (email notifications).
+        */
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', env('LOG_STACK', 'single')),
+            'channels' => ['daily'],
             'ignore_exceptions' => false,
         ],
 
@@ -74,8 +75,36 @@ return [
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_DAILY_DAYS', 14),
+            'level' => env('LOG_LEVEL', 'warning'),
+            'days' => env('LOG_DAILY_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Jobs Channel
+        |--------------------------------------------------------------------------
+        | Dedicated channel for queue job logging (processing, failures)
+        */
+        'jobs' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/jobs.log'),
+            'level' => 'info',
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | API Channel
+        |--------------------------------------------------------------------------
+        | Dedicated channel for external API calls (integrations, webhooks)
+        */
+        'api' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/api.log'),
+            'level' => 'info',
+            'days' => 14,
             'replace_placeholders' => true,
         ],
 

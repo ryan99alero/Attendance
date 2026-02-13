@@ -2,21 +2,21 @@
 
 namespace App\Jobs;
 
-use Exception;
-use Throwable;
-use App\Models\ClockEvent;
 use App\Models\Attendance;
+use App\Models\ClockEvent;
 use App\Models\CompanySetup;
+use Exception;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class ProcessClockEventJob implements ShouldQueue
 {
-    use Queueable, InteractsWithQueue, SerializesModels;
+    use InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -54,28 +54,30 @@ class ProcessClockEventJob implements ShouldQueue
      */
     public function handle(): void
     {
-        // Check if already processed (avoid duplicate processing)
-        if ($this->clockEvent->is_processed) {
-            Log::info("[QueueClockEventProcessing] Event already processed, skipping", [
-                'clock_event_id' => $this->clockEvent->id
+        // Check if event still exists (may have been processed by another job)
+        if (! $this->clockEvent->exists) {
+            Log::info('[QueueClockEventProcessing] Event no longer exists, skipping', [
+                'clock_event_id' => $this->clockEvent->id,
             ]);
+
             return;
         }
 
         // Check if employee exists (should have been validated at creation)
-        if (!$this->clockEvent->employee_id) {
+        if (! $this->clockEvent->employee_id) {
             $this->markEventAsError('No employee associated with clock event');
+
             return;
         }
 
         $batchId = Str::uuid();
 
         try {
-            Log::info("[QueueClockEventProcessing] Processing clock event", [
+            Log::info('[QueueClockEventProcessing] Processing clock event', [
                 'clock_event_id' => $this->clockEvent->id,
                 'employee_id' => $this->clockEvent->employee_id,
                 'event_time' => $this->clockEvent->event_time,
-                'batch_id' => $batchId
+                'batch_id' => $batchId,
             ]);
 
             // Create attendance record
@@ -93,31 +95,26 @@ class ProcessClockEventJob implements ShouldQueue
                 'created_by' => null, // System generated - no specific user
             ]);
 
-            // Mark clock event as processed
-            $this->clockEvent->update([
-                'is_processed' => true,
-                'processed_at' => now(),
-                'attendance_id' => $attendance->id,
-                'batch_id' => $batchId,
-                'processing_error' => null
-            ]);
-
-            Log::info("[QueueClockEventProcessing] Successfully processed clock event", [
+            Log::info('[QueueClockEventProcessing] Successfully processed clock event', [
                 'clock_event_id' => $this->clockEvent->id,
                 'attendance_id' => $attendance->id,
                 'employee_id' => $this->clockEvent->employee_id,
-                'batch_id' => $batchId
+                'batch_id' => $batchId,
             ]);
+
+            // Delete clock event after successful processing
+            // Record now lives in attendance table - no need to keep duplicate
+            $this->clockEvent->delete();
 
         } catch (Exception $e) {
             $this->markEventAsError($e->getMessage());
 
-            Log::error("[QueueClockEventProcessing] Failed to process clock event", [
+            Log::error('[QueueClockEventProcessing] Failed to process clock event', [
                 'clock_event_id' => $this->clockEvent->id,
                 'employee_id' => $this->clockEvent->employee_id,
                 'error' => $e->getMessage(),
                 'batch_id' => $batchId,
-                'attempt' => $this->attempts()
+                'attempt' => $this->attempts(),
             ]);
 
             // Re-throw to trigger retry mechanism
@@ -130,14 +127,14 @@ class ProcessClockEventJob implements ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
-        Log::error("[QueueClockEventProcessing] Job failed after all retries", [
+        Log::error('[QueueClockEventProcessing] Job failed after all retries', [
             'clock_event_id' => $this->clockEvent->id,
             'employee_id' => $this->clockEvent->employee_id,
             'error' => $exception->getMessage(),
-            'attempts' => $this->attempts()
+            'attempts' => $this->attempts(),
         ]);
 
-        $this->markEventAsError("Job failed after {$this->tries} attempts: " . $exception->getMessage());
+        $this->markEventAsError("Job failed after {$this->tries} attempts: ".$exception->getMessage());
     }
 
     /**
@@ -147,7 +144,6 @@ class ProcessClockEventJob implements ShouldQueue
     {
         $this->clockEvent->update([
             'processing_error' => $error,
-            'is_processed' => false // Keep as unprocessed for potential retry
         ]);
     }
 }

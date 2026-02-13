@@ -2,48 +2,64 @@
 
 namespace App\Services\Shift;
 
-use Exception;
-use DB;
+use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\ShiftSchedule;
-use App\Models\Attendance;
+use Exception;
+use Illuminate\Support\Facades\DB;
 use Phpml\Classification\KNearestNeighbors;
-use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class ShiftScheduleService
 {
     protected KNearestNeighbors $classifier;
 
+    protected array $punchTypeCache = [];
+
+    protected array $punchTypeNameCache = [];
+
+    protected array $employeeScheduleCache = [];
+
     public function __construct()
     {
         $this->classifier = new KNearestNeighbors(3);
-        Log::info("[Shift] Initialized ShiftScheduleService with ML-based recognition.");
+        $this->cachePunchTypes();
+    }
+
+    protected function cachePunchTypes(): void
+    {
+        $punchTypes = DB::table('punch_types')->get();
+        foreach ($punchTypes as $punchType) {
+            $this->punchTypeCache[$punchType->name] = $punchType->id;
+            $this->punchTypeNameCache[$punchType->id] = $punchType->name;
+        }
     }
 
     /**
-     * Retrieve the appropriate shift schedule for a single employee.
+     * Retrieve the appropriate shift schedule for a single employee (cached).
      */
     public function getShiftScheduleForEmployee(int $employeeId): ?ShiftSchedule
     {
+        // Return from cache if available
+        if (isset($this->employeeScheduleCache[$employeeId])) {
+            return $this->employeeScheduleCache[$employeeId];
+        }
+
         $employee = Employee::find($employeeId);
-        if (!$employee) {
-            Log::warning("[Shift] Employee not found with ID: {$employeeId}");
+        if (! $employee) {
+            $this->employeeScheduleCache[$employeeId] = null;
+
             return null;
         }
 
-        // Step 1: Check for employee-specific shift schedule
         if ($employee->shift_schedule_id) {
-            $employeeSchedule = ShiftSchedule::find($employee->shift_schedule_id);
-            if ($employeeSchedule) {
-                Log::info("[Shift] Found employee-specific shift schedule for Employee ID: {$employeeId}");
-                return $employeeSchedule;
-            }
+            $schedule = ShiftSchedule::find($employee->shift_schedule_id);
+            $this->employeeScheduleCache[$employeeId] = $schedule;
+
+            return $schedule;
         }
 
-        // Step 2: No department-level fallback anymore since shifts are independent
+        $this->employeeScheduleCache[$employeeId] = null;
 
-        Log::warning("[Shift] No shift schedule found for Employee ID: {$employeeId}");
         return null;
     }
 
@@ -52,60 +68,23 @@ class ShiftScheduleService
      */
     public function determinePunchType(int $employeeId, string $punchTime, int $punchId, &$punchEvaluations): void
     {
-        Log::info("[Shift] Processing Punch Type Assignment - Employee ID: {$employeeId}, Punch Time: {$punchTime}");
-
-        // Train ML Model
-        $this->trainModel();
-
-        // Predict Punch Type using ML
         $predictedType = $this->predictPunchType($punchTime);
         if ($predictedType) {
             $punchEvaluations[$punchId]['ml'] = [
                 'punch_type_id' => $predictedType,
                 'punch_state' => $this->determinePunchState($predictedType),
-                'source' => 'ML Model'
+                'source' => 'ML Model',
             ];
-            Log::info("[ML] Assigned: {$predictedType} for Punch ID: {$punchId}");
         }
 
-        // Fallback to heuristic if ML fails
         $heuristicType = $this->heuristicPunchTypeAssignment($employeeId, $punchTime);
         if ($heuristicType) {
             $punchEvaluations[$punchId]['heuristic'] = [
                 'punch_type_id' => $heuristicType,
                 'punch_state' => $this->determinePunchState($heuristicType),
-                'source' => 'Heuristic Model'
+                'source' => 'Heuristic Model',
             ];
-            Log::info("[Heuristic] Assigned: {$heuristicType} for Punch ID: {$punchId}");
         }
-    }
-
-    /**
-     * Train ML model using historical attendance data.
-     */
-    public function trainModel(): void
-    {
-        Log::info("[Shift] Training ML Model...");
-
-        $attendanceData = Attendance::whereNotNull('punch_type_id')
-            ->select('employee_id', 'punch_time', 'punch_type_id')
-            ->get();
-
-        if ($attendanceData->isEmpty()) {
-            Log::warning("[Shift] Insufficient data to train ML model.");
-            return;
-        }
-
-        // Process the data
-        $samples = [];
-        $labels = [];
-
-        foreach ($attendanceData as $record) {
-            $samples[] = [$record->employee_id, strtotime($record->punch_time)];
-            $labels[] = $record->punch_type_id;
-        }
-
-        Log::info("[Shift] ML Model trained with " . count($samples) . " attendance records.");
     }
 
     /**
@@ -116,7 +95,6 @@ class ShiftScheduleService
         try {
             return $this->classifier->predict([strtotime($punchTime) % 86400]);
         } catch (Exception $e) {
-            Log::error("[Shift] ML prediction failed: " . $e->getMessage());
             return null;
         }
     }
@@ -127,11 +105,11 @@ class ShiftScheduleService
     public function heuristicPunchTypeAssignment(int $employeeId, string $punchTime): ?int
     {
         $schedule = $this->getShiftScheduleForEmployee($employeeId);
-        if (!$schedule) {
+        if (! $schedule) {
             return null;
         }
 
-        $punchSeconds = strtotime($punchTime) % 86400; // Seconds in the day
+        $punchSeconds = strtotime($punchTime) % 86400;
 
         $times = [
             'Clock In' => strtotime($schedule->start_time) % 86400,
@@ -151,7 +129,6 @@ class ShiftScheduleService
             }
         }
 
-        Log::info("[Shift] Heuristic Assigned Punch Type: {$closestType} for Employee ID: {$employeeId}");
         return $this->getPunchTypeId($closestType);
     }
 
@@ -160,7 +137,7 @@ class ShiftScheduleService
         $startTypes = ['Clock In', 'Lunch Start', 'Shift Start', 'Manual Start'];
         $stopTypes = ['Clock Out', 'Lunch Stop', 'Shift Stop', 'Manual Stop'];
 
-        $punchTypeName = DB::table('punch_types')->where('id', $punchTypeId)->value('name');
+        $punchTypeName = $this->punchTypeNameCache[$punchTypeId] ?? null;
 
         if (in_array($punchTypeName, $startTypes)) {
             return 'start';
@@ -173,7 +150,7 @@ class ShiftScheduleService
 
     private function getPunchTypeId(string $type): ?int
     {
-        return DB::table('punch_types')->where('name', $type)->value('id');
+        return $this->punchTypeCache[$type] ?? null;
     }
 
     /**
@@ -181,28 +158,20 @@ class ShiftScheduleService
      */
     public function processStaleRecords(string $startDate, string $endDate, &$punchEvaluations): void
     {
-        Log::info("[Shift] Processing stale records...");
+        DB::disableQueryLog();
 
-        $staleRecords = Attendance::whereNull('punch_type_id')
+        // Use cursor to avoid loading all records into memory
+        foreach (Attendance::whereNull('punch_type_id')
             ->whereBetween('punch_time', [$startDate, $endDate])
-            ->get();
-
-        if ($staleRecords->isEmpty()) {
-            Log::info("[Shift] No stale records to process.");
-            return;
-        }
-
-        foreach ($staleRecords as $record) {
+            ->cursor() as $record) {
             $prediction = $this->predictPunchType($record->punch_time);
             if ($prediction !== null) {
                 $punchEvaluations[$record->id]['ml'] = [
                     'punch_type_id' => $prediction,
                     'punch_state' => $this->determinePunchState($prediction),
-                    'source' => 'ML Model'
+                    'source' => 'ML Model',
                 ];
             }
         }
-
-        Log::info("[Shift] Stale record processing completed.");
     }
 }

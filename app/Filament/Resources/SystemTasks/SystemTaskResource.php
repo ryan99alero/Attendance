@@ -185,8 +185,27 @@ class SystemTaskResource extends Resource
                     ->requiresConfirmation()
                     ->action(fn (SystemTask $record) => $record->markCancelled()),
 
+                Action::make('reset_dismiss')
+                    ->label('Reset & Dismiss')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->visible(fn (SystemTask $record): bool => $record->isFailed() || $record->status === SystemTask::STATUS_CANCELLED)
+                    ->requiresConfirmation()
+                    ->modalHeading('Reset & Dismiss Task')
+                    ->modalDescription('This will reset the related Pay Period (if any) so you can try again, and remove this task from the list.')
+                    ->action(function (SystemTask $record) {
+                        $record->resetRelatedModel();
+                        $record->delete();
+
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Task Dismissed')
+                            ->body('The task has been removed and related items have been reset.')
+                            ->send();
+                    }),
+
                 DeleteAction::make()
-                    ->visible(fn (SystemTask $record): bool => ! $record->isActive()),
+                    ->visible(fn (SystemTask $record): bool => ! $record->isActive() && ! $record->isFailed()),
             ])
             ->toolbarActions([
                 Action::make('clear_completed')

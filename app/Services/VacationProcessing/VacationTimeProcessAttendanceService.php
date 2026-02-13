@@ -2,33 +2,49 @@
 
 namespace App\Services\VacationProcessing;
 
+use App\Models\Attendance;
+use App\Models\Employee;
+use App\Models\ShiftSchedule;
+use App\Models\VacationCalendar;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\Attendance;
-use App\Models\VacationCalendar;
-use App\Models\Employee;
-use App\Models\ShiftSchedule;
-use Carbon\Carbon;
 
 class VacationTimeProcessAttendanceService
 {
+    /**
+     * Cache for employee data
+     */
+    private array $employeeCache = [];
+
     public function processVacationDays(string $startDate, string $endDate): void
     {
-        Log::info("📅 Processing vacation records from {$startDate} to {$endDate}");
+        // Disable query logging to prevent memory exhaustion
+        DB::disableQueryLog();
 
-        $vacationRecords = VacationCalendar::whereBetween('vacation_date', [$startDate, $endDate])
+        Log::info("Processing vacation records from {$startDate} to {$endDate}");
+
+        $totalCount = VacationCalendar::whereBetween('vacation_date', [$startDate, $endDate])
             ->where('is_active', true)
             ->where('is_recorded', false)
-            ->get();
+            ->count();
 
-        Log::info("✅ Found {$vacationRecords->count()} vacation records to process.");
+        Log::info("Found {$totalCount} vacation records to process.");
 
-        foreach ($vacationRecords as $record) {
-            $employee = Employee::find($record->employee_id);
+        // Pre-load employees that have vacation records to process
+        $this->preloadEmployees($startDate, $endDate);
 
-            if (!$employee) {
-                Log::warning("⚠️ Employee not found for Vacation Record ID: {$record->id}");
+        $processed = 0;
+
+        // Use cursor() to iterate one record at a time - prevents memory exhaustion
+        foreach (VacationCalendar::whereBetween('vacation_date', [$startDate, $endDate])
+            ->where('is_active', true)
+            ->where('is_recorded', false)
+            ->cursor() as $record) {
+            $employee = $this->getEmployee($record->employee_id);
+
+            if (! $employee) {
                 continue;
             }
 
@@ -39,54 +55,86 @@ class VacationTimeProcessAttendanceService
                 ->exists();
 
             if ($existingAttendance) {
-                Log::info("⏭️ Attendance records already exist for Vacation Record ID: {$record->id}. Marking as recorded and skipping...");
                 $record->update(['is_recorded' => true]);
+
                 continue;
             }
 
             $shiftSchedule = $this->getShiftScheduleForEmployee($employee);
 
-            if (!$shiftSchedule) {
-                Log::warning("⚠️ No shift schedule found for Employee ID: {$employee->id}. Skipping...");
+            if (! $shiftSchedule) {
                 continue;
             }
 
             try {
                 // Create Clock In record
                 $clockInTime = $this->getVacationPunchTime($record, $shiftSchedule);
-                $this->createAttendanceRecord($employee->id, $clockInTime, 'Clock In', "Generated from Vacation Calendar (Clock In)");
+                $this->createAttendanceRecord($employee->id, $clockInTime, 'Clock In', 'Generated from Vacation Calendar (Clock In)');
 
                 // Determine Clock Out time
                 $dailyHours = $record->is_half_day ? $shiftSchedule->daily_hours / 2 : $shiftSchedule->daily_hours;
                 $clockOutTime = Carbon::parse($clockInTime)->addHours($dailyHours)->format('Y-m-d H:i:s');
 
                 // Create Clock Out record
-                $this->createAttendanceRecord($employee->id, $clockOutTime, 'Clock Out', "Generated from Vacation Calendar (Clock Out)");
+                $this->createAttendanceRecord($employee->id, $clockOutTime, 'Clock Out', 'Generated from Vacation Calendar (Clock Out)');
 
                 // Mark vacation record as recorded only after both records are created
                 $record->update(['is_recorded' => true]);
 
-                Log::info("✅ Processed Vacation Record ID: {$record->id} for Employee ID: {$employee->id}");
+                $processed++;
 
             } catch (Exception $e) {
-                Log::error("❌ Failed to process Vacation Record ID: {$record->id} for Employee ID: {$employee->id}. Error: {$e->getMessage()}");
+                Log::error("Failed to process Vacation Record ID: {$record->id} for Employee ID: {$employee->id}. Error: {$e->getMessage()}");
             }
         }
+
+        Log::info("Completed vacation processing - {$processed}/{$totalCount} records processed.");
+    }
+
+    private ?int $cachedVacationClassificationId = null;
+
+    /**
+     * Pre-load employees that have vacation records to process
+     */
+    private function preloadEmployees(string $startDate, string $endDate): void
+    {
+        $employeeIds = VacationCalendar::whereBetween('vacation_date', [$startDate, $endDate])
+            ->where('is_active', true)
+            ->where('is_recorded', false)
+            ->distinct()
+            ->pluck('employee_id');
+
+        $employees = Employee::whereIn('id', $employeeIds)->get();
+        foreach ($employees as $employee) {
+            $this->employeeCache[$employee->id] = $employee;
+        }
+    }
+
+    /**
+     * Get employee from cache or database
+     */
+    private function getEmployee(int $employeeId): ?Employee
+    {
+        if (! isset($this->employeeCache[$employeeId])) {
+            $this->employeeCache[$employeeId] = Employee::find($employeeId);
+        }
+
+        return $this->employeeCache[$employeeId];
     }
 
     private function createAttendanceRecord(int $employeeId, string $punchTime, string $punchType, string $issueNotes): void
     {
         $punchTypeId = $this->getPunchTypeId($punchType);
 
-        if (!$punchTypeId) {
-            Log::warning("⚠️ Invalid Punch Type: {$punchType} for Employee ID: {$employeeId}");
+        if (! $punchTypeId) {
             return;
         }
 
-        // Get Vacation classification ID
-        $vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
+        // Cache vacation classification ID
+        if ($this->cachedVacationClassificationId === null) {
+            $this->cachedVacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
+        }
 
-        // Determine punch_state based on punch type
         $punchState = ($punchType === 'Clock In') ? 'start' : 'stop';
 
         Attendance::create([
@@ -94,18 +142,22 @@ class VacationTimeProcessAttendanceService
             'punch_time' => $punchTime,
             'punch_type_id' => $punchTypeId,
             'punch_state' => $punchState,
-            'classification_id' => $vacationClassificationId,
+            'classification_id' => $this->cachedVacationClassificationId,
             'is_manual' => true,
             'status' => 'Complete',
             'issue_notes' => $issueNotes,
         ]);
-
-        Log::info("📝 Created {$punchType} attendance record for Employee ID: {$employeeId}, Time: {$punchTime} (Vacation Classification)");
     }
+
+    private array $punchTypeCache = [];
 
     private function getPunchTypeId(string $type): ?int
     {
-        return DB::table('punch_types')->where('name', $type)->value('id');
+        if (! isset($this->punchTypeCache[$type])) {
+            $this->punchTypeCache[$type] = DB::table('punch_types')->where('name', $type)->value('id');
+        }
+
+        return $this->punchTypeCache[$type];
     }
 
     private function getShiftScheduleForEmployee(Employee $employee): ?ShiftSchedule
@@ -119,13 +171,11 @@ class VacationTimeProcessAttendanceService
             $validatedDate = Carbon::parse($vacation->vacation_date)->format('Y-m-d');
             $validatedTime = Carbon::parse($shiftSchedule->start_time)->format('H:i:s');
 
-            $punchTime = "{$validatedDate} {$validatedTime}";
-            Log::info("🕒 Validated punch time for Vacation ID {$vacation->id}: {$punchTime}");
-
-            return $punchTime;
+            return "{$validatedDate} {$validatedTime}";
         } catch (Exception $e) {
-            Log::error("❌ Failed to create punch_time for Vacation ID: {$vacation->id}. Error: {$e->getMessage()}");
-            return now()->toDateTimeString(); // Fallback in case of error
+            Log::error("Failed to create punch_time for Vacation ID: {$vacation->id}. Error: {$e->getMessage()}");
+
+            return now()->toDateTimeString();
         }
     }
 }

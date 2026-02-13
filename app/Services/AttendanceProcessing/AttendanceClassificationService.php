@@ -4,19 +4,24 @@ namespace App\Services\AttendanceProcessing;
 
 use App\Models\Attendance;
 use App\Models\Classification;
-use App\Models\VacationCalendar;
-use App\Models\HolidayTemplate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AttendanceClassificationService
 {
     private array $classificationCache = [];
 
+    private array $punchTypeNameCache = [];
+
+    private array $vacationDatesCache = [];
+
+    private bool $vacationCacheLoaded = false;
+
     public function __construct()
     {
         $this->loadClassificationCache();
+        $this->loadPunchTypeCache();
     }
 
     /**
@@ -31,14 +36,29 @@ class AttendanceClassificationService
     }
 
     /**
+     * Load punch type names into cache for performance
+     */
+    private function loadPunchTypeCache(): void
+    {
+        $punchTypes = DB::table('punch_types')->get();
+        foreach ($punchTypes as $punchType) {
+            $this->punchTypeNameCache[$punchType->id] = $punchType->name;
+        }
+    }
+
+    /**
      * Classify all unclassified attendance records
      */
     public function classifyAllUnclassifiedAttendance(): void
     {
-        Log::info('[AttendanceClassification] Starting classification of all unclassified attendance records');
+        // Disable query logging to prevent memory exhaustion
+        DB::disableQueryLog();
 
-        $unclassifiedAttendance = Attendance::whereNull('classification_id')->get();
-        Log::info("[AttendanceClassification] Found {$unclassifiedAttendance->count()} unclassified attendance records");
+        $totalCount = Attendance::whereNull('classification_id')->count();
+        Log::info("[AttendanceClassification] Found {$totalCount} unclassified attendance records");
+
+        // Pre-load vacation dates for the date range we're processing
+        $this->preloadVacationDates();
 
         $classificationCounts = [
             'REGULAR' => 0,
@@ -50,28 +70,42 @@ class AttendanceClassificationService
             'UNCLASSIFIED' => 0,
         ];
 
-        foreach ($unclassifiedAttendance as $attendance) {
+        // Use cursor() to iterate one record at a time
+        foreach (Attendance::whereNull('classification_id')->cursor() as $attendance) {
             $classificationCode = $this->determineClassification($attendance);
 
             if ($classificationCode && isset($this->classificationCache[$classificationCode])) {
                 $attendance->update(['classification_id' => $this->classificationCache[$classificationCode]]);
                 $classificationCounts[$classificationCode]++;
-
-                Log::debug("[AttendanceClassification] Classified Attendance ID {$attendance->id} as {$classificationCode}");
             } else {
                 $classificationCounts['UNCLASSIFIED']++;
-                Log::warning("[AttendanceClassification] Could not classify Attendance ID {$attendance->id}");
             }
         }
 
-        Log::info('[AttendanceClassification] Classification summary:');
-        foreach ($classificationCounts as $type => $count) {
-            if ($count > 0) {
-                Log::info("[AttendanceClassification] {$type}: {$count} records");
-            }
+        Log::info('[AttendanceClassification] Classification summary: '.json_encode(array_filter($classificationCounts)));
+    }
+
+    /**
+     * Pre-load vacation dates to avoid N+1 queries
+     */
+    private function preloadVacationDates(): void
+    {
+        if ($this->vacationCacheLoaded) {
+            return;
         }
 
-        Log::info('[AttendanceClassification] Completed classification of attendance records');
+        // Get all active vacation records and cache by employee_id + date
+        $vacations = DB::table('vacation_calendars')
+            ->where('is_active', true)
+            ->select('employee_id', 'vacation_date')
+            ->get();
+
+        foreach ($vacations as $vacation) {
+            $key = $vacation->employee_id.'_'.$vacation->vacation_date;
+            $this->vacationDatesCache[$key] = true;
+        }
+
+        $this->vacationCacheLoaded = true;
     }
 
     /**
@@ -83,11 +117,10 @@ class AttendanceClassificationService
 
         if ($classificationCode && isset($this->classificationCache[$classificationCode])) {
             $attendance->update(['classification_id' => $this->classificationCache[$classificationCode]]);
-            Log::info("[AttendanceClassification] Classified Attendance ID {$attendance->id} as {$classificationCode}");
+
             return $classificationCode;
         }
 
-        Log::warning("[AttendanceClassification] Could not classify Attendance ID {$attendance->id}");
         return null;
     }
 
@@ -96,132 +129,97 @@ class AttendanceClassificationService
      */
     private function determineClassification(Attendance $attendance): ?string
     {
-        // 1. Check if it's explicitly a vacation record
         if ($this->isVacationRecord($attendance)) {
             return 'VACATION';
         }
 
-        // 2. Check if it's explicitly a holiday record
         if ($this->isHolidayRecord($attendance)) {
             return 'HOLIDAY';
         }
 
-        // 3. Check if it's sick leave (based on notes or manual entry patterns)
         if ($this->isSickRecord($attendance)) {
             return 'SICK';
         }
 
-        // 4. Check if it's training (based on notes or manual entry patterns)
         if ($this->isTrainingRecord($attendance)) {
             return 'TRAINING';
         }
 
-        // 5. Check if it's remote work (based on notes or patterns)
         if ($this->isRemoteWorkRecord($attendance)) {
             return 'REMOTE';
         }
 
-        // 6. Default to regular work if it's a normal clock in/out pattern
         if ($this->isRegularWorkRecord($attendance)) {
             return 'REGULAR';
         }
 
-        // Unable to classify
         return null;
     }
 
-    /**
-     * Check if attendance record is vacation-related
-     */
     private function isVacationRecord(Attendance $attendance): bool
     {
-        // Check if generated from vacation calendar
         $notes = strtolower($attendance->issue_notes ?? '');
         if (str_contains($notes, 'vacation') || str_contains($notes, 'generated from vacation calendar')) {
             return true;
         }
 
-        // Check if there's a vacation calendar entry for this employee and date
+        // Use cached vacation dates to avoid N+1 queries
         $attendanceDate = Carbon::parse($attendance->punch_time)->toDateString();
-        $vacationEntry = VacationCalendar::where('employee_id', $attendance->employee_id)
-            ->whereDate('vacation_date', $attendanceDate)
-            ->where('is_active', true)
-            ->exists();
+        $key = $attendance->employee_id.'_'.$attendanceDate;
 
-        return $vacationEntry;
+        return isset($this->vacationDatesCache[$key]);
     }
 
-    /**
-     * Check if attendance record is holiday-related
-     */
     private function isHolidayRecord(Attendance $attendance): bool
     {
-        // Check if explicitly marked as holiday
-        if (!is_null($attendance->holiday_id)) {
+        if (! is_null($attendance->holiday_id)) {
             return true;
         }
 
-        // Check notes for holiday indicators
         $notes = strtolower($attendance->issue_notes ?? '');
-        if (str_contains($notes, 'holiday') || str_contains($notes, 'generated from holiday')) {
-            return true;
-        }
 
-        // Check if the date is a recognized holiday
-        $attendanceDate = Carbon::parse($attendance->punch_time)->toDateString();
-        // Note: You could add logic here to check against HolidayTemplate or other holiday sources
-
-        return false;
+        return str_contains($notes, 'holiday') || str_contains($notes, 'generated from holiday');
     }
 
-    /**
-     * Check if attendance record is sick leave
-     */
     private function isSickRecord(Attendance $attendance): bool
     {
         $notes = strtolower($attendance->issue_notes ?? '');
+
         return str_contains($notes, 'sick') || str_contains($notes, 'illness');
     }
 
-    /**
-     * Check if attendance record is training
-     */
     private function isTrainingRecord(Attendance $attendance): bool
     {
         $notes = strtolower($attendance->issue_notes ?? '');
+
         return str_contains($notes, 'training') || str_contains($notes, 'course') || str_contains($notes, 'seminar');
     }
 
-    /**
-     * Check if attendance record is remote work
-     */
     private function isRemoteWorkRecord(Attendance $attendance): bool
     {
         $notes = strtolower($attendance->issue_notes ?? '');
+
         return str_contains($notes, 'remote') || str_contains($notes, 'home') || str_contains($notes, 'wfh');
     }
 
-    /**
-     * Check if attendance record represents regular work
-     */
     private function isRegularWorkRecord(Attendance $attendance): bool
     {
-        // Check if it's a standard punch type (Clock In, Clock Out, Lunch, Break)
-        $punchType = $attendance->punchType;
-        if (!$punchType) {
+        // Use cached punch type names to avoid N+1 queries
+        if (! $attendance->punch_type_id) {
+            return false;
+        }
+
+        $punchTypeName = $this->punchTypeNameCache[$attendance->punch_type_id] ?? null;
+        if (! $punchTypeName) {
             return false;
         }
 
         $regularPunchTypes = ['Clock In', 'Clock Out', 'Lunch Start', 'Lunch Stop', 'Break Start', 'Break End'];
 
-        // If it's a regular punch type and not manually created with special notes, it's likely regular work
-        return in_array($punchType->name, $regularPunchTypes) &&
-               !$this->hasSpecialTimeOffIndicators($attendance);
+        return in_array($punchTypeName, $regularPunchTypes) &&
+               ! $this->hasSpecialTimeOffIndicators($attendance);
     }
 
-    /**
-     * Check if attendance record has indicators of special time off
-     */
     private function hasSpecialTimeOffIndicators(Attendance $attendance): bool
     {
         $notes = strtolower($attendance->issue_notes ?? '');
@@ -236,17 +234,11 @@ class AttendanceClassificationService
         return false;
     }
 
-    /**
-     * Get classification ID by code
-     */
     public function getClassificationId(string $code): ?int
     {
         return $this->classificationCache[$code] ?? null;
     }
 
-    /**
-     * Get all classification mappings
-     */
     public function getClassificationMappings(): array
     {
         return $this->classificationCache;

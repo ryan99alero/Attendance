@@ -1,69 +1,77 @@
 <?php
+
 namespace App\Services\TimeGrouping;
 
 use App\Models\Attendance;
-use Carbon\Carbon;
 use App\Models\AttendanceTimeGroup;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AttendanceTimeGroupService
 {
     /**
+     * Cache for employee+shift_date -> external_group_id mappings
+     */
+    protected array $groupCache = [];
+
+    /**
      * Get or create an attendance_time_group for an employee on a given shift date.
-     *
-     * @param int $employeeId
-     * @param string $shiftDate
-     * @param int $systemUserId
-     * @return string|null
      */
     public function getOrCreateGroup(int $employeeId, string $shiftDate, int $systemUserId): ?string
     {
-        // Check if an entry already exists for the employee on this shift date
+        $cacheKey = $employeeId.'_'.$shiftDate;
+
+        // Return from cache if available
+        if (isset($this->groupCache[$cacheKey])) {
+            return $this->groupCache[$cacheKey];
+        }
+
         $existingGroup = AttendanceTimeGroup::where('employee_id', $employeeId)
             ->whereDate('shift_date', $shiftDate)
             ->first();
 
         if ($existingGroup) {
-            Log::info("[TimeGroup] Using existing External Group ID: {$existingGroup->external_group_id} for Employee ID: {$employeeId} on $shiftDate");
+            $this->groupCache[$cacheKey] = $existingGroup->external_group_id;
+
             return $existingGroup->external_group_id;
         }
 
-        // Generate a unique group ID
         $externalGroupId = Str::uuid()->toString();
-
-        // Ensure the external_group_id does not exceed the database column size
-        $maxGroupIdLength = 40; // Adjust if the database column size is different
+        $maxGroupIdLength = 40;
         if (strlen($externalGroupId) > $maxGroupIdLength) {
-            Log::warning("[TimeGroup] Generated external_group_id exceeds the maximum length ({$maxGroupIdLength} chars). Truncating...");
             $externalGroupId = substr($externalGroupId, 0, $maxGroupIdLength);
         }
 
-        // Create a new group entry
         $newGroup = AttendanceTimeGroup::create([
             'employee_id' => $employeeId,
             'shift_date' => $shiftDate,
             'external_group_id' => $externalGroupId,
         ]);
 
-        Log::info("[TimeGroup] Created new Attendance Time Group: {$newGroup->external_group_id} for Employee ID: {$employeeId} on $shiftDate");
+        $this->groupCache[$cacheKey] = $newGroup->external_group_id;
 
         return $newGroup->external_group_id;
     }
 
     /**
      * Ensures the attendance record has a valid shift_date and external_group_id.
-     * Uses punch_time to infer shift_date if not already set.
-     *
-     * @param Attendance $attendance
-     * @param int $systemUserId
-     * @return void
      */
     public function getOrCreateShiftDate(Attendance $attendance, int $systemUserId): void
     {
         if (empty($attendance->shift_date)) {
             $attendance->shift_date = Carbon::parse($attendance->punch_time)->toDateString();
+        }
+
+        $cacheKey = $attendance->employee_id.'_'.$attendance->shift_date;
+
+        // Return from cache if available
+        if (isset($this->groupCache[$cacheKey])) {
+            $attendance->external_group_id = $this->groupCache[$cacheKey];
+            $attendance->save();
+
+            return;
         }
 
         $existingGroup = AttendanceTimeGroup::where('employee_id', $attendance->employee_id)
@@ -72,7 +80,7 @@ class AttendanceTimeGroupService
 
         if ($existingGroup) {
             $attendance->external_group_id = $existingGroup->external_group_id;
-            \Log::info("[TimeGroup] Found existing group for Attendance ID {$attendance->id} - External Group ID: {$existingGroup->external_group_id}");
+            $this->groupCache[$cacheKey] = $existingGroup->external_group_id;
         } else {
             $externalGroupId = Str::uuid()->toString();
             $maxGroupIdLength = 40;
@@ -82,17 +90,17 @@ class AttendanceTimeGroupService
             }
 
             AttendanceTimeGroup::create([
-                'employee_id'         => $attendance->employee_id,
-                'external_group_id'   => $externalGroupId,
-                'shift_date'          => $attendance->shift_date,
-                'shift_window_start'  => $attendance->punch_time,
-                'shift_window_end'    => Carbon::parse($attendance->punch_time)->addHours(8),
-                'created_at'          => now(),
-                'updated_at'          => now(),
+                'employee_id' => $attendance->employee_id,
+                'external_group_id' => $externalGroupId,
+                'shift_date' => $attendance->shift_date,
+                'shift_window_start' => $attendance->punch_time,
+                'shift_window_end' => Carbon::parse($attendance->punch_time)->addHours(8),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             $attendance->external_group_id = $externalGroupId;
-            \Log::info("[TimeGroup] Created new group for Attendance ID {$attendance->id} - External Group ID: {$externalGroupId}");
+            $this->groupCache[$cacheKey] = $externalGroupId;
         }
 
         $attendance->save();
@@ -100,18 +108,13 @@ class AttendanceTimeGroupService
 
     /**
      * Rebuilds all attendance_time_groups based on current attendance and schedule data.
-     * Similar to the InsertAttendanceTimeGroups stored procedure.
      */
     public function rebuildTimeGroups(): void
     {
-        Log::info("[TimeGroup] 🔁 Rebuilding all Attendance Time Groups...");
+        Log::info('[TimeGroup] Rebuilding all Attendance Time Groups...');
 
-        $flexMinutes = DB::table('company_setup')->value('attendance_flexibility_minutes') ?? 30;
-
-        // Clear existing groups
         AttendanceTimeGroup::truncate();
 
-        // Build new records
         $groupedData = DB::table('attendances as a')
             ->join('employees as e', 'a.employee_id', '=', 'e.id')
             ->leftJoin('shift_schedules as ss', function ($join) {
@@ -143,33 +146,26 @@ class AttendanceTimeGroupService
 
         foreach ($groupedData as $group) {
             AttendanceTimeGroup::create([
-                'employee_id'         => $group->employee_id,
-                'external_group_id'   => $group->external_group_id,
-                'shift_date'          => $group->shift_date,
-                'shift_window_start'  => $group->shift_window_start,
-                'shift_window_end'    => $group->shift_window_end,
-                'lunch_start_time'    => $group->lunch_start_time,
-                'lunch_end_time'      => $group->lunch_end_time,
-                'created_at'          => now(),
-                'updated_at'          => now(),
+                'employee_id' => $group->employee_id,
+                'external_group_id' => $group->external_group_id,
+                'shift_date' => $group->shift_date,
+                'shift_window_start' => $group->shift_window_start,
+                'shift_window_end' => $group->shift_window_end,
+                'lunch_start_time' => $group->lunch_start_time,
+                'lunch_end_time' => $group->lunch_end_time,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
 
-        Log::info("[TimeGroup] ✅ Finished rebuilding Attendance Time Groups.");
+        Log::info('[TimeGroup] Finished rebuilding Attendance Time Groups.');
     }
 
     /**
      * Wrapper to ensure both shift_date and external_group_id are assigned.
-     * Intended for external use where both are required in sync.
-     *
-     * @param Attendance $attendance
-     * @param int $systemUserId
-     * @return void
      */
     public function getOrCreateGroupAndAssign(Attendance $attendance, int $systemUserId): void
     {
-        Log::info("[TimeGroup] 🧩 Executing getOrCreateGroupAndAssign for Attendance ID: {$attendance->id}");
         $this->getOrCreateShiftDate($attendance, $systemUserId);
-        Log::info("[TimeGroup] ✅ Completed getOrCreateGroupAndAssign for Attendance ID: {$attendance->id}");
     }
 }

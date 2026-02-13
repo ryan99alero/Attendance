@@ -2,15 +2,11 @@
 
 namespace App\Services\ClockEventProcessing;
 
-use Exception;
-use App\Models\ClockEvent;
 use App\Models\Attendance;
-use App\Models\PunchType;
-use App\Models\PayPeriod;
-use Illuminate\Support\Facades\DB;
+use App\Models\ClockEvent;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class ClockEventProcessingService
 {
@@ -24,118 +20,104 @@ class ClockEventProcessingService
             'processed' => 0,
             'errors' => 0,
             'skipped' => 0,
-            'batch_id' => $batchId
+            'batch_id' => $batchId,
         ];
 
-        Log::info("[ClockEventProcessing] Starting batch processing", [
+        Log::info('[ClockEventProcessing] Starting batch processing', [
             'batch_id' => $batchId,
-            'batch_size' => $batchSize
+            'batch_size' => $batchSize,
         ]);
 
-        // Get unprocessed events in batches
-        $unprocessedEvents = ClockEvent::readyForProcessing()
+        // Get IDs only first to minimize memory
+        $eventIds = ClockEvent::readyForProcessing()
             ->orderBy('event_time')
             ->limit($batchSize)
-            ->get();
+            ->pluck('id')
+            ->toArray();
 
-        if ($unprocessedEvents->isEmpty()) {
-            Log::info("[ClockEventProcessing] No unprocessed events found");
+        if (empty($eventIds)) {
+            Log::info('[ClockEventProcessing] No unprocessed events found');
+
             return $stats;
         }
 
-        // Group events by employee and shift date for processing
-        $groupedEvents = $unprocessedEvents->groupBy(function ($event) {
-            return $event->employee_id . '_' . $event->shift_date->format('Y-m-d');
-        });
-
-        foreach ($groupedEvents as $groupKey => $events) {
+        // Process each event individually to avoid memory issues
+        foreach ($eventIds as $eventId) {
             try {
-                $this->processEventGroup($events, $batchId, $stats);
+                // Load fresh each time
+                $event = ClockEvent::with('employee')->find($eventId);
+
+                if (! $event) {
+                    continue;
+                }
+
+                if (! $event->employee) {
+                    $this->markEventAsError($event, 'No employee assigned', $batchId);
+                    $stats['errors']++;
+
+                    continue;
+                }
+
+                $this->processSingleEvent($event, $batchId, $stats);
+
             } catch (Exception $e) {
-                Log::error("[ClockEventProcessing] Failed to process group", [
-                    'group_key' => $groupKey,
+                Log::error('[ClockEventProcessing] Failed to process event', [
+                    'event_id' => $eventId,
                     'batch_id' => $batchId,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
 
-                // Mark all events in this group as having errors
-                foreach ($events as $event) {
+                // Try to mark the event as error
+                $event = ClockEvent::find($eventId);
+                if ($event) {
                     $this->markEventAsError($event, $e->getMessage(), $batchId);
-                    $stats['errors']++;
                 }
+                $stats['errors']++;
             }
         }
 
-        Log::info("[ClockEventProcessing] Batch processing completed", [
+        Log::info('[ClockEventProcessing] Batch processing completed', [
             'batch_id' => $batchId,
-            'stats' => $stats
+            'stats' => $stats,
         ]);
 
         return $stats;
     }
 
     /**
-     * Process a group of events for the same employee/day
+     * Process a single clock event
      */
-    protected function processEventGroup($events, string $batchId, array &$stats): void
+    protected function processSingleEvent(ClockEvent $event, string $batchId, array &$stats): void
     {
-        $employee = $events->first()->employee;
-        $shiftDate = $events->first()->shift_date;
+        $clockEventId = $event->id;
 
-        Log::info("[ClockEventProcessing] Processing event group", [
-            'employee_id' => $employee->id,
-            'employee_name' => $employee->full_names,
-            'shift_date' => $shiftDate->format('Y-m-d'),
-            'event_count' => $events->count(),
-            'batch_id' => $batchId
+        Log::debug('[ClockEventProcessing] Processing event', [
+            'clock_event_id' => $clockEventId,
+            'employee_id' => $event->employee_id,
+            'shift_date' => $event->shift_date?->format('Y-m-d'),
+            'batch_id' => $batchId,
         ]);
 
-        // Sort events by time
-        $sortedEvents = $events->sortBy('event_time');
+        $attendance = $this->createAttendanceRecord($event, $batchId);
 
-        // Create attendance records for each event (no punch type assignment)
-        foreach ($sortedEvents as $event) {
-            try {
-                $attendance = $this->createAttendanceRecord($event, $batchId);
+        // Delete clock event after successful processing
+        $event->delete();
 
-                // Mark event as processed
-                $event->update([
-                    'is_processed' => true,
-                    'processed_at' => now(),
-                    'attendance_id' => $attendance->id,
-                    'batch_id' => $batchId,
-                    'processing_error' => null
-                ]);
+        $stats['processed']++;
 
-                $stats['processed']++;
-
-                Log::info("[ClockEventProcessing] Created attendance record", [
-                    'clock_event_id' => $event->id,
-                    'attendance_id' => $attendance->id,
-                    'status' => 'Incomplete - ready for processing engines',
-                    'batch_id' => $batchId
-                ]);
-
-            } catch (Exception $e) {
-                $this->markEventAsError($event, $e->getMessage(), $batchId);
-                $stats['errors']++;
-
-                Log::error("[ClockEventProcessing] Failed to create attendance record", [
-                    'clock_event_id' => $event->id,
-                    'error' => $e->getMessage(),
-                    'batch_id' => $batchId
-                ]);
-            }
-        }
+        Log::debug('[ClockEventProcessing] Created attendance record', [
+            'clock_event_id' => $clockEventId,
+            'attendance_id' => $attendance->id,
+            'batch_id' => $batchId,
+        ]);
     }
-
 
     /**
      * Create an attendance record from a clock event
      */
-    protected function createAttendanceRecord($event, string $batchId): Attendance
+    protected function createAttendanceRecord(ClockEvent $event, string $batchId): Attendance
     {
-        $attendance = Attendance::create([
+        return Attendance::create([
             'employee_id' => $event->employee_id,
             'device_id' => $event->device_id,
             'punch_time' => $event->event_time,
@@ -149,8 +131,6 @@ class ClockEventProcessingService
             'issue_notes' => "Auto-generated from ClockEvent ID: {$event->id}",
             'created_by' => null, // System generated - no specific user
         ]);
-
-        return $attendance;
     }
 
     /**
@@ -161,21 +141,33 @@ class ClockEventProcessingService
         $event->update([
             'processing_error' => $error,
             'batch_id' => $batchId,
-            'is_processed' => false // Keep as unprocessed for retry
         ]);
     }
 
     /**
      * Get processing statistics
+     *
+     * Note: Processed events are deleted from clock_events table.
+     * Only pending and errored events remain in this table.
+     * Successfully processed events live in the attendances table.
      */
     public function getProcessingStats(): array
     {
+        $pendingCount = ClockEvent::readyForProcessing()->count();
+        $errorCount = ClockEvent::withErrors()->count();
+        $totalInTable = ClockEvent::count();
+
+        // Count of successfully processed = records in attendance from clock events
+        $processedCount = Attendance::whereNotNull('issue_notes')
+            ->where('issue_notes', 'like', 'Auto-generated from ClockEvent ID:%')
+            ->count();
+
         return [
-            'total_events' => ClockEvent::count(),
-            'processed_events' => ClockEvent::processed()->count(),
-            'unprocessed_events' => ClockEvent::unprocessed()->count(),
-            'events_with_errors' => ClockEvent::withErrors()->count(),
-            'ready_for_processing' => ClockEvent::readyForProcessing()->count(),
+            'total_events' => $totalInTable + $processedCount, // Total ever received
+            'processed_events' => $processedCount, // Now in attendance table
+            'unprocessed_events' => $totalInTable, // Still in clock_events
+            'events_with_errors' => $errorCount,
+            'ready_for_processing' => $pendingCount,
         ];
     }
 
@@ -184,18 +176,15 @@ class ClockEventProcessingService
      */
     public function retryFailedEvents(): array
     {
-        $failedEvents = ClockEvent::withErrors()->get();
-
-        foreach ($failedEvents as $event) {
-            $event->update([
+        $clearedCount = ClockEvent::withErrors()
+            ->update([
                 'processing_error' => null,
-                'batch_id' => null
+                'batch_id' => null,
             ]);
-        }
 
         return [
-            'cleared_errors' => $failedEvents->count(),
-            'ready_for_retry' => ClockEvent::readyForProcessing()->count()
+            'cleared_errors' => $clearedCount,
+            'ready_for_retry' => ClockEvent::readyForProcessing()->count(),
         ];
     }
 
@@ -204,33 +193,32 @@ class ClockEventProcessingService
      */
     public function processEmployeeEvents(int $employeeId, string $startDate, string $endDate): array
     {
-        $events = ClockEvent::unprocessed()
-            ->where('employee_id', $employeeId)
+        $eventIds = ClockEvent::where('employee_id', $employeeId)
             ->whereBetween('shift_date', [$startDate, $endDate])
             ->orderBy('event_time')
-            ->get();
+            ->pluck('id')
+            ->toArray();
 
-        if ($events->isEmpty()) {
+        if (empty($eventIds)) {
             return ['processed' => 0, 'message' => 'No unprocessed events found for this employee/date range'];
         }
 
         $batchId = Str::uuid();
         $stats = ['processed' => 0, 'errors' => 0, 'batch_id' => $batchId];
 
-        $groupedEvents = $events->groupBy(function ($event) {
-            return $event->shift_date->format('Y-m-d');
-        });
-
-        foreach ($groupedEvents as $date => $dayEvents) {
+        foreach ($eventIds as $eventId) {
             try {
-                $this->processEventGroup($dayEvents, $batchId, $stats);
+                $event = ClockEvent::with('employee')->find($eventId);
+                if ($event && $event->employee) {
+                    $this->processSingleEvent($event, $batchId, $stats);
+                }
             } catch (Exception $e) {
-                Log::error("[ClockEventProcessing] Failed to process employee events", [
+                Log::error('[ClockEventProcessing] Failed to process employee event', [
                     'employee_id' => $employeeId,
-                    'date' => $date,
-                    'error' => $e->getMessage()
+                    'event_id' => $eventId,
+                    'error' => $e->getMessage(),
                 ]);
-                $stats['errors'] += $dayEvents->count();
+                $stats['errors']++;
             }
         }
 

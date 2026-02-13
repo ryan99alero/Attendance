@@ -132,14 +132,10 @@ class PayPeriodResource extends Resource
                     ->label('Issues')
                     ->state(fn ($record) => $record->attendanceIssuesCount())
                     ->sortable()
-                    ->url(fn ($record) => route('filament.admin.resources.attendances.index', [
-                        'filter' => [
-                            'is_migrated' => false,
-                            'date_range' => [
-                                'start' => $record->start_date->toDateString(),
-                                'end' => $record->end_date->toDateString(),
-                            ],
-                        ],
+                    ->url(fn ($record) => '/admin/attendance-summary?'.http_build_query([
+                        'payPeriodId' => $record->id,
+                        'statusFilter' => 'problem_with_migrated',
+                        'duplicatesFilter' => 'all',
                     ]), true)
                     ->color('danger')
                     ->size('sm')
@@ -290,12 +286,16 @@ class PayPeriodResource extends Resource
                                 ->update([
                                     'status' => 'Posted',
                                     'is_posted' => true,
+                                    'is_archived' => true,
                                 ]);
 
-                            // Also update corresponding punch records to set is_posted = true
+                            // Also update corresponding punch records to set is_posted and is_archived = true
                             $updatedPunchRecords = DB::table('punches')
                                 ->where('pay_period_id', $record->id)
-                                ->update(['is_posted' => true]);
+                                ->update([
+                                    'is_posted' => true,
+                                    'is_archived' => true,
+                                ]);
 
                             $record->update(['is_posted' => true]);
 

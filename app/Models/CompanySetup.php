@@ -44,6 +44,8 @@ class CompanySetup extends Model
     protected $fillable = [
         'attendance_flexibility_minutes',
         'logging_level',
+        'debugbar_enabled',
+        'telescope_enabled',
         'log_retention_days',
         'log_request_payloads',
         'log_response_data',
@@ -101,6 +103,8 @@ class CompanySetup extends Model
     ];
 
     protected $casts = [
+        'debugbar_enabled' => 'boolean',
+        'telescope_enabled' => 'boolean',
         'log_request_payloads' => 'boolean',
         'log_response_data' => 'boolean',
         'auto_adjust_punches' => 'boolean',

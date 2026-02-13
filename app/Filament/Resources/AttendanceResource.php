@@ -2,51 +2,48 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\DatePicker;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\AttendanceResource\Pages\ListAttendances;
 use App\Filament\Resources\AttendanceResource\Pages\CreateAttendance;
 use App\Filament\Resources\AttendanceResource\Pages\EditAttendance;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\AttendanceResource\Pages;
+use App\Filament\Resources\AttendanceResource\Pages\ListAttendances;
 use App\Models\Attendance;
-use App\Models\PunchType;
+use App\Models\Classification;
 use App\Models\Employee;
 use App\Models\PayPeriod;
-use App\Models\Classification;
-use Filament\Resources\Resource;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use App\Models\PunchType;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Illuminate\Support\Facades\DB;
-use Filament\Tables\Columns\SelectColumn;
-use Filament\Tables\Columns\TextInputColumn;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\SelectColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextInputColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Filament\Tables;
-use Filament\Forms;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceResource extends Resource
 {
     protected static ?string $model = Attendance::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Tracking';
+
     protected static ?string $navigationLabel = 'Attendances';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-finger-print';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-finger-print';
+
     protected static ?int $navigationSort = -100;
 
     public static function form(Schema $schema): Schema
@@ -56,7 +53,7 @@ class AttendanceResource extends Resource
                 ->label('Employee')
                 ->options(Employee::orderBy('last_name')->orderBy('first_name')
                     ->get()
-                    ->mapWithKeys(fn($employee) => [$employee->id => "{$employee->last_name}, {$employee->first_name}"])
+                    ->mapWithKeys(fn ($employee) => [$employee->id => "{$employee->last_name}, {$employee->first_name}"])
                     ->toArray())
                 ->placeholder('Select an Employee')
                 ->searchable()
@@ -140,6 +137,15 @@ class AttendanceResource extends Resource
             ->modifyQueryUsing(function ($query) {
                 $filter = request()->input('filter');
 
+                // Hide archived records by default unless show_archived filter is enabled
+                $tableFilters = request()->input('tableFilters', []);
+                $showArchived = $tableFilters['show_archived']['value'] ?? false;
+                if (! $showArchived) {
+                    $query->where(function ($q) {
+                        $q->where('is_archived', false)->orWhereNull('is_archived');
+                    });
+                }
+
                 // Handle `filter_ids` if passed
                 $filterIds = request()->input('filter_ids');
                 if ($filterIds) {
@@ -162,7 +168,7 @@ class AttendanceResource extends Resource
                         if (isset($filter['date_range']['start'], $filter['date_range']['end'])) {
                             $subQuery->whereBetween('punch_time', [
                                 $filter['date_range']['start'],
-                                $filter['date_range']['end']
+                                $filter['date_range']['end'],
                             ]);
                         }
                     };
@@ -170,7 +176,7 @@ class AttendanceResource extends Resource
                     $disagreementDates = Attendance::where('status', 'Discrepancy')
                         ->where($dateRangeCondition)
                         ->get()
-                        ->map(fn($record) => $record->punch_time->format('Y-m-d'))
+                        ->map(fn ($record) => $record->punch_time->format('Y-m-d'))
                         ->unique();
 
                     // Show all records from those dates
@@ -323,7 +329,7 @@ class AttendanceResource extends Resource
                                     ->limit(10)
                                     ->get()
                                     ->mapWithKeys(function ($period) {
-                                        return [$period->id => $period->start_date->format('M j') . ' - ' . $period->end_date->format('M j, Y')];
+                                        return [$period->id => $period->start_date->format('M j').' - '.$period->end_date->format('M j, Y')];
                                     });
                             })
                             ->searchable()
@@ -340,6 +346,7 @@ class AttendanceResource extends Resource
                                         $payPeriod->end_date->endOfDay(),
                                     ]);
                                 }
+
                                 return $query;
                             }
                         );
@@ -354,6 +361,11 @@ class AttendanceResource extends Resource
                     ->toggle()
                     ->label('Consensus Review Required')
                     ->query(fn (Builder $query): Builder => $query->where('status', 'Discrepancy')),
+
+                Filter::make('show_archived')
+                    ->toggle()
+                    ->label('Show Archived Records')
+                    ->query(fn (Builder $query): Builder => $query), // Query handled in modifyQueryUsing
             ])
             ->recordActions([
                 EditAction::make(),

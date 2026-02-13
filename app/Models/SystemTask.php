@@ -171,6 +171,29 @@ class SystemTask extends Model
             'progress_message' => 'Cancelled by user',
             'completed_at' => now(),
         ]);
+
+        // Reset related PayPeriod if this was a processing task
+        $this->resetRelatedModel();
+    }
+
+    /**
+     * Reset the related model's processing status if applicable
+     */
+    public function resetRelatedModel(): void
+    {
+        if ($this->related_model === PayPeriod::class && $this->related_id) {
+            $payPeriod = PayPeriod::find($this->related_id);
+            if ($payPeriod) {
+                $payPeriod->update([
+                    'processing_status' => 'pending',
+                    'processing_progress' => 0,
+                    'processing_message' => null,
+                    'processing_started_at' => null,
+                    'processing_completed_at' => null,
+                    'processing_error' => null,
+                ]);
+            }
+        }
     }
 
     // Progress updates

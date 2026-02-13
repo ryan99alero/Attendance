@@ -2,22 +2,24 @@
 
 namespace App\Services\TimeGrouping;
 
-use DB;
 use App\Models\Attendance;
-use App\Models\PayPeriod;
 use App\Models\CompanySetup;
+use App\Models\PayPeriod;
+use App\Services\Consensus\PunchTypeConsensusService;
 use App\Services\Heuristic\HeuristicPunchTypeAssignmentService;
 use App\Services\ML\MLPunchTypePredictorService;
-use App\Services\Consensus\PunchTypeConsensusService;
-use App\Services\TimeGrouping\AttendanceTimeGroupService;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AttendanceTimeProcessorService
 {
     protected HeuristicPunchTypeAssignmentService $heuristicService;
+
     protected MLPunchTypePredictorService $mlService;
+
     protected PunchTypeConsensusService $consensusService;
+
     protected AttendanceTimeGroupService $attendanceTimeGroupService;
 
     public function __construct(
@@ -30,11 +32,13 @@ class AttendanceTimeProcessorService
         $this->mlService = $mlService;
         $this->consensusService = $consensusService;
         $this->attendanceTimeGroupService = $attendanceTimeGroupService;
-        Log::info("[Processor] Initialized AttendanceTimeProcessorService.");
     }
 
     public function processAttendanceForPayPeriod(PayPeriod $payPeriod): void
     {
+        // Disable query logging to prevent memory exhaustion
+        DB::disableQueryLog();
+
         Log::info("[AttendanceTimeProcessorService] Starting attendance processing for PayPeriod ID: {$payPeriod->id}");
 
         $startDate = Carbon::parse($payPeriod->start_date)->startOfDay();
@@ -46,36 +50,43 @@ class AttendanceTimeProcessorService
         $companySetup = CompanySetup::first();
         $flexibility = $companySetup->attendance_flexibility_minutes ?? 30;
 
-        $attendances = Attendance::whereBetween('punch_time', [$startDate, $endDate])
+        // Get distinct employee IDs that have records to process (memory-efficient)
+        $employeeIds = Attendance::whereBetween('punch_time', [$startDate, $endDate])
             ->whereIn('status', ['Incomplete', 'NeedsReview'])
-            ->orderBy('employee_id')
-            ->orderBy('punch_time')
-            ->get()
-            ->groupBy('employee_id');
+            ->distinct()
+            ->pluck('employee_id');
 
-        Log::info("[AttendanceTimeProcessorService] 📌 Found {$attendances->count()} incomplete attendance records.");
+        $totalRecords = Attendance::whereBetween('punch_time', [$startDate, $endDate])
+            ->whereIn('status', ['Incomplete', 'NeedsReview'])
+            ->count();
 
-        foreach ($attendances as $employeeId => $punches) {
-            Log::info("[Processor] Processing Employee ID: {$employeeId} with {$punches->count()} punch(es).");
+        Log::info("[AttendanceTimeProcessorService] Found {$totalRecords} incomplete records across {$employeeIds->count()} employees.");
 
-            // ✅ First: Assign shift_date to all punches before processing
+        $debugMode = $companySetup->debug_punch_assignment_mode ?? 'full';
+        $processed = 0;
+
+        // Process one employee at a time to avoid loading all records into memory
+        foreach ($employeeIds as $employeeId) {
+            $punches = Attendance::whereBetween('punch_time', [$startDate, $endDate])
+                ->whereIn('status', ['Incomplete', 'NeedsReview'])
+                ->where('employee_id', $employeeId)
+                ->orderBy('punch_time')
+                ->get();
+
+            // Assign shift_date to all punches before processing
             foreach ($punches as $punch) {
                 if (empty($punch->shift_date)) {
                     $this->attendanceTimeGroupService->getOrCreateShiftDate($punch, auth()->id() ?? 0);
-                    $punch->save(); // Save the updated shift_date
-                    Log::info("[Processor] Assigned shift_date {$punch->shift_date} to Punch ID: {$punch->id}");
+                    $punch->save();
                 }
             }
 
-            // ✅ Second: Handle odd-numbered punch days by processing pairs and marking unpaired punch
+            // Handle odd-numbered punch days
             $punchDays = $punches->groupBy('shift_date');
             $unpairedPunches = collect();
 
             foreach ($punchDays as $shiftDate => $dayPunches) {
                 if ($dayPunches->count() % 2 !== 0) {
-                    Log::warning("[Processor] Employee {$employeeId} has {$dayPunches->count()} punches on shift date {$shiftDate} - will process pairs and mark unpaired punch");
-
-                    // Find the unpaired punch (usually the middle one that breaks the pattern)
                     $sortedPunches = $dayPunches->sortBy('punch_time');
                     $unpairedPunch = $this->findUnpairedPunch($sortedPunches);
 
@@ -85,27 +96,19 @@ class AttendanceTimeProcessorService
                         $unpairedPunch->punch_state = 'unknown';
                         $unpairedPunch->issue_notes = "Unpaired punch detected on {$shiftDate} - requires manual review";
                         $unpairedPunch->save();
-
-                        // Remove only the unpaired punch from processing, let the pairs continue
                         $unpairedPunches->push($unpairedPunch);
-                        Log::info("[Processor] Marked punch ID {$unpairedPunch->id} as unpaired, continuing with remaining pairs");
                     }
                 }
             }
 
-            // Remove unpaired punches from processing but keep the pairs
             if ($unpairedPunches->isNotEmpty()) {
-                $punches = $punches->reject(function($punch) use ($unpairedPunches) {
+                $punches = $punches->reject(function ($punch) use ($unpairedPunches) {
                     return $unpairedPunches->pluck('id')->contains($punch->id);
                 });
-                Log::info("[Processor] Removed {$unpairedPunches->count()} unpaired punches, continuing with {$punches->count()} paired punches");
             }
 
-            $punchEvaluations = []; // ✅ Initialize array to collect punch evaluation results
+            $punchEvaluations = [];
 
-            $debugMode = $companySetup->debug_punch_assignment_mode ?? 'full';
-
-            // ✅ Check if ML mode needs training data first
             if ($debugMode === 'ml') {
                 $trainingDataCount = DB::table('attendances')
                     ->whereNotNull('punch_type_id')
@@ -113,46 +116,31 @@ class AttendanceTimeProcessorService
                     ->count();
 
                 if ($trainingDataCount < 50) {
-                    Log::info("[Processor] ML mode detected but insufficient training data ({$trainingDataCount} records). Running training phase first.");
-
-                    // Run Heuristic first to create training data
-                    Log::info("[Processor] Training Phase: Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
                     $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
-
-                    Log::info("[Processor] Training phase completed. These processed records will become ML training data after migration.");
                 } else {
-                    Log::info("[Processor] Sufficient training data available ({$trainingDataCount} records). Running ML mode.");
-                    // Only run ML when we have enough training data
                     $this->mlService->assignPunchTypes($punches, $employeeId, $punchEvaluations);
                 }
             } elseif ($debugMode === 'consensus') {
-                // ✅ Run Consensus Processing - both engines evaluate all punches
-                Log::info("[Processor] Running Consensus Punch Assignment for Employee ID: {$employeeId}.");
                 $this->consensusService->processConsensus($punches, $employeeId, $flexibility, $punchEvaluations);
             } else {
-                // ✅ 1️⃣ Run Heuristic Processing First
                 if ($debugMode === 'heuristic' || $debugMode === 'all') {
-                    Log::info("[Processor] Running Heuristic Punch Assignment for Employee ID: {$employeeId}.");
                     $this->heuristicService->assignPunchTypes($punches, $flexibility, $punchEvaluations);
                 }
 
-                // ✅ 2️⃣ Process Any Remaining Unresolved Punches Using ML
                 $mlPendingPunches = $punches->whereNull('punch_type_id');
                 if ($mlPendingPunches->isNotEmpty() && ($debugMode === 'all' && $companySetup->use_ml_for_punch_matching)) {
-                    Log::info("[Processor] Running ML Punch Assignment for Employee ID: {$employeeId}.");
                     $this->mlService->assignPunchTypes($mlPendingPunches, $employeeId, $punchEvaluations);
                 }
             }
 
-            // ✅ 4️⃣ FINALIZE Punch Types for Employee (skip if consensus mode handled it)
             if ($debugMode !== 'consensus') {
                 $this->finalizePunchTypes($punches, $punchEvaluations);
             }
 
-            Log::info("[Processor] Punch Type Evaluations Completed for Employee ID: {$employeeId}");
+            $processed++;
         }
 
-        Log::info("[AttendanceTimeProcessorService] ✅ Completed attendance processing for PayPeriod ID: {$payPeriod->id}");
+        Log::info("[AttendanceTimeProcessorService] Completed - processed {$processed} employees for PayPeriod ID: {$payPeriod->id}");
     }
 
     private function finalizePunchTypes($punches, &$punchEvaluations): void
@@ -162,14 +150,13 @@ class AttendanceTimeProcessorService
             $evaluations = $punchEvaluations[$punchId] ?? [];
 
             if (empty($evaluations)) {
-                Log::warning("[Processor] No evaluations found for Punch ID: {$punchId}. Marking as NeedsReview.");
                 $punch->status = 'NeedsReview';
-                $punch->issue_notes = "No confident Punch Type assigned.";
+                $punch->issue_notes = 'No confident Punch Type assigned.';
                 $punch->save();
+
                 continue;
             }
 
-            // Determine final Punch Type by confidence (ML prioritized, fallback to Heuristic, then Shift)
             $finalType = $this->selectFinalPunchType($evaluations);
             $finalState = $this->selectFinalPunchState($evaluations);
 
@@ -177,14 +164,11 @@ class AttendanceTimeProcessorService
                 $punch->punch_type_id = $finalType;
                 $punch->punch_state = $finalState;
                 $punch->status = 'Complete';
-                $punch->issue_notes = "Finalized Punch Type from multiple evaluations.";
+                $punch->issue_notes = 'Finalized Punch Type from multiple evaluations.';
                 $punch->save();
-
-                Log::info("[Processor] Assigned Punch ID: {$punchId} -> Type: {$finalType}, State: {$finalState}");
             } else {
-                Log::warning("[Processor] No confident decision for Punch ID: {$punchId}. Marking as NeedsReview.");
                 $punch->status = 'NeedsReview';
-                $punch->issue_notes = "Could not determine Punch Type.";
+                $punch->issue_notes = 'Could not determine Punch Type.';
                 $punch->save();
             }
         }
@@ -219,30 +203,20 @@ class AttendanceTimeProcessorService
 
     /**
      * Find the unpaired punch in an odd-numbered set of punches
-     * This identifies punches that break the normal pairing pattern
      */
     private function findUnpairedPunch($sortedPunches)
     {
-        $punches = $sortedPunches->values(); // Reset keys to 0, 1, 2...
+        $punches = $sortedPunches->values();
         $count = $punches->count();
 
-        // For 7 punches, we expect: Clock In, Break/Lunch Start, Break/Lunch Stop, Lunch/Break Start, Lunch/Break Stop, Break Start, Clock Out
-        // The unpaired punch is usually in the middle where the pattern breaks
-
-        // Simple heuristic: look for timing gaps or pattern breaks
-        // If we have 7 punches, typically one will be out of sequence
-
-        // Method 1: Look for the punch that creates the biggest time gap when removed
         $bestCandidate = null;
         $smallestGapSum = PHP_INT_MAX;
 
         for ($i = 0; $i < $count; $i++) {
-            // Create array without this punch
-            $withoutPunch = $punches->reject(function($punch, $index) use ($i) {
+            $withoutPunch = $punches->reject(function ($punch, $index) use ($i) {
                 return $index === $i;
             })->values();
 
-            // Calculate total gaps between consecutive punches
             $gapSum = 0;
             for ($j = 0; $j < $withoutPunch->count() - 1; $j++) {
                 $time1 = strtotime($withoutPunch[$j]->punch_time);
@@ -251,15 +225,10 @@ class AttendanceTimeProcessorService
                 $gapSum += $gap;
             }
 
-            // The punch that creates the most regular pattern when removed is likely the unpaired one
             if ($gapSum < $smallestGapSum) {
                 $smallestGapSum = $gapSum;
                 $bestCandidate = $punches[$i];
             }
-        }
-
-        if ($bestCandidate) {
-            Log::info("[Processor] Identified punch ID {$bestCandidate->id} at {$bestCandidate->punch_time} as unpaired");
         }
 
         return $bestCandidate;
