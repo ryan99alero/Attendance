@@ -108,9 +108,12 @@ class AttendanceClassificationService
         $this->vacationCacheLoaded = true;
     }
 
-    /**
+    // AUDIT: 2026-02-13 - classifyAttendance() never called externally
+    // classifyAllUnclassifiedAttendance() is the main entry point which calls determineClassification() directly
+    /*
+    **
      * Classify a single attendance record
-     */
+     *
     public function classifyAttendance(Attendance $attendance): ?string
     {
         $classificationCode = $this->determineClassification($attendance);
@@ -123,6 +126,7 @@ class AttendanceClassificationService
 
         return null;
     }
+    */
 
     /**
      * Determine the appropriate classification for an attendance record
@@ -239,8 +243,11 @@ class AttendanceClassificationService
         return $this->classificationCache[$code] ?? null;
     }
 
+    // AUDIT: 2026-02-13 - getClassificationMappings() never called externally
+    /*
     public function getClassificationMappings(): array
     {
         return $this->classificationCache;
     }
+    */
 }

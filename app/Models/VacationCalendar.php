@@ -2,20 +2,22 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
- *
+ * VacationCalendar - Stores employee vacation/PTO entries ONLY.
+ * Holidays are now managed separately via HolidayInstance table.
  *
  * @property int $id
  * @property int $employee_id Foreign key to Employees
  * @property Carbon $vacation_date Date of the vacation
  * @property bool $is_half_day Indicates if the vacation is a half-day
  * @property bool $is_active Indicates if the vacation record is active
+ * @property bool $is_recorded Indicates if this vacation has been recorded in the Attendance table
  * @property int|null $created_by Foreign key to Users for record creator
  * @property int|null $updated_by Foreign key to Users for last updater
  * @property Carbon|null $created_at
@@ -23,6 +25,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read User|null $creator
  * @property-read Employee $employee
  * @property-read User|null $updater
+ *
  * @method static Builder<static>|VacationCalendar newModelQuery()
  * @method static Builder<static>|VacationCalendar newQuery()
  * @method static Builder<static>|VacationCalendar query()
@@ -35,8 +38,8 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder<static>|VacationCalendar whereUpdatedAt($value)
  * @method static Builder<static>|VacationCalendar whereUpdatedBy($value)
  * @method static Builder<static>|VacationCalendar whereVacationDate($value)
- * @property int $is_recorded Indicates if this vacation has been recorded in the Attendance table
  * @method static Builder<static>|VacationCalendar whereIsRecorded($value)
+ *
  * @mixin \Eloquent
  */
 class VacationCalendar extends Model
@@ -73,26 +76,5 @@ class VacationCalendar extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    public function holidayTemplate(): BelongsTo
-    {
-        return $this->belongsTo(HolidayTemplate::class, 'holiday_template_id');
-    }
-
-    /**
-     * Scope for manual vacation entries (not auto-managed)
-     */
-    public function scopeManual($query)
-    {
-        return $query->where('auto_managed', false);
-    }
-
-    /**
-     * Scope for auto-managed vacation entries (holidays)
-     */
-    public function scopeAutoManaged($query)
-    {
-        return $query->where('auto_managed', true);
     }
 }

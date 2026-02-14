@@ -5,16 +5,13 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PayPeriodResource\Pages\CreatePayPeriod;
 use App\Filament\Resources\PayPeriodResource\Pages\EditPayPeriod;
 use App\Filament\Resources\PayPeriodResource\Pages\ListPayPeriods;
+use App\Jobs\PostPayPeriodJob;
 use App\Jobs\ProcessPayPeriodJob;
 use App\Jobs\ProcessPayrollExportJob;
-use App\Models\Attendance;
 use App\Models\IntegrationConnection;
 use App\Models\PayPeriod;
 use App\Models\PayrollExport;
-use App\Models\VacationCalendar;
-use App\Models\VacationTransaction;
 use App\Services\Payroll\PayrollAggregationService;
-use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -28,7 +25,6 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PayPeriodResource extends Resource
@@ -268,59 +264,14 @@ class PayPeriodResource extends Resource
                             return;
                         }
 
+                        // Dispatch job to handle posting in background
+                        PostPayPeriodJob::dispatch($record, auth()->id());
+
                         Notification::make()
                             ->info()
-                            ->title('Posting Time Records')
-                            ->body("Finalizing time records for Pay Period ID: {$record->id}...")
+                            ->title('Posting Started')
+                            ->body("Pay Period '{$record->name}' is now being posted in the background. Check the Task Monitor for progress.")
                             ->send();
-
-                        try {
-                            // Archive only properly processed records (Migrated status with punch types assigned)
-                            $updatedAttendanceRecords = DB::table('attendances')
-                                ->whereBetween('punch_time', [
-                                    Carbon::parse($record->start_date)->startOfDay(),
-                                    Carbon::parse($record->end_date)->endOfDay(),
-                                ])
-                                ->where('status', 'Migrated')
-                                ->whereNotNull('punch_type_id')
-                                ->update([
-                                    'status' => 'Posted',
-                                    'is_posted' => true,
-                                    'is_archived' => true,
-                                ]);
-
-                            // Also update corresponding punch records to set is_posted and is_archived = true
-                            $updatedPunchRecords = DB::table('punches')
-                                ->where('pay_period_id', $record->id)
-                                ->update([
-                                    'is_posted' => true,
-                                    'is_archived' => true,
-                                ]);
-
-                            $record->update(['is_posted' => true]);
-
-                            // Automatically deduct vacation time for posted vacation records
-                            $vacationDeductions = self::processVacationDeductions($record);
-
-                            $successMessage = "Posted {$updatedAttendanceRecords} attendance records and {$updatedPunchRecords} punch records for Pay Period ID: {$record->id}";
-                            if ($vacationDeductions > 0) {
-                                $successMessage .= " | Deducted vacation time for {$vacationDeductions} employees";
-                            }
-
-                            Notification::make()
-                                ->success()
-                                ->title('Time Posted Successfully')
-                                ->body($successMessage)
-                                ->send();
-
-                        } catch (Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Post Time Error')
-                                ->body("Error posting time for Pay Period ID: {$record->id}: {$e->getMessage()}")
-                                ->persistent()
-                                ->send();
-                        }
                     }),
 
                 // View Punches Button
@@ -497,113 +448,6 @@ class PayPeriodResource extends Resource
                     ->modalCancelActionLabel('Close')
                     ->modalWidth('6xl'),
             ]);
-    }
-
-    /**
-     * Process vacation deductions for posted vacation records
-     */
-    private static function processVacationDeductions(PayPeriod $payPeriod): int
-    {
-        // Get vacation classification ID
-        $vacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
-
-        // Find all vacation attendance records that were just posted
-        $vacationRecords = Attendance::whereBetween('punch_time', [
-            Carbon::parse($payPeriod->start_date)->startOfDay(),
-            Carbon::parse($payPeriod->end_date)->endOfDay(),
-        ])
-            ->where('classification_id', $vacationClassificationId)
-            ->where('status', 'Posted')
-            ->with('employee.shiftSchedule')
-            ->get();
-
-        if ($vacationRecords->isEmpty()) {
-            return 0;
-        }
-
-        // Group vacation records by employee and date to calculate actual hours
-        $employeeVacationHours = [];
-
-        foreach ($vacationRecords as $record) {
-            $employeeId = $record->employee_id;
-            $date = Carbon::parse($record->punch_time)->toDateString();
-
-            if (! isset($employeeVacationHours[$employeeId])) {
-                $employeeVacationHours[$employeeId] = [];
-            }
-
-            if (! isset($employeeVacationHours[$employeeId][$date])) {
-                // Calculate actual hours from punch times for this date
-                $vacationPunchesForDate = $vacationRecords->where('employee_id', $employeeId)
-                    ->filter(function ($r) use ($date) {
-                        return Carbon::parse($r->punch_time)->toDateString() === $date;
-                    });
-
-                $clockInTimes = $vacationPunchesForDate->where('punch_state', 'start')->pluck('punch_time');
-                $clockOutTimes = $vacationPunchesForDate->where('punch_state', 'stop')->pluck('punch_time');
-
-                $totalHours = 0;
-
-                // Calculate hours from paired clock in/out times
-                foreach ($clockInTimes as $index => $clockIn) {
-                    if (isset($clockOutTimes[$index])) {
-                        $start = Carbon::parse($clockIn);
-                        $end = Carbon::parse($clockOutTimes[$index]);
-                        $totalHours += $end->diffInHours($start, true); // true for absolute value
-                    }
-                }
-
-                // Fallback to traditional calculation if no paired punches found
-                if ($totalHours == 0) {
-                    // Get daily hours from shift schedule or default to 8 hours
-                    $dailyHours = $record->employee->shiftSchedule->daily_hours ?? 8.0;
-
-                    // Check if this is a half-day vacation (from VacationCalendar)
-                    $vacationCalendar = VacationCalendar::where('employee_id', $employeeId)
-                        ->whereDate('vacation_date', $date)
-                        ->first();
-
-                    if ($vacationCalendar && $vacationCalendar->is_half_day) {
-                        $totalHours = $dailyHours / 2;
-                    } else {
-                        $totalHours = $dailyHours;
-                    }
-                }
-
-                $employeeVacationHours[$employeeId][$date] = $totalHours;
-            }
-        }
-
-        // Create vacation usage transactions for each employee
-        $employeesUpdated = 0;
-
-        foreach ($employeeVacationHours as $employeeId => $dailyHours) {
-            foreach ($dailyHours as $date => $hoursUsed) {
-                if ($hoursUsed > 0) {
-                    // Create vacation usage transaction
-                    $description = "Vacation usage - {$date}";
-                    if ($hoursUsed < 8) {
-                        $description .= ' (half day)';
-                    }
-
-                    VacationTransaction::createUsageTransaction(
-                        $employeeId,
-                        $payPeriod->id,
-                        $hoursUsed,
-                        $date,
-                        $description
-                    );
-
-                    Log::info("VacationTransaction: Created usage transaction - {$hoursUsed} hours for Employee ID {$employeeId} on {$date}");
-                }
-            }
-
-            if (! empty($dailyHours)) {
-                $employeesUpdated++;
-            }
-        }
-
-        return $employeesUpdated;
     }
 
     public static function getPages(): array

@@ -175,13 +175,14 @@ class PayrollAggregationService
             $typeName = $punchType ? strtolower($punchType->name) : '';
 
             // Determine if this is a clock-in or clock-out based on punch_type or punch_state
+            // AUDIT: 2026-02-13 - Fixed bug: punch_state enum only allows 'start', 'stop', 'unknown' (not 'in'/'out')
             $isClockIn = str_contains($typeName, 'in') ||
                 str_contains($typeName, 'start') ||
-                $record->punch_state === 'in';
+                $record->punch_state === 'start';
 
             $isClockOut = str_contains($typeName, 'out') ||
                 str_contains($typeName, 'end') ||
-                $record->punch_state === 'out';
+                $record->punch_state === 'stop';
 
             if ($isClockIn && ! $punchIn) {
                 $punchIn = Carbon::parse($record->punch_time);

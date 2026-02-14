@@ -2,12 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\HolidayInstance;
+use App\Models\HolidayTemplate;
 use Exception;
 use Illuminate\Console\Command;
-use App\Models\HolidayTemplate;
-use App\Models\VacationCalendar;
-use App\Models\Employee;
-use Carbon\Carbon;
 
 class CreateUpcomingHolidays extends Command
 {
@@ -15,7 +13,7 @@ class CreateUpcomingHolidays extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'holidays:create-upcoming
-                           {--year= : Create holidays for specific year (default: next year)}
+                           {--year= : Create holidays for specific year (default: current year)}
                            {--template= : Process specific holiday template ID}
                            {--dry-run : Show what would be created without making changes}
                            {--force : Recreate holidays even if they already exist}';
@@ -23,33 +21,34 @@ class CreateUpcomingHolidays extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Create upcoming holidays based on active holiday templates';
+    protected $description = 'Create upcoming holiday instances based on active holiday templates';
 
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
-        $year = $this->option('year') ? (int) $this->option('year') : Carbon::now()->addYear()->year;
+        $year = $this->option('year') ? (int) $this->option('year') : now()->year;
         $templateId = $this->option('template');
         $dryRun = $this->option('dry-run');
         $force = $this->option('force');
 
-        $this->info("🎉 Creating holidays for year: {$year}");
+        $this->info("🎉 Creating holiday instances for year: {$year}");
 
         if ($dryRun) {
-            $this->warn("🧪 DRY RUN MODE - No changes will be made");
+            $this->warn('🧪 DRY RUN MODE - No changes will be made');
         }
 
         // Get holiday templates to process
         $templates = $this->getTemplatesToProcess($templateId);
 
         if ($templates->isEmpty()) {
-            $this->info("✅ No active holiday templates found to process");
+            $this->info('✅ No active holiday templates found to process');
+
             return 0;
         }
 
-        $this->info("📋 Found " . $templates->count() . " holiday template(s) to process");
+        $this->info('📋 Found '.$templates->count().' holiday template(s) to process');
 
         $created = 0;
         $skipped = 0;
@@ -63,9 +62,9 @@ class CreateUpcomingHolidays extends Command
                 $result = $this->processHolidayTemplate($template, $year, $force, $dryRun);
 
                 if ($result['created']) {
-                    $created += $result['count'];
+                    $created++;
                     $this->newLine();
-                    $this->info("✅ {$template->name}: Created {$result['count']} holiday(s) for {$result['date']}");
+                    $this->info("✅ {$template->name}: Created holiday instance for {$result['date']}");
                 } else {
                     $skipped++;
                     if ($this->output->isVerbose()) {
@@ -77,7 +76,7 @@ class CreateUpcomingHolidays extends Command
             } catch (Exception $e) {
                 $errors++;
                 $this->newLine();
-                $this->error("❌ {$template->name}: " . $e->getMessage());
+                $this->error("❌ {$template->name}: ".$e->getMessage());
             }
 
             $progressBar->advance();
@@ -87,7 +86,7 @@ class CreateUpcomingHolidays extends Command
         $this->newLine(2);
 
         // Summary
-        $this->info("📊 Processing Summary:");
+        $this->info('📊 Processing Summary:');
         $this->table(
             ['Status', 'Count'],
             [
@@ -99,7 +98,7 @@ class CreateUpcomingHolidays extends Command
         );
 
         if ($dryRun && $created > 0) {
-            $this->warn("🧪 This was a dry run. Run without --dry-run to actually create holidays.");
+            $this->warn('🧪 This was a dry run. Run without --dry-run to actually create holiday instances.');
         }
 
         return $errors > 0 ? 1 : 0;
@@ -120,117 +119,58 @@ class CreateUpcomingHolidays extends Command
     }
 
     /**
-     * Process a single holiday template
+     * Process a single holiday template - creates ONE HolidayInstance record per template/year
      */
     protected function processHolidayTemplate(HolidayTemplate $template, int $year, bool $force, bool $dryRun): array
     {
         // Calculate holiday date for the year
         $holidayDate = $template->calculateDateForYear($year);
 
-        // Check if holidays already exist for this template and date
-        if (!$force) {
-            $existingCount = VacationCalendar::where('holiday_template_id', $template->id)
-                ->whereDate('vacation_date', $holidayDate)
-                ->count();
+        // Check if holiday instance already exists for this template and year
+        $existing = HolidayInstance::where('holiday_template_id', $template->id)
+            ->where('year', $year)
+            ->first();
 
-            if ($existingCount > 0) {
-                return [
-                    'created' => false,
-                    'count' => 0,
-                    'reason' => "Already exists for {$holidayDate->toDateString()} ({$existingCount} employees)",
-                    'date' => $holidayDate->toDateString(),
-                ];
-            }
+        if ($existing && ! $force) {
+            return [
+                'created' => false,
+                'reason' => "Already exists for {$holidayDate->toDateString()}",
+                'date' => $holidayDate->toDateString(),
+            ];
         }
 
         if ($dryRun) {
-            $employeeCount = $this->getEligibleEmployees($template)->count();
             return [
                 'created' => true,
-                'count' => $employeeCount,
-                'reason' => 'Would create holidays',
+                'reason' => 'Would create holiday instance',
                 'date' => $holidayDate->toDateString(),
             ];
         }
 
-        // Get eligible employees
-        $employees = $this->getEligibleEmployees($template);
-
-        if ($employees->isEmpty()) {
-            return [
-                'created' => false,
-                'count' => 0,
-                'reason' => 'No eligible employees found',
-                'date' => $holidayDate->toDateString(),
-            ];
+        // Delete existing instance if force is enabled
+        if ($existing && $force) {
+            $existing->delete();
         }
 
-        // Delete existing holidays if force is enabled
-        if ($force) {
-            VacationCalendar::where('holiday_template_id', $template->id)
-                ->whereDate('vacation_date', $holidayDate)
-                ->delete();
-        }
-
-        // Create vacation calendar entries for all eligible employees
-        $created = 0;
-        foreach ($employees as $employee) {
-            VacationCalendar::create([
-                'employee_id' => $employee->id,
-                'vacation_date' => $holidayDate,
-                'holiday_template_id' => $template->id,
-                'holiday_type' => 'auto_created',
-                'auto_managed' => true,
-                'description' => $template->name,
-                'is_half_day' => false,
-                'is_active' => true,
-                'created_by' => null, // System created
-            ]);
-            $created++;
-        }
+        // Create the holiday instance (ONE record, not one per employee)
+        HolidayInstance::create([
+            'holiday_template_id' => $template->id,
+            'holiday_date' => $holidayDate,
+            'year' => $year,
+            'name' => $template->name,
+            'holiday_multiplier' => $template->holiday_multiplier ?? 2.00,
+            'standard_hours' => $template->standard_holiday_hours ?? 8.00,
+            'require_day_before' => $template->require_day_before ?? false,
+            'require_day_after' => $template->require_day_after ?? false,
+            'paid_if_not_worked' => $template->paid_if_not_worked ?? true,
+            'eligible_pay_types' => $template->eligible_pay_types,
+            'is_active' => true,
+        ]);
 
         return [
             'created' => true,
-            'count' => $created,
             'reason' => 'Successfully created',
             'date' => $holidayDate->toDateString(),
         ];
-    }
-
-    /**
-     * Get employees eligible for this holiday template
-     */
-    protected function getEligibleEmployees(HolidayTemplate $template)
-    {
-        $query = Employee::where('is_active', true);
-
-        // Apply pay type eligibility filtering
-        $eligiblePayTypes = $template->eligible_pay_types ?? ['salary', 'hourly_fulltime'];
-
-        $query->where(function ($payTypeQuery) use ($eligiblePayTypes) {
-            if (in_array('salary', $eligiblePayTypes)) {
-                $payTypeQuery->orWhere('pay_type', 'salary');
-            }
-
-            if (in_array('hourly_fulltime', $eligiblePayTypes)) {
-                $payTypeQuery->orWhere(function ($hourlyQuery) {
-                    $hourlyQuery->where('pay_type', 'hourly')
-                               ->where('full_time', true);
-                });
-            }
-
-            if (in_array('hourly_parttime', $eligiblePayTypes)) {
-                $payTypeQuery->orWhere(function ($hourlyQuery) {
-                    $hourlyQuery->where('pay_type', 'hourly')
-                               ->where('full_time', false);
-                });
-            }
-
-            if (in_array('contract', $eligiblePayTypes)) {
-                $payTypeQuery->orWhere('pay_type', 'contract');
-            }
-        });
-
-        return $query->get();
     }
 }

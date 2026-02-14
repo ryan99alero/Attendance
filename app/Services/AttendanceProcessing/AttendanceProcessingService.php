@@ -93,15 +93,18 @@ class AttendanceProcessingService
 
         $steps = [
             ['name' => 'Removing duplicates', 'action' => fn () => $this->attendanceCleansingService->cleanUpDuplicates()],
-            ['name' => 'Processing vacation', 'action' => fn () => $this->vacationTimeProcessAttendanceService->processVacationDays($payPeriod->start_date, $payPeriod->end_date)],
+            // Process holidays FIRST (from HolidayInstance), then vacations
+            // This ensures holiday takes precedence when both exist for same employee/date
             ['name' => 'Processing holidays', 'action' => fn () => $this->holidayAttendanceProcessor->processHolidaysForPayPeriod($payPeriod)],
+            ['name' => 'Processing vacation', 'action' => fn () => $this->vacationTimeProcessAttendanceService->processVacationDays($payPeriod->start_date, $payPeriod->end_date)],
             ['name' => 'Processing attendance', 'action' => fn () => $this->attendanceTimeProcessorService->processAttendanceForPayPeriod($payPeriod)],
             ['name' => 'Classifying records', 'action' => fn () => $this->attendanceClassificationService->classifyAllUnclassifiedAttendance()],
             ['name' => 'Processing unresolved', 'action' => fn () => $this->unresolvedAttendanceProcessorService->processStalePartialRecords($payPeriod)],
             ['name' => 'Validating punches', 'action' => fn () => $this->punchValidationService->validatePunchesWithinPayPeriod($payPeriod)],
             ['name' => 'Resolving overlaps', 'action' => fn () => $this->punchValidationService->resolveOverlappingRecords($payPeriod)],
             ['name' => 'Re-evaluating reviews', 'action' => fn () => $this->attendanceStatusUpdateService->reevaluateNeedsReviewRecords($payPeriod)],
-            ['name' => 'Migrating punches', 'action' => fn () => $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod)],
+            // NOTE: Punch migration removed from Process Time - now happens during Post Time
+            // This keeps records in attendances table for review before finalizing to punches
         ];
 
         $totalSteps = count($steps);
@@ -127,12 +130,7 @@ class AttendanceProcessingService
 
         $this->attendanceStatusUpdateService->markRecordsAsComplete($attendanceIds);
 
-        if ($autoProcess) {
-            $firstAttendance = Attendance::find($attendanceIds[0] ?? 0);
-            $payPeriod = $firstAttendance ? PayPeriod::current() : null;
-            if ($payPeriod instanceof PayPeriod) {
-                $this->punchMigrationService->migratePunchesWithinPayPeriod($payPeriod);
-            }
-        }
+        // NOTE: Migration removed - records remain in attendances until Post Time
+        // The $autoProcess flag is no longer used for migration
     }
 }

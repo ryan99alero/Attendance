@@ -15,7 +15,6 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
-use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 
 class PunchResource extends Resource
@@ -60,16 +59,6 @@ class PunchResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function ($query) {
-                // Hide archived records by default unless show_archived filter is enabled
-                $tableFilters = request()->input('tableFilters', []);
-                $showArchived = $tableFilters['show_archived']['value'] ?? false;
-                if (! $showArchived) {
-                    $query->where(function ($q) {
-                        $q->where('is_archived', false)->orWhereNull('is_archived');
-                    });
-                }
-            })
             ->columns([
                 TextColumn::make('employee.first_name')
                     ->label('Employee')
@@ -102,17 +91,9 @@ class PunchResource extends Resource
                     ->alignCenter()
                     ->boolean(),
             ])
-            ->filters([
-                Filter::make('pay_period_id')
-                    ->label('Pay Period')
-                    ->query(fn ($query, $value) => $query->where('pay_period_id', $value))
-                    ->default(fn () => request()->input('tableFilters.pay_period_id.value')),
-
-                Filter::make('show_archived')
-                    ->toggle()
-                    ->label('Show Archived Records')
-                    ->query(fn ($query) => $query), // Query handled in modifyQueryUsing
-            ]);
+            ->emptyStateHeading('No Pay Period Selected')
+            ->emptyStateDescription('Click the "Pay Period" button above to select a posted pay period.')
+            ->emptyStateIcon('heroicon-o-finger-print');
     }
 
     public static function getPages(): array

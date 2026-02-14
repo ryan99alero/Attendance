@@ -122,43 +122,34 @@ class HolidayTemplateResource extends Resource
                             ->live()
                             ->afterStateUpdated(fn (Set $set) => $set('calculation_rule', null)),
 
-                        // Fixed Date Configuration
-                        Group::make([
-                            Select::make('calculation_rule.month')
-                                ->label('Month')
-                                ->options([
-                                    1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
-                                    5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
-                                ])
-                                ->required(),
+                        // Shared Month field for fixed_date and relative types
+                        Select::make('calculation_rule.month')
+                            ->label('Month')
+                            ->options([
+                                1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+                                5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+                                9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
+                            ])
+                            ->requiredIf('type', 'fixed_date')
+                            ->requiredIf('type', 'relative')
+                            ->visible(fn (Get $get) => in_array($get('type'), ['fixed_date', 'relative'])),
 
-                            Select::make('calculation_rule.day')
-                                ->label('Day')
-                                ->options(array_combine(range(1, 31), range(1, 31)))
-                                ->required(),
-                        ])
-                            ->columns(2)
+                        // Fixed Date Configuration - Day only
+                        Select::make('calculation_rule.day')
+                            ->label('Day of Month')
+                            ->options(array_combine(range(1, 31), range(1, 31)))
+                            ->requiredIf('type', 'fixed_date')
                             ->visible(fn (Get $get) => $get('type') === 'fixed_date'),
 
-                        // Relative Date Configuration
+                        // Relative Date Configuration - Day of Week and Occurrence
                         Group::make([
-                            Select::make('calculation_rule.month')
-                                ->label('Month')
-                                ->options([
-                                    1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
-                                    5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-                                    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
-                                ])
-                                ->required(),
-
                             Select::make('calculation_rule.day_of_week')
                                 ->label('Day of Week')
                                 ->options([
                                     0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
                                     4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday',
                                 ])
-                                ->required(),
+                                ->requiredIf('type', 'relative'),
 
                             Select::make('calculation_rule.occurrence')
                                 ->label('Occurrence')
@@ -166,10 +157,10 @@ class HolidayTemplateResource extends Resource
                                     1 => '1st (First)', 2 => '2nd (Second)', 3 => '3rd (Third)',
                                     4 => '4th (Fourth)', 5 => '5th (Fifth)', -1 => 'Last',
                                 ])
-                                ->required()
+                                ->requiredIf('type', 'relative')
                                 ->helperText('e.g., "4th" Thursday for Thanksgiving'),
                         ])
-                            ->columns(3)
+                            ->columns(2)
                             ->visible(fn (Get $get) => $get('type') === 'relative'),
 
                         // Custom Date Configuration
@@ -179,7 +170,7 @@ class HolidayTemplateResource extends Resource
                                 ->options([
                                     'easter' => 'Easter Sunday',
                                 ])
-                                ->required(),
+                                ->requiredIf('type', 'custom'),
 
                             TextInput::make('calculation_rule.offset_days')
                                 ->label('Offset Days')

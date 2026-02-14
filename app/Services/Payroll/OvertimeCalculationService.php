@@ -435,11 +435,16 @@ class OvertimeCalculationService
     // Legacy Methods (kept for backward compatibility)
     // =====================================================
 
-    /**
+    // AUDIT: 2026-02-13 - Deprecated methods commented out
+    // These are superseded by calculatePayPeriodOvertime() which handles all overtime scenarios
+    // Kept getOvertimeMultiplier() and getDoubleTimeMultiplier() as they may still be used
+
+    /*
+    **
      * Calculate overtime for an employee based on their weekly hours.
      *
      * @deprecated Use calculatePayPeriodOvertime() instead
-     */
+     *
     public function calculateWeeklyOvertime(
         Employee $employee,
         float $totalHoursWorked,
@@ -481,11 +486,11 @@ class OvertimeCalculationService
         ];
     }
 
-    /**
+    **
      * Calculate daily overtime (for states like California that require daily OT).
      *
      * @deprecated Use calculatePayPeriodOvertime() instead
-     */
+     *
     public function calculateDailyOvertime(
         Employee $employee,
         float $dailyHours,
@@ -522,6 +527,25 @@ class OvertimeCalculationService
         ];
     }
 
+    **
+     * Check if consecutive day overtime rules apply.
+     *
+     * @deprecated Use calculatePayPeriodOvertime() instead
+     *
+    public function hasConsecutiveDayOvertime(Employee $employee, int $consecutiveDaysWorked): bool
+    {
+        $rules = $this->getApplicableRules($employee);
+
+        foreach ($rules->filter(fn (OvertimeRule $r) => $r->isConsecutiveDayRule()) as $rule) {
+            if ($rule->consecutive_days_threshold && $consecutiveDaysWorked >= $rule->consecutive_days_threshold) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    */
+
     /**
      * Get the overtime rate multiplier for an employee.
      */
@@ -543,23 +567,5 @@ class OvertimeCalculationService
     public function getDoubleTimeMultiplier(): float
     {
         return 2.0;
-    }
-
-    /**
-     * Check if consecutive day overtime rules apply.
-     *
-     * @deprecated Use calculatePayPeriodOvertime() instead
-     */
-    public function hasConsecutiveDayOvertime(Employee $employee, int $consecutiveDaysWorked): bool
-    {
-        $rules = $this->getApplicableRules($employee);
-
-        foreach ($rules->filter(fn (OvertimeRule $r) => $r->isConsecutiveDayRule()) as $rule) {
-            if ($rule->consecutive_days_threshold && $consecutiveDaysWorked >= $rule->consecutive_days_threshold) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

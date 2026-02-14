@@ -11,12 +11,20 @@ use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Processes VACATION entries only (not holidays).
+ * Holidays are now processed separately via HolidayAttendanceService.
+ */
 class VacationTimeProcessAttendanceService
 {
     /**
      * Cache for employee data
      */
     private array $employeeCache = [];
+
+    private ?int $cachedVacationClassificationId = null;
+
+    private ?int $cachedHolidayClassificationId = null;
 
     public function processVacationDays(string $startDate, string $endDate): void
     {
@@ -25,6 +33,25 @@ class VacationTimeProcessAttendanceService
 
         Log::info("Processing vacation records from {$startDate} to {$endDate}");
 
+        // Pre-load classification IDs
+        $this->cachedVacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
+        $this->cachedHolidayClassificationId = DB::table('classifications')->where('code', 'HOLIDAY')->value('id');
+
+        // Pre-load employees that have vacation records to process
+        $this->preloadEmployees($startDate, $endDate);
+
+        // Process VACATION entries only (holiday_template_id IS NULL)
+        $vacationCount = $this->processVacationEntries($startDate, $endDate);
+
+        Log::info("Completed processing - {$vacationCount} vacation records processed.");
+    }
+
+    /**
+     * Process vacation entries from vacation_calendars table.
+     * Note: This table now ONLY contains vacation entries (holidays are in holiday_instances).
+     */
+    private function processVacationEntries(string $startDate, string $endDate): int
+    {
         $totalCount = VacationCalendar::whereBetween('vacation_date', [$startDate, $endDate])
             ->where('is_active', true)
             ->where('is_recorded', false)
@@ -32,55 +59,83 @@ class VacationTimeProcessAttendanceService
 
         Log::info("Found {$totalCount} vacation records to process.");
 
-        // Pre-load employees that have vacation records to process
-        $this->preloadEmployees($startDate, $endDate);
-
         $processed = 0;
 
-        // Use cursor() to iterate one record at a time - prevents memory exhaustion
         foreach (VacationCalendar::whereBetween('vacation_date', [$startDate, $endDate])
             ->where('is_active', true)
             ->where('is_recorded', false)
             ->cursor() as $record) {
-            $employee = $this->getEmployee($record->employee_id);
 
+            $employee = $this->getEmployee($record->employee_id);
             if (! $employee) {
                 continue;
             }
 
-            // Check if attendance records already exist for this vacation
-            $existingAttendance = Attendance::where('employee_id', $employee->id)
+            // Check if a HOLIDAY attendance already exists for this day
+            // If so, skip vacation processing (holiday takes precedence)
+            $existingHoliday = Attendance::where('employee_id', $employee->id)
                 ->whereDate('punch_time', $record->vacation_date)
-                ->where('issue_notes', 'like', '%Generated from Vacation Calendar%')
+                ->where('classification_id', $this->cachedHolidayClassificationId)
                 ->exists();
 
-            if ($existingAttendance) {
+            if ($existingHoliday) {
+                // Holiday already processed for this day - mark vacation as recorded but don't create attendance
+                $record->update(['is_recorded' => true]);
+                Log::info("Vacation {$record->id} skipped - holiday attendance exists for employee {$employee->id} on {$record->vacation_date}");
+
+                continue;
+            }
+
+            // Check if vacation attendance already exists
+            $existingVacation = Attendance::where('employee_id', $employee->id)
+                ->whereDate('punch_time', $record->vacation_date)
+                ->where('classification_id', $this->cachedVacationClassificationId)
+                ->exists();
+
+            if ($existingVacation) {
                 $record->update(['is_recorded' => true]);
 
                 continue;
             }
 
             $shiftSchedule = $this->getShiftScheduleForEmployee($employee);
-
             if (! $shiftSchedule) {
+                Log::warning("Employee {$employee->id} has no shift schedule - skipping vacation {$record->id}");
+
                 continue;
             }
 
             try {
-                // Create Clock In record
                 $clockInTime = $this->getVacationPunchTime($record, $shiftSchedule);
-                $this->createAttendanceRecord($employee->id, $clockInTime, 'Clock In', 'Generated from Vacation Calendar (Clock In)');
-
-                // Determine Clock Out time
                 $dailyHours = $record->is_half_day ? $shiftSchedule->daily_hours / 2 : $shiftSchedule->daily_hours;
                 $clockOutTime = Carbon::parse($clockInTime)->addHours($dailyHours)->format('Y-m-d H:i:s');
 
-                // Create Clock Out record
-                $this->createAttendanceRecord($employee->id, $clockOutTime, 'Clock Out', 'Generated from Vacation Calendar (Clock Out)');
+                // Generate shift_date and external_group_id for punch migration
+                $vacationDate = $record->vacation_date->format('Y-m-d');
+                $externalGroupId = "VAC-{$employee->id}-{$vacationDate}";
 
-                // Mark vacation record as recorded only after both records are created
+                // Create with VACATION classification
+                $this->createAttendanceRecord(
+                    $employee->id,
+                    $clockInTime,
+                    'Clock In',
+                    'Generated from Vacation Calendar (Clock In)',
+                    $this->cachedVacationClassificationId,
+                    $vacationDate,
+                    $externalGroupId
+                );
+
+                $this->createAttendanceRecord(
+                    $employee->id,
+                    $clockOutTime,
+                    'Clock Out',
+                    'Generated from Vacation Calendar (Clock Out)',
+                    $this->cachedVacationClassificationId,
+                    $vacationDate,
+                    $externalGroupId
+                );
+
                 $record->update(['is_recorded' => true]);
-
                 $processed++;
 
             } catch (Exception $e) {
@@ -88,10 +143,8 @@ class VacationTimeProcessAttendanceService
             }
         }
 
-        Log::info("Completed vacation processing - {$processed}/{$totalCount} records processed.");
+        return $processed;
     }
-
-    private ?int $cachedVacationClassificationId = null;
 
     /**
      * Pre-load employees that have vacation records to process
@@ -122,17 +175,12 @@ class VacationTimeProcessAttendanceService
         return $this->employeeCache[$employeeId];
     }
 
-    private function createAttendanceRecord(int $employeeId, string $punchTime, string $punchType, string $issueNotes): void
+    private function createAttendanceRecord(int $employeeId, string $punchTime, string $punchType, string $issueNotes, ?int $classificationId = null, ?string $shiftDate = null, ?string $externalGroupId = null): void
     {
         $punchTypeId = $this->getPunchTypeId($punchType);
 
         if (! $punchTypeId) {
             return;
-        }
-
-        // Cache vacation classification ID
-        if ($this->cachedVacationClassificationId === null) {
-            $this->cachedVacationClassificationId = DB::table('classifications')->where('code', 'VACATION')->value('id');
         }
 
         $punchState = ($punchType === 'Clock In') ? 'start' : 'stop';
@@ -142,7 +190,9 @@ class VacationTimeProcessAttendanceService
             'punch_time' => $punchTime,
             'punch_type_id' => $punchTypeId,
             'punch_state' => $punchState,
-            'classification_id' => $this->cachedVacationClassificationId,
+            'classification_id' => $classificationId ?? $this->cachedVacationClassificationId,
+            'shift_date' => $shiftDate,
+            'external_group_id' => $externalGroupId,
             'is_manual' => true,
             'status' => 'Complete',
             'issue_notes' => $issueNotes,
