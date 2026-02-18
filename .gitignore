@@ -34,6 +34,5 @@
 # OS files
 .DS_Store
 Thumbs.db
-/storage/app/templates/esp32_p4_nfc_espidf/SquareLineConsole/backup/
 /docs/Import/
 /storage/app/private/livewire-tmp/
