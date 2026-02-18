@@ -1,0 +1,14 @@
+# Build output
+build/
+
+# ESP-IDF generated files
+sdkconfig.old
+*.pyc
+__pycache__/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
