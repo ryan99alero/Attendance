@@ -2,24 +2,18 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use App\Filament\Resources\PunchTypeResource\Pages\ListPunchTypes;
 use App\Filament\Resources\PunchTypeResource\Pages\CreatePunchType;
 use App\Filament\Resources\PunchTypeResource\Pages\EditPunchType;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\PunchTypeResource\Pages;
+use App\Filament\Resources\PunchTypeResource\Pages\ListPunchTypes;
 use App\Models\PunchType;
-use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class PunchTypeResource extends Resource
@@ -27,9 +21,12 @@ class PunchTypeResource extends Resource
     protected static ?string $model = PunchType::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Tracking';
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Tracking';
+
     protected static ?string $navigationLabel = 'Punch Types';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-tag';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-tag';
+
     protected static ?int $navigationSort = -80;
 
     public static function form(Schema $schema): Schema
@@ -41,18 +38,15 @@ class PunchTypeResource extends Resource
             Textarea::make('description')
                 ->label('Description')
                 ->nullable(),
-            Select::make('schedule_reference')
-                ->label('Schedule')
+            Select::make('punch_direction')
+                ->label('Direction')
                 ->options([
-                    'start_time' => 'Start Time',
-                    'lunch_start' => 'Lunch Start',
-                    'lunch_stop' => 'Lunch Stop',
-                    'stop_time' => 'Stop Time',
-                    'flexible' => 'Flexible',
-                    'passthrough' => 'Passthrough',
+                    'start' => 'Start (Clock In / Resume Work)',
+                    'stop' => 'Stop (Clock Out / Pause Work)',
                 ])
+                ->placeholder('None')
                 ->nullable()
-                ->searchable(),
+                ->helperText('Start = beginning work or resuming after break. Stop = ending work or taking a break.'),
             Toggle::make('is_active')
                 ->label('Active')
                 ->default(true),
@@ -64,18 +58,18 @@ class PunchTypeResource extends Resource
         return $table->columns([
             TextColumn::make('name')->label('Punch Type Name'),
             TextColumn::make('description')->label('Description'),
-            TextColumn::make('schedule_reference')
-                ->label('Schedule')
-                ->formatStateUsing(function ($state) {
-                    return match ($state) {
-                        'start_time' => 'Start Time',
-                        'lunch_start' => 'Lunch Start',
-                        'lunch_stop' => 'Lunch Stop',
-                        'stop_time' => 'Stop Time',
-                        'flexible' => 'Flexible',
-                        'passthrough' => 'Passthrough',
-                        default => 'None',
-                    };
+            TextColumn::make('punch_direction')
+                ->label('Direction')
+                ->badge()
+                ->color(fn (?string $state): string => match ($state) {
+                    'start' => 'success',
+                    'stop' => 'danger',
+                    default => 'gray',
+                })
+                ->formatStateUsing(fn (?string $state): string => match ($state) {
+                    'start' => 'Start',
+                    'stop' => 'Stop',
+                    default => 'None',
                 }),
             IconColumn::make('is_active')->label('Active'),
         ]);

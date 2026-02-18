@@ -2,54 +2,45 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Log;
+use App\Models\PunchType;
 
 class PunchStateService
 {
     /**
      * Determine the punch state (start/stop/unknown) based on the punch type.
      *
-     * @param string $punchType
-     * @param string|null $currentPunchState
-     * @return string
+     * Now uses the punch_direction column directly from the PunchType model
+     * instead of a hardcoded mapping.
+     *
+     * @param  int|string|PunchType  $punchType  PunchType model, ID, or legacy name
+     * @param  string|null  $currentPunchState  Unused, kept for backwards compatibility
+     * @return string 'start', 'stop', or 'unknown'
      */
-    public static function determinePunchState(string $punchType, ?string $currentPunchState = null): string
+    public static function determinePunchState(int|string|PunchType $punchType, ?string $currentPunchState = null): string
     {
-        // Define the mapping for punch types to their default states
-        $punchTypeStateMapping = [
-            'start_time' => 'start',
-            'stop_time' => 'stop',
-            'clock_in' => 'start',
-            'clock_out' => 'stop',
-            'lunch_start' => 'stop',  // ✅ Lunch Start = Stopping work
-            'lunch_stop' => 'start',  // ✅ Lunch Stop = Resuming work
-            'unclassified' => 'unknown',
-        ];
+        // If already a PunchType model, use it directly
+        if ($punchType instanceof PunchType) {
+            return $punchType->punch_direction ?? 'unknown';
+        }
 
-        return $punchTypeStateMapping[$punchType] ?? 'unknown';
+        // If it's an integer, look up by ID
+        if (is_int($punchType)) {
+            $model = PunchType::find($punchType);
+
+            return $model?->punch_direction ?? 'unknown';
+        }
+
+        // Legacy support: if it's a string, try to look up by name
+        $model = PunchType::where('name', $punchType)->first();
+
+        return $model?->punch_direction ?? 'unknown';
     }
 
     /**
-     * Validate whether a given punch state is valid for the provided punch type.
-     *
-     * @param string $punchType
-     * @param string $punchState
-     * @return bool
+     * Get the punch state directly from a PunchType model.
      */
-// Ryan Not Used
-//   public static function isValidPunchState(string $punchType, string $punchState): bool
-//    {
-//        $validStates = ['start', 'stop'];
-//
-//        // Punch types that should have either 'start' or 'stop'
-//        $punchTypesWithStates = ['start_time', 'stop_time', 'clock_in', 'clock_out', 'lunch_start', 'lunch_stop'];
-//
-//        // If punch type supports start/stop, ensure punchState is valid
-//        if (in_array($punchType, $punchTypesWithStates, true)) {
-//            return in_array($punchState, $validStates, true);
-//        }
-//
-//        // All other punch types should be 'unknown'
-//        return $punchState === 'unknown';
-//    }
+    public static function getStateFromPunchType(PunchType $punchType): string
+    {
+        return $punchType->punch_direction ?? 'unknown';
+    }
 }

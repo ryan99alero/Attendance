@@ -2,33 +2,30 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Tables\Table;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\ClassificationResource\Pages\ListClassifications;
 use App\Filament\Resources\ClassificationResource\Pages\CreateClassification;
 use App\Filament\Resources\ClassificationResource\Pages\EditClassification;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\ClassificationResource\Pages;
+use App\Filament\Resources\ClassificationResource\Pages\ListClassifications;
 use App\Models\Classification;
-use Filament\Forms;
-use Filament\Forms\Components\TextInput;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
-use Filament\Tables;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class ClassificationResource extends Resource
 {
     protected static ?string $model = Classification::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-squares-2x2';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-squares-2x2';
+
     protected static ?string $navigationLabel = 'Classifications';
-    protected static string | \UnitEnum | null $navigationGroup = 'System & Hardware';
-    protected static ?int $navigationSort = 30;
+
+    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

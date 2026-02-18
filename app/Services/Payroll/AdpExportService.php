@@ -14,7 +14,10 @@ use Illuminate\Support\Facades\Storage;
 class AdpExportService
 {
     /**
-     * ADP CSV Column Headers (21 columns as per spec)
+     * ADP CSV Column Headers (standard EPI format)
+     *
+     * Hours 3/4 are generic "extra hours" slots - the CODE tells ADP what type they are.
+     * Earnings 5 is for monetary amounts like tips/bonuses.
      */
     protected const HEADERS = [
         'Co Code',
@@ -26,18 +29,10 @@ class AdpExportService
         'O/T Hours',
         'Hours 3 Code',
         'Hours 3 Amount',
-        'Hours 3 Code',
-        'Hours 3 Amount',
-        'Hours 3 Code',
-        'Hours 3 Amount',
-        'Earnings 3 Code',
-        'Earnings 3 Amount',
-        'Earnings 3 Code',
-        'Earnings 3 Amount',
-        'Earnings 3 Code',
-        'Earnings 3 Amount',
-        'Memo Code',
-        'Memo Amount',
+        'Hours 4 Code',
+        'Hours 4 Amount',
+        'Earnings 5 Code',
+        'Earnings 5 Amount',
     ];
 
     /**
@@ -149,8 +144,8 @@ class AdpExportService
                 'temp_rate' => null, // Optional override
                 'regular_hours' => 0,
                 'overtime_hours' => 0,
-                'hours_3' => [], // Array of [code, amount] pairs
-                'earnings_3' => [], // Array of [code, amount] pairs
+                'extra_hours' => [], // Array of [code, amount] pairs - fills Hours 3/4 slots sequentially
+                'earnings' => [], // Array of [code, amount] pairs
             ];
 
             foreach ($employeeSummaries as $summary) {
@@ -175,9 +170,9 @@ class AdpExportService
                     continue;
                 }
 
-                // Check if has ADP code (Hours 3)
+                // Check if has ADP code - add to extra_hours
                 if ($classification->adp_code) {
-                    $data['hours_3'][] = [
+                    $data['extra_hours'][] = [
                         'code' => $classification->adp_code,
                         'amount' => $hours,
                     ];
@@ -185,10 +180,10 @@ class AdpExportService
                     continue;
                 }
 
-                // Check classification map for codes
+                // Check classification map for codes (fallback)
                 $code = $classificationMap[$classification->code] ?? null;
                 if ($code) {
-                    $data['hours_3'][] = [
+                    $data['extra_hours'][] = [
                         'code' => $code,
                         'amount' => $hours,
                     ];
@@ -254,8 +249,8 @@ class AdpExportService
      *     temp_rate: float|null,
      *     regular_hours: float,
      *     overtime_hours: float,
-     *     hours_3: array<array{code: string, amount: float}>,
-     *     earnings_3: array<array{code: string, amount: float}>
+     *     extra_hours: array<array{code: string, amount: float}>,
+     *     earnings: array<array{code: string, amount: float}>
      * } $data
      */
     protected function buildEmployeeRow(array $data, string $companyCode, string $batchId): array
@@ -270,33 +265,35 @@ class AdpExportService
             $this->formatDecimal($data['overtime_hours']),               // O/T Hours
         ];
 
-        // Add Hours 3 pairs (up to 3 pairs = 6 columns)
-        $hours3 = array_slice($data['hours_3'], 0, 3);
-        for ($i = 0; $i < 3; $i++) {
-            if (isset($hours3[$i])) {
-                $row[] = $hours3[$i]['code'];
-                $row[] = $this->formatDecimal($hours3[$i]['amount']);
-            } else {
-                $row[] = '';
-                $row[] = '';
-            }
+        // Add Hours 3 (first extra hour type)
+        $hours3 = $data['extra_hours'][0] ?? null;
+        if ($hours3) {
+            $row[] = $hours3['code'];
+            $row[] = $this->formatDecimal($hours3['amount']);
+        } else {
+            $row[] = '';
+            $row[] = '';
         }
 
-        // Add Earnings 3 pairs (up to 3 pairs = 6 columns)
-        $earnings3 = array_slice($data['earnings_3'] ?? [], 0, 3);
-        for ($i = 0; $i < 3; $i++) {
-            if (isset($earnings3[$i])) {
-                $row[] = $earnings3[$i]['code'];
-                $row[] = $this->formatDecimal($earnings3[$i]['amount']);
-            } else {
-                $row[] = '';
-                $row[] = '';
-            }
+        // Add Hours 4 (second extra hour type)
+        $hours4 = $data['extra_hours'][1] ?? null;
+        if ($hours4) {
+            $row[] = $hours4['code'];
+            $row[] = $this->formatDecimal($hours4['amount']);
+        } else {
+            $row[] = '';
+            $row[] = '';
         }
 
-        // Add Memo Code and Amount (empty by default)
-        $row[] = '';
-        $row[] = '';
+        // Add Earnings 5 (first earnings type)
+        $earnings5 = $data['earnings'][0] ?? null;
+        if ($earnings5) {
+            $row[] = $earnings5['code'];
+            $row[] = $this->formatDecimal($earnings5['amount']);
+        } else {
+            $row[] = '';
+            $row[] = '';
+        }
 
         return $row;
     }
@@ -437,13 +434,15 @@ class AdpExportService
         $employeeData = $this->getEmployeeData($payPeriod, $provider);
 
         return $employeeData->map(function ($data) {
+            $extraHours = collect($data['extra_hours'])
+                ->map(fn ($h) => "{$h['code']}: {$h['amount']}")
+                ->implode(', ');
+
             return [
                 'file_number' => $data['file_number'],
                 'regular_hours' => $data['regular_hours'],
                 'overtime_hours' => $data['overtime_hours'],
-                'additional_hours' => collect($data['hours_3'])->map(function ($h) {
-                    return "{$h['code']}: {$h['amount']}";
-                })->implode(', '),
+                'extra_hours' => $extraHours ?: '-',
             ];
         })->toArray();
     }

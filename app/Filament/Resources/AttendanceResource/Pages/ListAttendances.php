@@ -6,18 +6,24 @@ use App\Exports\DataExport;
 use App\Filament\Resources\AttendanceResource;
 use App\Jobs\ProcessDataImportJob;
 use App\Models\Attendance;
+use App\Models\PayPeriod;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Url;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ListAttendances extends ListRecords
 {
     protected static string $resource = AttendanceResource::class;
+
+    #[Url]
+    public ?string $payPeriodId = null;
 
     protected function getTableQuery(): ?Builder
     {
@@ -37,12 +43,52 @@ class ListAttendances extends ListRecords
             }
         }
 
+        // Filter by selected pay period
+        if ($this->payPeriodId) {
+            $payPeriod = PayPeriod::find($this->payPeriodId);
+            if ($payPeriod) {
+                $query->whereBetween('punch_time', [
+                    $payPeriod->start_date->startOfDay(),
+                    $payPeriod->end_date->endOfDay(),
+                ]);
+            }
+        } else {
+            // Show nothing until a pay period is selected
+            $query->whereRaw('1 = 0');
+        }
+
         return $query;
     }
 
     protected function getHeaderActions(): array
     {
         return [
+            // Pay Period Selection
+            Action::make('select_pay_period')
+                ->label('Pay Period')
+                ->color('gray')
+                ->icon('heroicon-o-calendar')
+                ->form([
+                    Select::make('pay_period_id')
+                        ->label('Select Pay Period')
+                        ->options(
+                            PayPeriod::orderBy('start_date', 'desc')
+                                ->get()
+                                ->mapWithKeys(fn ($pp) => [
+                                    $pp->id => $pp->name ?? "{$pp->start_date->format('M j')} - {$pp->end_date->format('M j, Y')}",
+                                ])
+                        )
+                        ->placeholder('Select a Pay Period')
+                        ->searchable()
+                        ->required()
+                        ->default($this->payPeriodId),
+                ])
+                ->action(function (array $data) {
+                    $this->payPeriodId = $data['pay_period_id'];
+                })
+                ->modalSubmitActionLabel('View Attendances')
+                ->modalWidth('md'),
+
             // Add a "Create" action button
             Action::make('New Attendance')
                 ->label('New Attendance')

@@ -22,6 +22,8 @@ class UnresolvedAttendanceProcessorService
 
     protected ?int $lunchStopTypeId = null;
 
+    protected array $punchTypeDirectionCache = [];
+
     public function __construct(ShiftScheduleService $shiftScheduleService)
     {
         $this->shiftScheduleService = $shiftScheduleService;
@@ -29,10 +31,27 @@ class UnresolvedAttendanceProcessorService
 
     protected function cachePunchTypes(): void
     {
-        $this->clockInTypeId = DB::table('punch_types')->where('name', 'Clock In')->value('id');
-        $this->clockOutTypeId = DB::table('punch_types')->where('name', 'Clock Out')->value('id');
-        $this->lunchStartTypeId = DB::table('punch_types')->where('name', 'Lunch Start')->value('id');
-        $this->lunchStopTypeId = DB::table('punch_types')->where('name', 'Lunch Stop')->value('id');
+        $punchTypes = DB::table('punch_types')->get(['id', 'name', 'punch_direction']);
+
+        foreach ($punchTypes as $punchType) {
+            $this->punchTypeDirectionCache[$punchType->id] = $punchType->punch_direction;
+
+            match ($punchType->name) {
+                'Clock In' => $this->clockInTypeId = $punchType->id,
+                'Clock Out' => $this->clockOutTypeId = $punchType->id,
+                'Lunch Start' => $this->lunchStartTypeId = $punchType->id,
+                'Lunch Stop' => $this->lunchStopTypeId = $punchType->id,
+                default => null,
+            };
+        }
+    }
+
+    /**
+     * Get punch_direction from cache for a given punch type ID.
+     */
+    protected function getPunchDirection(?int $punchTypeId): string
+    {
+        return $this->punchTypeDirectionCache[$punchTypeId] ?? 'unknown';
     }
 
     public function processStalePartialRecords(PayPeriod $payPeriod): void
@@ -107,19 +126,19 @@ class UnresolvedAttendanceProcessorService
             return;
         }
 
-        // Assign Punch Type & State
+        // Assign Punch Type & State (using database-driven punch_direction)
         if ($punchTime->between($shiftStart->subMinutes($flexibility), $shiftStart->addMinutes($flexibility))) {
             $punch->punch_type_id = $this->clockInTypeId;
-            $punch->punch_state = 'start';
+            $punch->punch_state = $this->getPunchDirection($this->clockInTypeId);
         } elseif ($punchTime->between($shiftEnd->subMinutes($flexibility), $shiftEnd->addMinutes($flexibility))) {
             $punch->punch_type_id = $this->clockOutTypeId;
-            $punch->punch_state = 'stop';
+            $punch->punch_state = $this->getPunchDirection($this->clockOutTypeId);
         } elseif ($lunchStart && $punchTime->between($lunchStart->subMinutes(10), $lunchStart->addMinutes(10))) {
             $punch->punch_type_id = $this->lunchStartTypeId;
-            $punch->punch_state = 'start';
+            $punch->punch_state = $this->getPunchDirection($this->lunchStartTypeId);
         } elseif ($lunchEnd && $punchTime->between($lunchEnd->subMinutes(10), $lunchEnd->addMinutes(10))) {
             $punch->punch_type_id = $this->lunchStopTypeId;
-            $punch->punch_state = 'stop';
+            $punch->punch_state = $this->getPunchDirection($this->lunchStopTypeId);
         } else {
             $punch->status = 'NeedsReview';
             $punch->issue_notes = 'Could not determine Punch Type via Shift Schedule';

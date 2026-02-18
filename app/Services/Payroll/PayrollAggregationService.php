@@ -198,31 +198,67 @@ class PayrollAggregationService
 
     /**
      * Get hours by classification (vacation, holiday, etc.)
+     *
+     * NOTE: This method is now DISABLED for classifications that have punch pairs.
+     * Hours for HOLIDAY, VACATION, etc. are calculated from actual punch pairs
+     * in calculateWorkedHoursByDay() and then categorized by the overtime engine.
+     *
+     * This method should ONLY add hours for exception types where there are
+     * NO actual punch pairs (e.g., a sick day with no clock in/out).
      */
     protected function getClassificationHours(Employee $employee, PayPeriod $payPeriod): array
     {
-        // Get attendance records with classifications
+        // Get attendance records with classifications, grouped by date
+        // Only count classifications for days where there's a single unpaired record
+        // (i.e., exception time entries, not actual worked time with punches)
         $classified = Attendance::where('employee_id', $employee->id)
             ->whereBetween('punch_time', [
                 $payPeriod->start_date->startOfDay(),
                 $payPeriod->end_date->endOfDay(),
             ])
             ->whereNotNull('classification_id')
+            ->whereIn('status', ['Complete', 'Migrated', 'Posted'])
             ->with('classification')
             ->get();
 
+        // Group by date and classification to avoid double-counting
+        $byDateAndClassification = $classified->groupBy(function ($record) {
+            $date = $record->shift_date ?? Carbon::parse($record->punch_time)->toDateString();
+            $code = $record->classification->code ?? 'OTHER';
+
+            return "{$date}_{$code}";
+        });
+
         $hours = [];
 
-        foreach ($classified as $record) {
-            $code = $record->classification->code ?? 'OTHER';
-            // Assume 8 hours for full-day classifications like vacation/holiday
-            // TODO: This should come from actual hours field if available
-            $recordHours = 8.0;
+        foreach ($byDateAndClassification as $key => $records) {
+            // Skip if this has punch pairs (Clock In + Clock Out)
+            // These are worked hours and should be calculated from punch pairs, not classification
+            $hasClockIn = $records->contains(fn ($r) => $r->punch_state === 'start');
+            $hasClockOut = $records->contains(fn ($r) => $r->punch_state === 'stop');
+
+            if ($hasClockIn && $hasClockOut) {
+                // This is worked time with punch pairs - hours calculated elsewhere
+                // DO NOT add classification hours here to avoid double-counting
+                continue;
+            }
+
+            // For unpaired records (exception entries), add default hours
+            $code = $records->first()->classification->code ?? 'OTHER';
+
+            // Skip REGULAR classification - these are never exception hours
+            if ($code === 'REGULAR') {
+                continue;
+            }
+
+            // Get default hours from classification or use 8 hours
+            $classification = $records->first()->classification;
+            $defaultHours = $classification->default_hours ?? 8.0;
 
             if (! isset($hours[$code])) {
                 $hours[$code] = 0.0;
             }
-            $hours[$code] += $recordHours;
+            $hours[$code] += $defaultHours;
         }
 
         return $hours;

@@ -6,6 +6,7 @@ use App\Filament\Resources\IntegrationConnectionResource\Pages\CreateIntegration
 use App\Filament\Resources\IntegrationConnectionResource\Pages\EditIntegrationConnection;
 use App\Filament\Resources\IntegrationConnectionResource\Pages\ListIntegrationConnections;
 use App\Filament\Resources\IntegrationConnectionResource\RelationManagers\IntegrationObjectsRelationManager;
+use App\Models\Classification;
 use App\Models\IntegrationConnection;
 use App\Services\Integrations\PaceApiClient;
 use Exception;
@@ -40,11 +41,11 @@ class IntegrationConnectionResource extends Resource
 
     protected static ?string $navigationLabel = 'Integrations';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Integrations';
+    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {
@@ -180,9 +181,15 @@ class IntegrationConnectionResource extends Resource
                                             ->helperText('How to generate the Batch ID for each export'),
 
                                         Placeholder::make('adp_format_info')
-                                            ->content('ADP exports use a specific format: PRcccEPI.csv where ccc is your company code. The file contains one row per employee with hours pivoted into columns (Reg Hours, O/T Hours, and up to 3 Hours 3 Code/Amount pairs for Holiday, Vacation, Sick, etc.).')
+                                            ->content('ADP exports use a specific format: PRcccEPI.csv where ccc is your company code. The file contains one row per employee with hours pivoted into columns (Reg Hours, O/T Hours, and Hours 3/4 Code pairs for additional hour types).')
                                             ->columnSpanFull(),
                                     ])
+                                    ->columns(2)
+                                    ->visible(fn (Get $get): bool => $get('integration_type') === 'adp_file'),
+
+                                Section::make('ADP Hour Code Mappings')
+                                    ->description('Map hour types to ADP codes. These codes must match your ADP tenant configuration. Regular Hours and Overtime Hours use fixed columns.')
+                                    ->schema(self::getAdpCodeMappingFields())
                                     ->columns(2)
                                     ->visible(fn (Get $get): bool => $get('integration_type') === 'adp_file'),
 
@@ -672,5 +679,30 @@ class IntegrationConnectionResource extends Resource
             'create' => CreateIntegrationConnection::route('/create'),
             'edit' => EditIntegrationConnection::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Generate ADP code mapping fields for classifications.
+     *
+     * @return array<\Filament\Forms\Components\Component>
+     */
+    protected static function getAdpCodeMappingFields(): array
+    {
+        $classifications = Classification::where('is_regular', false)
+            ->where('is_overtime', false)
+            ->orderBy('name')
+            ->get();
+
+        $fields = [];
+        foreach ($classifications as $classification) {
+            $fields[] = TextInput::make("adp_codes.{$classification->id}")
+                ->label($classification->name)
+                ->placeholder('e.g., HOL, VAC')
+                ->maxLength(10)
+                ->default($classification->adp_code)
+                ->helperText($classification->code);
+        }
+
+        return $fields;
     }
 }

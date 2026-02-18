@@ -2,34 +2,33 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\DeviceResource\Pages\ListDevices;
 use App\Filament\Resources\DeviceResource\Pages\CreateDevice;
 use App\Filament\Resources\DeviceResource\Pages\EditDevice;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\DeviceResource\Pages;
+use App\Filament\Resources\DeviceResource\Pages\ListDevices;
 use App\Models\Device;
-use Filament\Resources\Resource;
-use Filament\Tables\Table;
-use Filament\Forms\Components\TextInput;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class DeviceResource extends Resource
 {
     protected static ?string $model = Device::class;
 
     // Navigation Configuration
-    protected static string | \UnitEnum | null $navigationGroup = 'System & Hardware';
+    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+
     protected static ?string $navigationLabel = 'Devices';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-device-phone-mobile';
-    protected static ?int $navigationSort = 10;
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-device-phone-mobile';
+
+    protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
     {
@@ -72,15 +71,15 @@ class DeviceResource extends Resource
                     Select::make('timezone')
                         ->label('Timezone')
                         ->options([
-                            'Alaska Time (AKST/AKDT)'           => 'Alaska Time (AKST/AKDT)',
-                            'Atlantic Time (AST)'               => 'Atlantic Time (AST)',
-                            'Central Time (CST/CDT)'            => 'Central Time (CST/CDT)',
-                            'Chamorro Time (ChST)'              => 'Chamorro Time (ChST)',
-                            'Eastern Time (EST/EDT)'            => 'Eastern Time (EST/EDT)',
-                            'Hawaii-Aleutian Time (HST/HDT)'    => 'Hawaii-Aleutian Time (HST/HDT)',
-                            'Mountain Time (MST/MDT)'           => 'Mountain Time (MST/MDT)',
-                            'Pacific Time (PST/PDT)'            => 'Pacific Time (PST/PDT)',
-                            'Samoa Time (SST)'                  => 'Samoa Time (SST)',
+                            'Alaska Time (AKST/AKDT)' => 'Alaska Time (AKST/AKDT)',
+                            'Atlantic Time (AST)' => 'Atlantic Time (AST)',
+                            'Central Time (CST/CDT)' => 'Central Time (CST/CDT)',
+                            'Chamorro Time (ChST)' => 'Chamorro Time (ChST)',
+                            'Eastern Time (EST/EDT)' => 'Eastern Time (EST/EDT)',
+                            'Hawaii-Aleutian Time (HST/HDT)' => 'Hawaii-Aleutian Time (HST/HDT)',
+                            'Mountain Time (MST/MDT)' => 'Mountain Time (MST/MDT)',
+                            'Pacific Time (PST/PDT)' => 'Pacific Time (PST/PDT)',
+                            'Samoa Time (SST)' => 'Samoa Time (SST)',
                         ])
                         ->nullable()
                         ->helperText('Device timezone for time recording'),
@@ -223,10 +222,10 @@ class DeviceResource extends Resource
                 ->label('Firmware')
                 ->placeholder('Unknown'),
         ])
-        ->defaultSort('device_name')
-        ->recordActions([
-            EditAction::make(),
-        ]);
+            ->defaultSort('device_name')
+            ->recordActions([
+                EditAction::make(),
+            ]);
     }
 
     public static function getPages(): array

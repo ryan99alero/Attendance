@@ -2,18 +2,17 @@
 
 namespace App\Filament\Resources\IntegrationConnectionResource\Pages;
 
-use Filament\Actions\Action;
-use Illuminate\Support\Facades\Http;
-use Exception;
-use Filament\Actions\DeleteAction;
 use App\Filament\Resources\IntegrationConnectionResource;
+use App\Models\Classification;
 use App\Services\Integrations\IntegrationSyncEngine;
 use App\Services\Integrations\PaceApiClient;
-use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Artisan;
+use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 
 class EditIntegrationConnection extends EditRecord
 {
@@ -41,7 +40,7 @@ class EditIntegrationConnection extends EditRecord
                             $this->record->markConnected();
                             $result = [
                                 'success' => true,
-                                'message' => 'Connection successful (HTTP ' . $response->status() . ')',
+                                'message' => 'Connection successful (HTTP '.$response->status().')',
                             ];
                         } catch (Exception $e) {
                             $this->record->markError($e->getMessage());
@@ -54,8 +53,8 @@ class EditIntegrationConnection extends EditRecord
 
                     if ($result['success']) {
                         $body = $result['message'];
-                        if (!empty($result['version'])) {
-                            $body .= "\nPace Version: " . $result['version'];
+                        if (! empty($result['version'])) {
+                            $body .= "\nPace Version: ".$result['version'];
                         }
 
                         Notification::make()
@@ -90,6 +89,7 @@ class EditIntegrationConnection extends EditRecord
                             ->body('Add integration objects first, then use Discover to validate them against the API.')
                             ->warning()
                             ->send();
+
                         return;
                     }
 
@@ -171,6 +171,7 @@ class EditIntegrationConnection extends EditRecord
                                 ->body('No objects are enabled for pull sync on this connection.')
                                 ->warning()
                                 ->send();
+
                             return;
                         }
 
@@ -189,7 +190,7 @@ class EditIntegrationConnection extends EditRecord
                                 'skipped' => $result->skipped,
                                 'errors' => $result->errors,
                             ];
-                            if (!empty($result->errors)) {
+                            if (! empty($result->errors)) {
                                 $hasErrors = true;
                             }
                         }
@@ -200,7 +201,7 @@ class EditIntegrationConnection extends EditRecord
                         $lines = [];
                         foreach ($results as $r) {
                             $line = "{$r['name']}: {$r['created']} created, {$r['updated']} updated, {$r['skipped']} skipped";
-                            if (!empty($r['errors'])) {
+                            if (! empty($r['errors'])) {
                                 $errorCount = is_array($r['errors']) ? count($r['errors']) : $r['errors'];
                                 $line .= " ({$errorCount} errors)";
                             }
@@ -243,12 +244,22 @@ class EditIntegrationConnection extends EditRecord
         // $hidden strips auth_credentials from toArray(), so read directly from the model
         $encrypted = $this->record->getAttributes()['auth_credentials'] ?? null;
 
-        if (!empty($encrypted)) {
+        if (! empty($encrypted)) {
             try {
                 $data['credentials'] = json_decode(Crypt::decryptString($encrypted), true);
             } catch (Exception $e) {
                 $data['credentials'] = [];
             }
+        }
+
+        // Load ADP code mappings from classifications
+        $classifications = Classification::where('is_regular', false)
+            ->where('is_overtime', false)
+            ->get();
+
+        $data['adp_codes'] = [];
+        foreach ($classifications as $classification) {
+            $data['adp_codes'][$classification->id] = $classification->adp_code;
         }
 
         return $data;
@@ -259,9 +270,18 @@ class EditIntegrationConnection extends EditRecord
         // Encrypt credentials before saving
         if (isset($data['credentials']) && is_array($data['credentials'])) {
             // Filter out empty values but keep the structure
-            $credentials = array_filter($data['credentials'], fn($value) => $value !== null && $value !== '');
+            $credentials = array_filter($data['credentials'], fn ($value) => $value !== null && $value !== '');
             $data['auth_credentials'] = Crypt::encryptString(json_encode($credentials));
             unset($data['credentials']);
+        }
+
+        // Save ADP code mappings to classifications
+        if (isset($data['adp_codes']) && is_array($data['adp_codes'])) {
+            foreach ($data['adp_codes'] as $classificationId => $adpCode) {
+                Classification::where('id', $classificationId)
+                    ->update(['adp_code' => $adpCode ?: null]);
+            }
+            unset($data['adp_codes']);
         }
 
         $data['updated_by'] = auth()->id();

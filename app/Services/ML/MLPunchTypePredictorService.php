@@ -24,6 +24,8 @@ class MLPunchTypePredictorService
 
     protected array $punchTypeNameCache = [];
 
+    protected array $punchTypeDirectionCache = [];
+
     public function __construct(ShiftScheduleService $shiftScheduleService)
     {
         $this->modelPath = storage_path('ml/punch_model.serialized');
@@ -39,6 +41,7 @@ class MLPunchTypePredictorService
         foreach ($punchTypes as $punchType) {
             $this->punchTypeCache[$punchType->name] = $punchType->id;
             $this->punchTypeNameCache[$punchType->id] = $punchType->name;
+            $this->punchTypeDirectionCache[$punchType->id] = $punchType->punch_direction;
         }
     }
 
@@ -168,20 +171,12 @@ class MLPunchTypePredictorService
         }
     }
 
+    /**
+     * Get punch state from cached punch_direction (database-driven).
+     */
     private function determinePunchState(int $punchTypeId): string
     {
-        $startTypes = ['Clock In', 'Lunch Start', 'Break Start', 'Shift Start', 'Manual Start'];
-        $stopTypes = ['Clock Out', 'Lunch Stop', 'Break End', 'Shift Stop', 'Manual Stop'];
-
-        $punchTypeName = $this->punchTypeNameCache[$punchTypeId] ?? null;
-
-        if (in_array($punchTypeName, $startTypes)) {
-            return 'start';
-        } elseif (in_array($punchTypeName, $stopTypes)) {
-            return 'stop';
-        }
-
-        return 'unknown';
+        return $this->punchTypeDirectionCache[$punchTypeId] ?? 'unknown';
     }
 
     /**

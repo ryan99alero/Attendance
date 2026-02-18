@@ -1,8 +1,0 @@
-description: ESP32-P4 EV Board: Wi-Fi (remote) + Display demo
-
-dependencies:
-  idf: ">=5.5"
-  espressif/esp32_p4_function_ev_board: "^5.0.0"
-  espressif/esp_wifi_remote: "*"
-  espressif/esp_lvgl_port: "*"
-  lvgl/lvgl: "^9.3.0"

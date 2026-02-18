@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Helpers\KoolReportLaravelCompatibility;
+use App\Models\Attendance;
 use App\Models\SystemTask;
+use App\Observers\AttendanceObserver;
 use App\Services\Shift\ShiftScheduleService;
 use Carbon\Carbon;
 use Filament\Actions\Exports\Models\Export;
@@ -32,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register AttendanceObserver for automatic payroll summary recalculation
+        Attendance::observe(AttendanceObserver::class);
+
         // Track Filament Imports in SystemTask using model events directly
         Import::created(function (Import $import) {
             Log::info('[AppServiceProvider] Import created event fired', [

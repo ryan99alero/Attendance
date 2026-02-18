@@ -1,1 +1,0 @@
-/Users/ryangoff/.espressif/frameworks/esp-idf-v5.5.1/components/mbedtls/mbedtls/library/version_features.c

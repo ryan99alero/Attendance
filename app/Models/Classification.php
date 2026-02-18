@@ -58,6 +58,7 @@ class Classification extends Model
         'name', // The name of the classification
         'code', // Unique code identifier
         'adp_code', // ADP hour code (H, V, S, D, P, etc.)
+        'adp_column', // ADP column number: 3 = Hours 3 (worked), 4 = Hours 4 (time off)
         'is_regular', // Maps to standard Reg Hours column
         'is_overtime', // Maps to standard O/T Hours column
         'description', // Description of the classification

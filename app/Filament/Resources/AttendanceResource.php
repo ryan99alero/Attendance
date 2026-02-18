@@ -8,7 +8,6 @@ use App\Filament\Resources\AttendanceResource\Pages\ListAttendances;
 use App\Models\Attendance;
 use App\Models\Classification;
 use App\Models\Employee;
-use App\Models\PayPeriod;
 use App\Models\PunchType;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -31,7 +30,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 class AttendanceResource extends Resource
 {
@@ -134,68 +132,6 @@ class AttendanceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function ($query) {
-                $filter = request()->input('filter');
-
-                // Hide archived records by default unless show_archived filter is enabled
-                $tableFilters = request()->input('tableFilters', []);
-                $showArchived = $tableFilters['show_archived']['value'] ?? false;
-                if (! $showArchived) {
-                    $query->where(function ($q) {
-                        $q->where('is_archived', false)->orWhereNull('is_archived');
-                    });
-                }
-
-                // Handle `filter_ids` if passed
-                $filterIds = request()->input('filter_ids');
-                if ($filterIds) {
-                    $ids = array_filter(explode(',', $filterIds), 'is_numeric');
-                    $query->whereIn('id', $ids);
-                }
-
-                // Apply date range filter
-                if ($filter && isset($filter['date_range']['start'], $filter['date_range']['end'])) {
-                    $query->whereBetween('punch_time', [
-                        $filter['date_range']['start'],
-                        $filter['date_range']['end'],
-                    ]);
-                }
-
-                // Apply consensus review filter - show all records from days that have Discrepancy records
-                if ($filter && isset($filter['consensus_review']) && $filter['consensus_review']) {
-                    // Get all dates that have Discrepancy records within the date range
-                    $dateRangeCondition = function ($subQuery) use ($filter) {
-                        if (isset($filter['date_range']['start'], $filter['date_range']['end'])) {
-                            $subQuery->whereBetween('punch_time', [
-                                $filter['date_range']['start'],
-                                $filter['date_range']['end'],
-                            ]);
-                        }
-                    };
-
-                    $disagreementDates = Attendance::where('status', 'Discrepancy')
-                        ->where($dateRangeCondition)
-                        ->get()
-                        ->map(fn ($record) => $record->punch_time->format('Y-m-d'))
-                        ->unique();
-
-                    // Show all records from those dates
-                    if ($disagreementDates->isNotEmpty()) {
-                        $query->whereIn(
-                            DB::raw('DATE(punch_time)'),
-                            $disagreementDates
-                        );
-                    } else {
-                        // If no consensus review records found, show none
-                        $query->whereRaw('1 = 0');
-                    }
-                }
-
-                // Apply `is_migrated` filter
-                if ($filter && isset($filter['is_migrated'])) {
-                    $query->where('is_migrated', $filter['is_migrated']);
-                }
-            })
             ->columns([
                 TextColumn::make('employee.first_name')
                     ->label('Employee')
@@ -309,47 +245,17 @@ class AttendanceResource extends Resource
                             ->label('Until Date'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
+                        // Only apply filters if values are provided
+                        // If both are empty, return all records (no filtering)
                         return $query
                             ->when(
-                                $data['from'],
+                                $data['from'] ?? null,
                                 fn (Builder $query, $date): Builder => $query->whereDate('punch_time', '>=', $date),
                             )
                             ->when(
-                                $data['until'],
+                                $data['until'] ?? null,
                                 fn (Builder $query, $date): Builder => $query->whereDate('punch_time', '<=', $date),
                             );
-                    }),
-
-                Filter::make('pay_period')
-                    ->schema([
-                        Select::make('pay_period_id')
-                            ->label('Pay Period')
-                            ->options(function () {
-                                return PayPeriod::orderBy('start_date', 'desc')
-                                    ->limit(10)
-                                    ->get()
-                                    ->mapWithKeys(function ($period) {
-                                        return [$period->id => $period->start_date->format('M j').' - '.$period->end_date->format('M j, Y')];
-                                    });
-                            })
-                            ->searchable()
-                            ->placeholder('Select Pay Period'),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query->when(
-                            $data['pay_period_id'],
-                            function (Builder $query, $payPeriodId): Builder {
-                                $payPeriod = PayPeriod::find($payPeriodId);
-                                if ($payPeriod) {
-                                    return $query->whereBetween('punch_time', [
-                                        $payPeriod->start_date->startOfDay(),
-                                        $payPeriod->end_date->endOfDay(),
-                                    ]);
-                                }
-
-                                return $query;
-                            }
-                        );
                     }),
 
                 Filter::make('issues_only')
@@ -376,7 +282,10 @@ class AttendanceResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('punch_time', 'desc');
+            ->defaultSort('punch_time', 'desc')
+            ->emptyStateHeading('No Pay Period Selected')
+            ->emptyStateDescription('Click the "Pay Period" button above to select a pay period.')
+            ->emptyStateIcon('heroicon-o-finger-print');
     }
 
     public static function getPages(): array

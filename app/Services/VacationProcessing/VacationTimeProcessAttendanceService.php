@@ -177,19 +177,17 @@ class VacationTimeProcessAttendanceService
 
     private function createAttendanceRecord(int $employeeId, string $punchTime, string $punchType, string $issueNotes, ?int $classificationId = null, ?string $shiftDate = null, ?string $externalGroupId = null): void
     {
-        $punchTypeId = $this->getPunchTypeId($punchType);
+        $punchTypeData = $this->getPunchTypeData($punchType);
 
-        if (! $punchTypeId) {
+        if (! $punchTypeData) {
             return;
         }
-
-        $punchState = ($punchType === 'Clock In') ? 'start' : 'stop';
 
         Attendance::create([
             'employee_id' => $employeeId,
             'punch_time' => $punchTime,
-            'punch_type_id' => $punchTypeId,
-            'punch_state' => $punchState,
+            'punch_type_id' => $punchTypeData['id'],
+            'punch_state' => $punchTypeData['punch_direction'] ?? 'unknown',
             'classification_id' => $classificationId ?? $this->cachedVacationClassificationId,
             'shift_date' => $shiftDate,
             'external_group_id' => $externalGroupId,
@@ -201,13 +199,27 @@ class VacationTimeProcessAttendanceService
 
     private array $punchTypeCache = [];
 
-    private function getPunchTypeId(string $type): ?int
+    /**
+     * Get punch type data including id and punch_direction from database.
+     */
+    private function getPunchTypeData(string $type): ?array
     {
         if (! isset($this->punchTypeCache[$type])) {
-            $this->punchTypeCache[$type] = DB::table('punch_types')->where('name', $type)->value('id');
+            $punchType = DB::table('punch_types')->where('name', $type)->first(['id', 'punch_direction']);
+            $this->punchTypeCache[$type] = $punchType ? ['id' => $punchType->id, 'punch_direction' => $punchType->punch_direction] : null;
         }
 
         return $this->punchTypeCache[$type];
+    }
+
+    /**
+     * @deprecated Use getPunchTypeData() instead
+     */
+    private function getPunchTypeId(string $type): ?int
+    {
+        $data = $this->getPunchTypeData($type);
+
+        return $data['id'] ?? null;
     }
 
     private function getShiftScheduleForEmployee(Employee $employee): ?ShiftSchedule

@@ -1,6 +1,0 @@
-dependencies:
-  idf:
-    version: '>=5.5.0'
-  espressif/esp32_p4_function_ev_board: "^5.0.0"
-  espressif/esp_wifi_remote: "*"
-  espressif/esp_lvgl_port: "*"

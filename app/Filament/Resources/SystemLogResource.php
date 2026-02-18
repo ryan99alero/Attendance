@@ -30,7 +30,7 @@ class SystemLogResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 50;
 
     public static function form(Schema $schema): Schema
     {

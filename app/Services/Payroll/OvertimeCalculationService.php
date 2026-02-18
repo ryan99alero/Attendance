@@ -36,14 +36,36 @@ class OvertimeCalculationService
     ): OvertimeResult {
         $result = new OvertimeResult($employee, $payPeriod);
 
+        // Get holidays for the pay period (needed for both exempt and non-exempt employees)
+        $holidays = $this->getHolidaysForPeriod($payPeriod);
+
+        // Create consecutive day tracker for holiday qualification checks
+        $tracker = new ConsecutiveDayTracker($dailyHours);
+
         // Check if employee is overtime exempt
         if ($this->isOvertimeExempt($employee)) {
             $result->markExempt($this->getExemptReason($employee));
 
-            // All hours are regular for exempt employees
+            // For exempt employees: still check for holidays but skip overtime calculations
             foreach ($dailyHours as $dateStr => $hours) {
                 $date = Carbon::parse($dateStr);
-                $dayResult = DayOvertimeResult::exempt($date, $hours);
+
+                // Check for holiday first (even exempt employees get holiday pay)
+                $holiday = $holidays->first(fn (HolidayInstance $h) => $h->holiday_date->isSameDay($date));
+
+                if ($holiday && $this->employeeQualifiesForHoliday($employee, $holiday, $tracker)) {
+                    // Holiday hours for exempt employee
+                    $dayResult = DayOvertimeResult::allHoliday($date, $hours, $holiday)
+                        ->withContext([
+                            'holiday_name' => $holiday->name,
+                            'multiplier' => $holiday->holiday_multiplier,
+                            'exempt' => true,
+                        ]);
+                } else {
+                    // Regular hours for exempt employee
+                    $dayResult = DayOvertimeResult::exempt($date, $hours);
+                }
+
                 $result->addDayResult($dayResult);
 
                 if ($this->logCalculations) {
@@ -54,14 +76,8 @@ class OvertimeCalculationService
             return $result;
         }
 
-        // Create consecutive day tracker for the period
-        $tracker = new ConsecutiveDayTracker($dailyHours);
-
         // Get applicable rules for this employee's shift and pay type
         $rules = $this->getApplicableRules($employee);
-
-        // Get holidays for the pay period
-        $holidays = $this->getHolidaysForPeriod($payPeriod);
 
         // Process each day
         foreach ($dailyHours as $dateStr => $hours) {

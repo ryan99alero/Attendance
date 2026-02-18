@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Punch;
 use App\Models\Attendance;
+use App\Models\Punch;
+use Illuminate\Console\Command;
 
 class FixPunchStates extends Command
 {
@@ -41,29 +41,30 @@ class FixPunchStates extends Command
         $this->fixAttendanceRecords($isDryRun);
 
         $this->info('Punch state fix completed');
+
         return 0;
     }
 
     private function fixPunchRecords(bool $isDryRun): void
     {
-        $unknownPunches = Punch::where(function($query) {
+        $unknownPunches = Punch::where(function ($query) {
             $query->where('punch_state', 'unknown')
-                  ->orWhereNull('punch_state');
+                ->orWhereNull('punch_state');
         })
-        ->whereNotNull('punch_type_id')
-        ->get();
+            ->whereNotNull('punch_type_id')
+            ->get();
 
         $this->info("Found {$unknownPunches->count()} punch records with unknown/null punch_state");
 
         $fixedCount = 0;
         foreach ($unknownPunches as $punch) {
             if ($punch->punchType) {
-                $correctState = $this->determinePunchState($punch->punchType->name);
+                $correctState = $this->determinePunchState($punch->punchType);
 
                 if ($correctState) {
                     $this->line("Punch ID {$punch->id}: {$punch->punchType->name} -> {$correctState}");
 
-                    if (!$isDryRun) {
+                    if (! $isDryRun) {
                         $punch->update(['punch_state' => $correctState]);
                     }
                     $fixedCount++;
@@ -77,24 +78,24 @@ class FixPunchStates extends Command
 
     private function fixAttendanceRecords(bool $isDryRun): void
     {
-        $unknownAttendance = Attendance::where(function($query) {
+        $unknownAttendance = Attendance::where(function ($query) {
             $query->where('punch_state', 'unknown')
-                  ->orWhereNull('punch_state');
+                ->orWhereNull('punch_state');
         })
-        ->whereNotNull('punch_type_id')
-        ->get();
+            ->whereNotNull('punch_type_id')
+            ->get();
 
         $this->info("Found {$unknownAttendance->count()} attendance records with unknown/null punch_state");
 
         $fixedCount = 0;
         foreach ($unknownAttendance as $attendance) {
             if ($attendance->punchType) {
-                $correctState = $this->determinePunchState($attendance->punchType->name);
+                $correctState = $this->determinePunchState($attendance->punchType);
 
                 if ($correctState) {
                     $this->line("Attendance ID {$attendance->id}: {$attendance->punchType->name} -> {$correctState}");
 
-                    if (!$isDryRun) {
+                    if (! $isDryRun) {
                         $attendance->update(['punch_state' => $correctState]);
                     }
                     $fixedCount++;
@@ -106,12 +107,12 @@ class FixPunchStates extends Command
         $this->info("{$action} {$fixedCount} attendance records");
     }
 
-    private function determinePunchState(string $punchTypeName): ?string
+    /**
+     * Get the punch state from the PunchType's punch_direction field.
+     * Uses database-driven values instead of hardcoded mappings.
+     */
+    private function determinePunchState(\App\Models\PunchType $punchType): ?string
     {
-        return match ($punchTypeName) {
-            'Clock In', 'Lunch Stop', 'Break End' => 'start',
-            'Clock Out', 'Lunch Start', 'Break Start' => 'stop',
-            default => null
-        };
+        return $punchType->punch_direction;
     }
 }

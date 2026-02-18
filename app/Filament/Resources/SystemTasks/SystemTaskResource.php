@@ -30,7 +30,7 @@ class SystemTaskResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 60;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 

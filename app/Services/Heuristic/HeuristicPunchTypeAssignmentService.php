@@ -14,6 +14,8 @@ class HeuristicPunchTypeAssignmentService
 
     protected array $punchTypeNameCache = [];
 
+    protected array $punchTypeDirectionCache = [];
+
     public function __construct(ShiftScheduleService $shiftScheduleService)
     {
         $this->shiftScheduleService = $shiftScheduleService;
@@ -26,6 +28,7 @@ class HeuristicPunchTypeAssignmentService
         foreach ($punchTypes as $punchType) {
             $this->punchTypeCache[$punchType->name] = $punchType->id;
             $this->punchTypeNameCache[$punchType->id] = $punchType->name;
+            $this->punchTypeDirectionCache[$punchType->id] = $punchType->punch_direction;
         }
     }
 
@@ -138,24 +141,16 @@ class HeuristicPunchTypeAssignmentService
         return $assignedTypes;
     }
 
+    /**
+     * Get punch state from cached punch_direction (database-driven).
+     */
     private function determinePunchState(?int $punchTypeId): string
     {
         if (! $punchTypeId) {
-            return 'NeedsReview';
+            return 'unknown';
         }
 
-        $startTypes = ['Clock In', 'Lunch Start', 'Break Start'];
-        $stopTypes = ['Clock Out', 'Lunch Stop', 'Break End'];
-
-        $punchTypeName = $this->punchTypeNameCache[$punchTypeId] ?? null;
-
-        if (in_array($punchTypeName, $startTypes)) {
-            return 'start';
-        } elseif (in_array($punchTypeName, $stopTypes)) {
-            return 'stop';
-        }
-
-        return 'unknown';
+        return $this->punchTypeDirectionCache[$punchTypeId] ?? 'unknown';
     }
 
     private function getPunchTypeId(string $type): ?int
