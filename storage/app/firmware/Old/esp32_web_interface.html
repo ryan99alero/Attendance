@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Time Clock Configuration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .form-container {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e6ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+
+        .status-display {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .ip-display {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 20px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>ESP32 Time Clock</h1>
+            <p>Device Configuration & Registration</p>
+        </div>
+
+        <div class="form-container">
+            <!-- Current IP Display -->
+            <div class="ip-display">
+                Device IP: <span id="deviceIP">Loading...</span>
+            </div>
+
+            <!-- Status Display -->
+            <div class="status-display">
+                <div class="status-item">
+                    <span>Status:</span>
+                    <span id="deviceStatus">Not Configured</span>
+                </div>
+                <div class="status-item">
+                    <span>WiFi:</span>
+                    <span id="wifiStatus">Disconnected</span>
+                </div>
+                <div class="status-item">
+                    <span>Server:</span>
+                    <span id="serverStatus">Not Connected</span>
+                </div>
+                <div class="status-item">
+                    <span>Time Sync:</span>
+                    <span id="timeStatus">Not Synced</span>
+                </div>
+                <div class="status-item">
+                    <span>Last Update:</span>
+                    <span id="lastUpdate">Never</span>
+                </div>
+            </div>
+
+            <!-- Alert Area -->
+            <div id="alertArea"></div>
+
+            <!-- Configuration Form -->
+            <form id="configForm">
+                <div class="form-group">
+                    <label for="deviceName">Device Name</label>
+                    <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name (e.g., Front Door Clock)" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="serverHost">Attendance System IP/FQDN</label>
+                    <input type="text" id="serverHost" name="serverHost" placeholder="192.168.1.100 or attend.company.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="serverPort">Server Port</label>
+                    <input type="number" id="serverPort" name="serverPort" value="80" min="1" max="65535" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="wifiSSID">WiFi Network (SSID)</label>
+                    <input type="text" id="wifiSSID" name="wifiSSID" placeholder="Company-WiFi" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="wifiPassword">WiFi Password</label>
+                    <input type="password" id="wifiPassword" name="wifiPassword" placeholder="Enter WiFi password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="ntpServer">NTP Server (Optional)</label>
+                    <input type="text" id="ntpServer" name="ntpServer" placeholder="pool.ntp.org" value="pool.ntp.org">
+                </div>
+
+                <div class="form-group">
+                    <label for="timezone">Timezone</label>
+                    <select id="timezone" name="timezone" required>
+                        <option value="">Select Timezone</option>
+                        <option value="America/New_York">Eastern Time (EST/EDT)</option>
+                        <option value="America/Chicago">Central Time (CST/CDT)</option>
+                        <option value="America/Denver">Mountain Time (MST/MDT)</option>
+                        <option value="America/Los_Angeles">Pacific Time (PST/PDT)</option>
+                        <option value="America/Phoenix">Arizona Time (MST)</option>
+                        <option value="America/Anchorage">Alaska Time (AKST/AKDT)</option>
+                        <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+                    </select>
+                </div>
+
+                <button type="button" class="btn btn-primary" id="registerBtn">
+                    Register Device
+                </button>
+
+                <button type="button" class="btn btn-secondary" id="testConnectionBtn">
+                    Test Connection
+                </button>
+
+                <button type="button" class="btn btn-secondary" id="restartBtn">
+                    Restart Device
+                </button>
+            </form>
+
+            <!-- Loading Area -->
+            <div id="loadingArea" class="loading hidden">
+                <div class="spinner"></div>
+                <p id="loadingText">Processing...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let deviceConfig = {};
+        let registrationStatus = 'not_configured';
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDeviceInfo();
+            loadSavedConfig();
+            updateStatus();
+
+            // Set up event listeners
+            document.getElementById('registerBtn').addEventListener('click', registerDevice);
+            document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
+            document.getElementById('restartBtn').addEventListener('click', restartDevice);
+
+            // Auto-refresh status every 30 seconds
+            setInterval(updateStatus, 30000);
+        });
+
+        // Load device information
+        async function loadDeviceInfo() {
+            try {
+                const response = await fetch('/api/device/info');
+                const data = await response.json();
+
+                document.getElementById('deviceIP').textContent = data.ip || 'Unknown';
+
+                // Pre-fill MAC address if available
+                if (data.mac) {
+                    deviceConfig.macAddress = data.mac;
+                }
+            } catch (error) {
+                console.error('Failed to load device info:', error);
+                document.getElementById('deviceIP').textContent = 'Error';
+            }
+        }
+
+        // Load saved configuration
+        async function loadSavedConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+
+                if (config) {
+                    document.getElementById('deviceName').value = config.deviceName || '';
+                    document.getElementById('serverHost').value = config.serverHost || '';
+                    document.getElementById('serverPort').value = config.serverPort || '80';
+                    document.getElementById('wifiSSID').value = config.wifiSSID || '';
+                    document.getElementById('ntpServer').value = config.ntpServer || 'pool.ntp.org';
+                    document.getElementById('timezone').value = config.timezone || '';
+
+                    deviceConfig = config;
+                }
+            } catch (error) {
+                console.error('Failed to load saved config:', error);
+            }
+        }
+
+        // Update status display
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                document.getElementById('deviceStatus').textContent = status.registration || 'Not Configured';
+                document.getElementById('wifiStatus').textContent = status.wifi || 'Disconnected';
+                document.getElementById('serverStatus').textContent = status.server || 'Not Connected';
+                document.getElementById('timeStatus').textContent = status.time || 'Not Synced';
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+                registrationStatus = status.registration || 'not_configured';
+
+                // Update button states based on status
+                updateButtonStates();
+
+            } catch (error) {
+                console.error('Failed to update status:', error);
+                showAlert('Failed to update device status', 'error');
+            }
+        }
+
+        // Update button states
+        function updateButtonStates() {
+            const registerBtn = document.getElementById('registerBtn');
+            const testBtn = document.getElementById('testConnectionBtn');
+
+            if (registrationStatus === 'registered') {
+                registerBtn.textContent = 'Re-register Device';
+                registerBtn.className = 'btn btn-secondary';
+            } else {
+                registerBtn.textContent = 'Register Device';
+                registerBtn.className = 'btn btn-primary';
+            }
+        }
+
+        // Register device with attendance system
+        async function registerDevice() {
+            const formData = new FormData(document.getElementById('configForm'));
+            const config = Object.fromEntries(formData.entries());
+
+            // Validate required fields
+            if (!config.deviceName || !config.serverHost || !config.wifiSSID || !config.wifiPassword) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
+
+            showLoading('Registering device...');
+
+            try {
+                // First save the configuration
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                // Then attempt registration with the attendance system
+                const registrationData = {
+                    device_name: config.deviceName,
+                    mac_address: deviceConfig.macAddress,
+                    firmware_version: '1.0.0',
+                    device_config: {
+                        wifi_ssid: config.wifiSSID,
+                        ntp_server: config.ntpServer,
+                        timezone: config.timezone,
+                        server_host: config.serverHost,
+                        server_port: config.serverPort
+                    }
+                };
+
+                const registerResponse = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(registrationData)
+                });
+
+                const result = await registerResponse.json();
+
+                if (registerResponse.ok) {
+                    showAlert('Device registered successfully! Waiting for approval...', 'success');
+                    deviceConfig.apiToken = result.api_token;
+                    deviceConfig.deviceId = result.device_id;
+
+                    // Save the API token locally
+                    await fetch('/api/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            api_token: result.api_token,
+                            device_id: result.device_id
+                        })
+                    });
+
+                    updateStatus();
+                } else {
+                    showAlert('Registration failed: ' + (result.message || 'Unknown error'), 'error');
+                }
+
+            } catch (error) {
+                console.error('Registration error:', error);
+                showAlert('Failed to register device. Please check your settings and try again.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Test connection to attendance system
+        async function testConnection() {
+            const serverHost = document.getElementById('serverHost').value;
+            const serverPort = document.getElementById('serverPort').value;
+
+            if (!serverHost) {
+                showAlert('Please enter server host/IP address', 'error');
+                return;
+            }
+
+            showLoading('Testing connection...');
+
+            try {
+                const response = await fetch('/api/test-connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        host: serverHost,
+                        port: serverPort
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showAlert('Connection successful!', 'success');
+                } else {
+                    showAlert('Connection failed: ' + (result.message || 'Unable to reach server'), 'error');
+                }
+
+            } catch (error) {
+                console.error('Connection test error:', error);
+                showAlert('Connection test failed', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Restart device
+        async function restartDevice() {
+            if (confirm('Are you sure you want to restart the device?')) {
+                showLoading('Restarting device...');
+
+                try {
+                    await fetch('/api/restart', { method: 'POST' });
+                    showAlert('Device is restarting...', 'info');
+                } catch (error) {
+                    console.error('Restart error:', error);
+                    showAlert('Failed to restart device', 'error');
+                } finally {
+                    hideLoading();
+                }
+            }
+        }
+
+        // Show alert message
+        function showAlert(message, type = 'info') {
+            const alertArea = document.getElementById('alertArea');
+            alertArea.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+
+            // Auto-hide after 5 seconds for success/info messages
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    alertArea.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Show loading indicator
+        function showLoading(text = 'Processing...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingArea').classList.remove('hidden');
+            document.getElementById('configForm').style.opacity = '0.5';
+
+            // Disable all buttons
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => btn.disabled = true);
+        }
+
+        // Hide loading indicator
+        function hideLoading() {
+            document.getElementById('loadingArea').classList.add('hidden');
+            document.getElementById('configForm').style.opacity = '1';
+
+            // Re-enable all buttons
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => btn.disabled = false);
+        }
+    </script>
+</body>
+</html>

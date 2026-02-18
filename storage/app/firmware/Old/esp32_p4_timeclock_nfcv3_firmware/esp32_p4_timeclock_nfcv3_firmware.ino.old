@@ -1,0 +1,1699 @@
+/*
+ * ESP32-P4 Time Clock Firmware with 7" Display and NFC Module V3
+ *
+ * This firmware creates a WiFi access point for initial configuration,
+ * serves a web interface for device setup, communicates with the Laravel
+ * attendance system, and provides a 7" touchscreen interface.
+ *
+ * Hardware Requirements:
+ * - ESP32-P4-Function-EV-Board v1.5.2
+ * - 7" Display connected via MIPI DSI port
+ * - NFC Module V3 (MFRC522-based, 3.3V only)
+ * - PWM backlight control via GPIO26
+ *
+ * Display Wiring:
+ * - 7" Display → MIPI DSI Port (J6)
+ * - PWM wire → J6 header → GPIO26 (J1 header)
+ *
+ * NFC Module V3 Wiring (SPI):
+ * - VCC → 3.3V (CRITICAL: 3.3V only, NOT 5V!)
+ * - GND → GND
+ * - MOSI → GPIO11 (SPI2)
+ * - MISO → GPIO13 (SPI2)
+ * - SCK → GPIO12 (SPI2)
+ * - SS → GPIO10 (Chip Select)
+ * - RSTO → GPIO14 (Reset)
+ * - IRQ → GPIO47 (Interrupt, optional)
+ *
+ * Libraries Required:
+ * - WiFi
+ * - WebServer
+ * - ArduinoJson
+ * - MFRC522 (for NFC Module V3)
+ * - NTPClient
+ * - Preferences (for NVS storage)
+ * - ESP32_Display_Panel (for display)
+ * - lvgl (for GUI)
+ */
+
+#include <Arduino.h>
+#include <esp_display_panel.hpp>
+#include <lvgl.h>
+#include "lvgl_v8_port.h"
+#define LV_CONF_INCLUDE_SIMPLE 1
+#include "lv_conf.h"
+using namespace esp_panel::drivers;
+using namespace esp_panel::board;
+
+// Include other libraries AFTER display panel initialization to avoid conflicts
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <Preferences.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include <SPI.h>
+
+// Conditional NFC library includes based on module selection
+#ifdef USE_PN532
+  #include <Adafruit_PN532.h>
+#elif defined(USE_PN5180)
+  #include <PN5180.h>
+  #include <PN5180ISO15693.h>
+#endif
+
+#include <esp_sleep.h>
+#include <esp_system.h>
+#include <esp_core_dump.h>
+#include <driver/gpio.h>
+#include <driver/ledc.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+// ============================================================================
+// NFC MODULE SELECTION - Choose ONE, comment out the other
+// ============================================================================
+#define USE_PN532       // PN532 NFC Module (currently installed)
+// #define USE_PN5180   // PN5180 NFC Module (backup)
+// ============================================================================
+//
+// SWITCHING BETWEEN MODULES:
+// 1. Comment/uncomment the appropriate #define above
+// 2. Install required library:
+//    - PN532:  Library Manager → "Adafruit PN532" by Adafruit
+//    - PN5180: Library Manager → "PN5180" by ATrappmann or tueddy
+// 3. Wiring stays THE SAME for both modules (pins below)
+// 4. Compile and upload
+// ============================================================================
+
+// NFC Module Pin Definitions for ESP32-P4-Function-EV-Board v1.5.2
+// SAME WIRING FOR BOTH PN532 AND PN5180 - No rewiring needed when swapping!
+// CRITICAL: Avoid GPIO7/8 (I2C for GT911 touch), GPIO18/19 (SDIO), GPIO24/25 (USB-JTAG)
+#define NFC_SS_PIN      33    // SPI Chip Select (SS) - GPIO33 on J1
+#define NFC_RST_PIN     46    // Reset pin - GPIO46 on J1
+#define NFC_IRQ_PIN     47    // Interrupt pin (optional) - GPIO47 on J1
+#define NFC_MOSI        3     // Data Out - GPIO3 on J1 (safe, not reserved)
+#define NFC_MISO        4     // Data In - GPIO4 on J1 (safe, not reserved)
+#define NFC_SCK         5     // Clock - GPIO5 on J1 (safe, not reserved)
+
+// Display backlight control
+#define BACKLIGHT_PWM_PIN    26    // Connected from J6 PWM to GPIO26
+#define BACKLIGHT_PWM_FREQ   5000  // 5kHz PWM frequency
+#define BACKLIGHT_PWM_CHANNEL 0    // LEDC channel
+#define BACKLIGHT_PWM_BITS   8     // 8-bit resolution (0-255)
+
+// Status LED LEDC configuration (separate from backlight to avoid conflicts)
+#define STATUS_LED_FREQ      5000  // 5kHz PWM frequency
+#define LEDC_CH_R            LEDC_CHANNEL_1  // Red channel
+#define LEDC_CH_G            LEDC_CHANNEL_2  // Green channel
+#define LEDC_CH_B            LEDC_CHANNEL_3  // Blue channel
+#define LEDC_TM_LED          LEDC_TIMER_1    // Separate timer from backlight TIMER_0
+
+// Status LED pins (using actual J1 header GPIOs that exist on the board)
+#define LED_RED_PIN     48    // GPIO48 on J1 header
+#define LED_GREEN_PIN   53    // GPIO53 on J1 header
+#define LED_BLUE_PIN    54    // GPIO54 on J1 header
+#define BUZZER_PIN      32    // GPIO32 on J1 header
+
+// Display configuration (LVGL disabled for now)
+// #define LCD_PIXEL_CLOCK_HZ    (10 * 1000 * 1000)
+// #define LCD_BK_LIGHT_ON_LEVEL 1
+// #define LCD_BK_LIGHT_OFF_LEVEL !LCD_BK_LIGHT_ON_LEVEL
+
+// LVGL display buffer (disabled)
+// #define LVGL_BUFFER_SIZE (800 * 100)
+// static lv_disp_draw_buf_t draw_buf;
+// static lv_color_t buf_1[LVGL_BUFFER_SIZE];
+// static lv_disp_drv_t disp_drv;
+
+// Network Configuration
+const char* AP_SSID = "ESP32P4-TimeClock-V3";
+const char* AP_PASSWORD = "Configure123";
+
+// Global Objects - Initialize as pointers to avoid early static construction
+WebServer *server = nullptr;
+WiFiUDP *ntpUDP = nullptr;
+NTPClient *timeClient = nullptr;
+Preferences preferences;
+
+// NFC Reader object - conditional based on module type
+#ifdef USE_PN532
+  Adafruit_PN532 *nfc = nullptr;
+#elif defined(USE_PN5180)
+  PN5180ISO15693 *nfc = nullptr;
+#endif
+
+// Configuration Structure
+struct DeviceConfig {
+    String deviceName;
+    String deviceId;
+    String macAddress;
+    String wifiSSID;
+    String wifiPassword;
+    String serverHost;
+    int serverPort;
+    String apiToken;
+    String ntpServer;
+    String timezone;
+    bool isConfigured;
+    bool isRegistered;
+    unsigned long lastSync;
+    int lastConfigVersion;
+    int backlightBrightness; // 0-255
+
+    // Timezone drift protection
+    int lastValidTimezoneOffset;
+    unsigned long lastTimezoneUpdate;
+    bool timezoneValidated;
+};
+
+DeviceConfig config;
+
+// Status Variables
+enum DeviceStatus {
+    STATUS_NOT_CONFIGURED,
+    STATUS_CONFIGURED,
+    STATUS_REGISTERED,
+    STATUS_APPROVED,
+    STATUS_ERROR
+};
+
+DeviceStatus currentStatus = STATUS_NOT_CONFIGURED;
+String lastError = "";
+unsigned long lastHeartbeat = 0;
+unsigned long lastCardRead = 0;
+unsigned long lastConfigPoll = 0;
+
+// NFC Status Variables
+bool nfcInitialized = false;
+String lastCardUID = "";
+unsigned long cardReadCount = 0;
+String nfcStatusMessage = "Not Initialized";
+
+// Display and GUI Objects
+Board *board = nullptr;
+static bool display_initialized = false;
+static lv_obj_t *main_screen = nullptr;
+static lv_obj_t *status_label = nullptr;
+static lv_obj_t *time_label = nullptr;
+static lv_obj_t *card_label = nullptr;
+static lv_obj_t *wifi_label = nullptr;
+
+void setup() {
+    // ESP32-P4 uses printf() for logging via USB Serial/JTAG
+    delay(2000); // Give USB Serial/JTAG time to initialize
+
+    // FIRST THING - check if setup() even runs
+    printf("[SETUP-START] Setup function starting - if you see this, setup() is running!\n");
+    vTaskDelay(pdMS_TO_TICKS(100)); // Use vTaskDelay instead of delay
+
+    // Initialize global objects early to avoid static constructor conflicts
+    printf("[SETUP-002] Initializing global objects...\n");
+    server = new WebServer(80);
+    ntpUDP = new WiFiUDP();
+    timeClient = new NTPClient(*ntpUDP);
+    // Note: MFRC522 will be initialized later after hardware setup
+    printf("[SETUP-003] Global objects initialized\n");
+
+    printf("\n");
+    printf("========================================\n");
+    printf("ESP32-P4 Time Clock with NFC Module V3\n");
+    printf("========================================\n");
+
+    // System information
+    printf("🔧 CPU Frequency: %d MHz\n", getCpuFrequencyMhz());
+    printf("🧠 Free Heap: %d bytes\n", ESP.getFreeHeap());
+    printf("📱 Chip Model: %s\n", ESP.getChipModel());
+    printf("🔢 Chip Revision: %d\n", ESP.getChipRevision());
+    printf("🆔 MAC Address: %s\n", WiFi.macAddress().c_str());
+
+    printf("🚀 Starting initialization sequence...\n");
+
+    // Initialize board EARLY like working simple_rotation example
+    printf("[LINE-010] Initializing board\n");
+    board = new Board();
+    board->init();
+    if (!board->begin()) {
+        printf("[LINE-015] ❌ Board initialization failed - STOPPING to prevent crash\n");
+        printf("[LINE-016] Check board connections and configuration\n");
+        fflush(stdout);
+        while(1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            printf("[ERROR] Board init failed - system halted\n");
+        }
+    } else {
+        display_initialized = true;
+        printf("[LINE-020] ✅ Board initialization successful\n");
+    }
+
+    // Initialize LVGL early - ONLY if board init succeeded
+    printf("[LINE-025] Initializing LVGL\n");
+    lvgl_port_init(board->getLCD(), board->getTouch());
+
+    // Create GUI elements early
+    printf("[LINE-030] Creating UI\n");
+    if (!lvgl_port_lock(50)) { // 50ms timeout
+        printf("[ERROR] Could not acquire LVGL lock during setup\n");
+        return;
+    }
+
+    lv_obj_t *scr = lv_scr_act();
+    main_screen = scr;
+
+    // Create status labels
+    status_label = lv_label_create(scr);
+    lv_label_set_text(status_label, "ESP32-P4 TimeClock");
+    lv_obj_align(status_label, LV_ALIGN_TOP_MID, 0, 20);
+
+    wifi_label = lv_label_create(scr);
+    lv_label_set_text(wifi_label, "WiFi: Initializing...");
+    lv_obj_align(wifi_label, LV_ALIGN_TOP_LEFT, 20, 60);
+
+    time_label = lv_label_create(scr);
+    lv_label_set_text(time_label, "Time: --:--:--");
+    lv_obj_align(time_label, LV_ALIGN_TOP_RIGHT, -20, 60);
+
+    card_label = lv_label_create(scr);
+    lv_label_set_text(card_label, "Card: No card detected");
+    lv_obj_align(card_label, LV_ALIGN_CENTER, 0, 0);
+
+    lvgl_port_unlock();
+    printf("[LINE-035] ✅ LVGL and GUI initialized\n");
+
+    // Initialize hardware
+    printf("[LINE-040] 🔧 Initializing hardware...\n");
+    initializeHardware();
+
+    // Load configuration
+    printf("[LINE-045] 📁 Loading configuration...\n");
+    loadConfiguration();
+
+    // Generate device ID if not present
+    if (config.deviceId.isEmpty()) {
+        config.deviceId = "ESP32P4-V3-" + WiFi.macAddress();
+        config.deviceId.replace(":", "");
+        printf("[LINE-050] 🆔 Generated Device ID: %s\n", config.deviceId.c_str());
+        saveConfiguration();
+    }
+
+    // Initialize backlight PWM
+    printf("[LINE-055] 📱 Initializing backlight...\n");
+    initializeBacklight();
+    printf("[LINE-060] ✅ Backlight initialized\n");
+
+    // Initialize status LED PWM (after hardware initialization)
+    printf("[LINE-061] 🔄 Initializing status LED PWM...\n");
+    initializeStatusLedPWM();
+    printf("[LINE-062] ✅ Status LED PWM initialized\n");
+
+    // Board and LVGL already initialized early
+    printf("[LINE-065] ✅ Display and GUI ready\n");
+
+    // Initialize WiFi
+    printf("[LINE-070] Starting WiFi initialization...\n");
+    if (config.isConfigured && !config.wifiSSID.isEmpty()) {
+        printf("[LINE-075] 🌐 Connecting to configured WiFi...\n");
+        connectToWiFi();
+
+        // Display WiFi connection status and IP
+        if (WiFi.status() == WL_CONNECTED) {
+            printf("[LINE-080] ✅ WiFi Connected Successfully!\n");
+            printf("📡 SSID: %s\n", WiFi.SSID().c_str());
+            printf("🌐 IP Address: %s\n", WiFi.localIP().toString().c_str());
+            printf("🚪 Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+            printf("🏠 Subnet: %s\n", WiFi.subnetMask().toString().c_str());
+            printf("📊 RSSI: %d dBm\n", WiFi.RSSI());
+            printf("🔗 Web Interface: http://%s\n", WiFi.localIP().toString().c_str());
+            printf("🎯 API Target: %s:%d\n", config.serverHost.c_str(), config.serverPort);
+            fflush(stdout);
+        } else {
+            printf("[LINE-085] ❌ WiFi connection failed, starting AP mode\n");
+            startAccessPoint();
+        }
+    } else {
+        printf("[LINE-090] 📡 Starting WiFi Access Point for configuration...\n");
+        startAccessPoint();
+    }
+
+    // Always show current network status
+    printf("[LINE-095] \n=== NETWORK STATUS ===\n");
+    if (WiFi.status() == WL_CONNECTED) {
+        printf("Mode: Station (Connected)\n");
+        printf("IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        printf("Mode: Access Point\n");
+        printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+        printf("AP SSID: ESP32-P4-TimeClock\n");
+    }
+    printf("======================\n");
+
+    // Initialize NTP if WiFi is connected
+    if (WiFi.status() == WL_CONNECTED) {
+        printf("[LINE-100] ⏰ Initializing NTP client...\n");
+        initializeNTP();
+    }
+
+    // Initialize web server
+    printf("[LINE-105] Initializing web server...\n");
+    initializeWebServer();
+
+    // Initialize NFC Module
+    printf("[LINE-110] Initializing NFC Module...\n");
+    initializeNFC();
+
+    printf("[LINE-115] ESP32-P4 Time Clock with NFC Module V3 initialized successfully\n");
+    setStatusLED(0, 255, 0); // Green - ready
+
+    // Update display with initial status (disabled for now)
+    // updateDisplayStatus();
+}
+
+void loop() {
+    // Simple status output like working simple_rotation example
+    printf("[LOOP-001] TIMECLOCK LOOP\n");
+
+    // Show IP address every loop (like simple_rotation shows "IDLE loop")
+    if (WiFi.status() == WL_CONNECTED) {
+        printf("[LOOP-005] WiFi IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        printf("[LOOP-010] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+    }
+
+    // Handle web server requests
+    server->handleClient();
+
+    // Handle LVGL tasks (disabled for now)
+    // lv_timer_handler();
+
+    // Reduced status updates to minimize serial load
+    static unsigned long lastDebugPrint = 0;
+    if (millis() - lastDebugPrint > 60000) { // Reduced to every 60 seconds
+        printf("📊 Device: %s | %s | NFC: %s | Cards: %d | Heap: %d\n",
+                      config.deviceName.c_str(), getStatusText().c_str(),
+                      nfcStatusMessage.c_str(), cardReadCount, ESP.getFreeHeap());
+        lastDebugPrint = millis();
+    }
+
+    // Handle NFC card reading
+    if (config.isRegistered && (currentStatus == STATUS_REGISTERED || currentStatus == STATUS_APPROVED)) {
+        handleCardReading();
+    } else {
+        // Blink status LED to show we're waiting for configuration/registration
+        static unsigned long lastBlink = 0;
+        if (millis() - lastBlink > 1000) {
+            static bool ledState = false;
+            if (currentStatus == STATUS_NOT_CONFIGURED) {
+                setStatusLED(255, ledState ? 0 : 255, 0); // Red/Yellow blink
+            } else if (currentStatus == STATUS_CONFIGURED) {
+                setStatusLED(0, 0, ledState ? 255 : 0); // Blue blink
+            }
+            ledState = !ledState;
+            lastBlink = millis();
+        }
+    }
+
+    // Poll for configuration updates every 5 minutes if registered
+    if (config.isRegistered && WiFi.status() == WL_CONNECTED) {
+        if (millis() - lastConfigPoll > 300000) { // 5 minutes
+            printf("🔄 Polling for configuration updates...\n");
+            pollConfigurationUpdates();
+            lastConfigPoll = millis();
+        }
+    }
+
+    // Send heartbeat every 60 seconds if approved
+    if (currentStatus == STATUS_APPROVED && WiFi.status() == WL_CONNECTED) {
+        if (millis() - lastHeartbeat > 60000) { // 60 seconds
+            sendHeartbeat();
+            lastHeartbeat = millis();
+        }
+    }
+
+    // Update display periodically
+    static unsigned long lastDisplayUpdate = 0;
+    if (millis() - lastDisplayUpdate > 1000) { // Every second
+        updateDisplayStatus();
+        lastDisplayUpdate = millis();
+    }
+
+    // Keep serial console active and show status every 30 seconds
+    static unsigned long lastNetworkLog = 0;
+    if (millis() - lastNetworkLog > 30000) { // Every 30 seconds
+        // Force serial to stay active
+        vTaskDelay(pdMS_TO_TICKS(50)); // Reduced from 100ms
+
+        printf("\n📊 === TIMECLOCK STATUS UPDATE ===\n");
+        printf("⏰ Uptime: %lu seconds\n", millis() / 1000);
+
+        // Network Status
+        if (WiFi.status() == WL_CONNECTED) {
+            printf("🌐 WiFi: Connected to %s\n", WiFi.SSID().c_str());
+            printf("📍 IP Address: %s (RSSI: %d dBm)\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+            printf("🔗 Web Interface: http://%s\n", WiFi.localIP().toString().c_str());
+            printf("🎯 API Server: %s:%d\n", config.serverHost.c_str(), config.serverPort);
+        } else {
+            printf("📡 Access Point Mode\n");
+            printf("📍 AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+            printf("🔗 Connect to 'ESP32P4-TimeClock-V3' (password: Configure123)\n");
+            printf("🌐 Configure at: http://%s\n", WiFi.softAPIP().toString().c_str());
+        }
+
+        // Device Status
+        printf("🆔 Device: %s (ID: %s)\n", config.deviceName.c_str(), config.deviceId.c_str());
+        printf("📱 NFC Status: %s | Cards Read: %d\n", nfcStatusMessage.c_str(), cardReadCount);
+        printf("🧠 Free Memory: %d bytes\n", ESP.getFreeHeap());
+        printf("⚙️ Configuration: %s | Registration: %s\n",
+                     config.isConfigured ? "Complete" : "Pending",
+                     config.isRegistered ? "Registered" : "Not Registered");
+        printf("==========================================\n");
+        fflush(stdout); // Force output
+        lastNetworkLog = millis();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(100)); // Allow background tasks to run, reduce from 1000ms to 100ms
+}
+
+void initializeBacklight() {
+    printf("=== Display Backlight Initialization ===\n");
+
+    // Configure LEDC for PWM backlight control (ESP32-P4 compatible)
+    ledc_timer_config_t ledc_timer = {};
+    ledc_timer.speed_mode = LEDC_LOW_SPEED_MODE;
+    ledc_timer.timer_num = LEDC_TIMER_0;
+    ledc_timer.duty_resolution = LEDC_TIMER_8_BIT;
+    ledc_timer.freq_hz = BACKLIGHT_PWM_FREQ;
+    ledc_timer.clk_cfg = LEDC_AUTO_CLK;
+
+    esp_err_t ret = ledc_timer_config(&ledc_timer);
+    if (ret != ESP_OK) {
+        printf("❌ LEDC timer config failed: %s\n", esp_err_to_name(ret));
+        return;
+    }
+
+    ledc_channel_config_t ledc_channel = {};
+    ledc_channel.gpio_num = BACKLIGHT_PWM_PIN;
+    ledc_channel.speed_mode = LEDC_LOW_SPEED_MODE;
+    ledc_channel.channel = LEDC_CHANNEL_0;
+    ledc_channel.timer_sel = LEDC_TIMER_0;
+    ledc_channel.duty = 0;
+    ledc_channel.hpoint = 0;
+
+    ret = ledc_channel_config(&ledc_channel);
+    if (ret != ESP_OK) {
+        printf("❌ LEDC channel config failed: %s\n", esp_err_to_name(ret));
+        return;
+    }
+
+    // Set default brightness (80%)
+    config.backlightBrightness = 204; // 80% of 255
+    setBacklightBrightness(config.backlightBrightness);
+
+    printf("✅ Backlight PWM initialized on GPIO%d at %dHz\n", BACKLIGHT_PWM_PIN, BACKLIGHT_PWM_FREQ);
+    printf("   Default brightness: %d/255 (%.1f%%)\n", config.backlightBrightness, (config.backlightBrightness/255.0)*100);
+}
+
+void setBacklightBrightness(uint8_t brightness) {
+    uint32_t duty = (brightness * 255) / 255; // Convert to LEDC duty cycle
+    esp_err_t ret = ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
+    if (ret == ESP_OK) {
+        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+        printf("🔆 Backlight brightness set to %d/255 (%.1f%%)\n", brightness, (brightness/255.0)*100);
+    } else {
+        printf("❌ Failed to set backlight brightness: %s\n", esp_err_to_name(ret));
+    }
+}
+
+void initializeStatusLedPWM() {
+    printf("=== Status LED PWM Initialization ===\n");
+
+    // Configure LEDC timer for status LED (separate from backlight timer)
+    ledc_timer_config_t timer_config = {};
+    timer_config.speed_mode = LEDC_LOW_SPEED_MODE;
+    timer_config.timer_num = LEDC_TM_LED;
+    timer_config.duty_resolution = LEDC_TIMER_8_BIT;
+    timer_config.freq_hz = STATUS_LED_FREQ;
+    timer_config.clk_cfg = LEDC_AUTO_CLK;
+
+    esp_err_t ret = ledc_timer_config(&timer_config);
+    if (ret != ESP_OK) {
+        printf("❌ Status LED timer config failed: %s\n", esp_err_to_name(ret));
+        return;
+    }
+
+    // Helper function to configure a single LED channel
+    auto ledcAttach = [](int pin, ledc_channel_t channel) {
+        ledc_channel_config_t channel_config = {};
+        channel_config.gpio_num = pin;
+        channel_config.speed_mode = LEDC_LOW_SPEED_MODE;
+        channel_config.channel = channel;
+        channel_config.timer_sel = LEDC_TM_LED;
+        channel_config.duty = 0;
+        channel_config.hpoint = 0;
+        return ledc_channel_config(&channel_config);
+    };
+
+    // Configure RGB channels
+    if (ledcAttach(LED_RED_PIN, LEDC_CH_R) != ESP_OK ||
+        ledcAttach(LED_GREEN_PIN, LEDC_CH_G) != ESP_OK ||
+        ledcAttach(LED_BLUE_PIN, LEDC_CH_B) != ESP_OK) {
+        printf("❌ Status LED channel config failed\n");
+        return;
+    }
+
+    printf("✅ Status LED PWM initialized: R=GPIO%d, G=GPIO%d, B=GPIO%d at %dHz\n",
+                  LED_RED_PIN, LED_GREEN_PIN, LED_BLUE_PIN, STATUS_LED_FREQ);
+}
+
+
+void initializeLVGL() {
+    printf("=== LVGL GUI Initialization ===\n");
+    if (!display_initialized) {
+        printf("❌ Cannot initialize LVGL - display not initialized\n");
+        return;
+    }
+
+    printf("Initializing LVGL\n");
+    lvgl_port_init(board->getLCD(), board->getTouch());
+
+    printf("Creating UI\n");
+    /* Lock the mutex due to the LVGL APIs are not thread-safe */
+    if (!lvgl_port_lock(50)) { // 50ms timeout
+        printf("❌ Could not acquire LVGL lock for initializeLVGL\n");
+        return;
+    }
+
+    lv_obj_t *scr = lv_scr_act();
+
+    // Create main screen
+    main_screen = scr;
+
+    // Create status labels
+    status_label = lv_label_create(scr);
+    lv_label_set_text(status_label, "ESP32-P4 TimeClock");
+    lv_obj_align(status_label, LV_ALIGN_TOP_MID, 0, 20);
+
+    wifi_label = lv_label_create(scr);
+    lv_label_set_text(wifi_label, "WiFi: Disconnected");
+    lv_obj_align(wifi_label, LV_ALIGN_TOP_LEFT, 20, 60);
+
+    time_label = lv_label_create(scr);
+    lv_label_set_text(time_label, "Time: --:--:--");
+    lv_obj_align(time_label, LV_ALIGN_TOP_RIGHT, -20, 60);
+
+    card_label = lv_label_create(scr);
+    lv_label_set_text(card_label, "Card: No card detected");
+    lv_obj_align(card_label, LV_ALIGN_CENTER, 0, 0);
+
+    /* Release the mutex */
+    lvgl_port_unlock();
+
+    printf("✅ LVGL GUI initialized with 1024x600 resolution\n");
+}
+
+void createGUI() {
+    // GUI creation code would go here
+}
+
+void updateDisplayStatus() {
+    if (!display_initialized || !main_screen) {
+        return;
+    }
+
+    if (!lvgl_port_lock(10)) { // 10ms timeout - bail if can't get lock quickly
+        return;
+    }
+
+    // Update WiFi status with IP address
+    if (wifi_label) {
+        String wifiStatus;
+        if (WiFi.status() == WL_CONNECTED) {
+            wifiStatus = String("WiFi: ") + WiFi.localIP().toString();
+        } else {
+            wifiStatus = String("AP: ") + WiFi.softAPIP().toString();
+        }
+        lv_label_set_text(wifi_label, wifiStatus.c_str());
+    }
+
+    // Update time
+    if (time_label) {
+        String currentTime = String("Time: ") + String(millis() / 1000) + "s";
+        lv_label_set_text(time_label, currentTime.c_str());
+    }
+
+    // Update card status
+    if (card_label) {
+        String cardStatus = String("Cards: ") + String(cardReadCount) + " | " + nfcStatusMessage;
+        lv_label_set_text(card_label, cardStatus.c_str());
+    }
+
+    lvgl_port_unlock();
+
+    printf("📊 Display Status: NFC=%s, WiFi=%s, Cards=%d\n",
+                   nfcStatusMessage.c_str(),
+                   WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected",
+                   cardReadCount);
+}
+
+void initializeNFC() {
+#ifdef USE_PN532
+    printf("=== PN532 NFC Module Initialization ===\n");
+
+    // Initialize MFRC522 object if not already done
+    if (rfid == nullptr) {
+        printf("🔧 Creating MFRC522 object...\n");
+        rfid = new MFRC522(RFID_SS_PIN, RFID_RST_PIN);
+        printf("✅ MFRC522 object created\n");
+    }
+
+    // Check GPIO pin states before initialization
+    printf("📋 Pre-initialization pin status:\n");
+    printf("   SS (GPIO %d): %s\n", RFID_SS_PIN, digitalRead(RFID_SS_PIN) ? "HIGH" : "LOW");
+    printf("   RST (GPIO %d): %s\n", RFID_RST_PIN, digitalRead(RFID_RST_PIN) ? "HIGH" : "LOW");
+    if (RFID_IRQ_PIN != -1) {
+        printf("   IRQ (GPIO %d): %s\n", RFID_IRQ_PIN, digitalRead(RFID_IRQ_PIN) ? "HIGH" : "LOW");
+    }
+
+    // Initialize SPI for MFRC522 with proper pin order to prevent bus conflicts
+    printf("🔧 Initializing SPI for MFRC522...\n");
+
+    // CRITICAL: Set SS high and configure pins BEFORE SPI.begin() to prevent bus conflicts
+    pinMode(RFID_SS_PIN, OUTPUT);
+    digitalWrite(RFID_SS_PIN, HIGH);  // Deselect BEFORE SPI init
+    pinMode(RFID_RST_PIN, OUTPUT);
+    digitalWrite(RFID_RST_PIN, HIGH); // Not in reset
+    vTaskDelay(pdMS_TO_TICKS(10)); // Brief settling time
+
+    // Now safe to initialize SPI
+    SPI.begin(RFID_SCK, RFID_MISO, RFID_MOSI, RFID_SS_PIN); // SCK, MISO, MOSI, SS
+    SPI.setFrequency(4000000); // 4 MHz for MFRC522 (safe frequency)
+    vTaskDelay(pdMS_TO_TICKS(50)); // Allow SPI to stabilize
+    printf("✅ SPI initialized: SCK=%d, MISO=%d, MOSI=%d, SS=%d\n",
+                  RFID_SCK, RFID_MISO, RFID_MOSI, RFID_SS_PIN);
+
+    // Initialize MFRC522
+    printf("🔧 Initializing MFRC522...\n");
+    rfid->PCD_Init();
+    vTaskDelay(pdMS_TO_TICKS(100)); // Reduced MFRC522 init delay
+    printf("✅ MFRC522 initialization called\n");
+
+    // Test communication with multiple attempts
+    printf("🔍 Testing MFRC522 communication...\n");
+    byte version = 0xFF;
+    bool communicationSuccess = false;
+
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        printf("   Attempt %d/3: ", attempt);
+        version = rfid->PCD_ReadRegister(rfid->VersionReg);
+        printf("Version = 0x%02X ", version);
+
+        // Check for valid MFRC522 versions
+        if (version == 0x91) {
+            printf("✅ SUCCESS! MFRC522 v1.0 detected\n");
+            communicationSuccess = true;
+            break;
+        } else if (version == 0x92) {
+            printf("✅ SUCCESS! MFRC522 v2.0 detected\n");
+            communicationSuccess = true;
+            break;
+        } else if (version == 0x88) {
+            printf("✅ SUCCESS! MFRC522 clone detected\n");
+            communicationSuccess = true;
+            break;
+        } else if (version == 0x00) {
+            printf("❌ No response (check wiring)\n");
+        } else if (version == 0xFF) {
+            printf("❌ Invalid response (check power/wiring)\n");
+        } else {
+            printf("⚠️  Unknown version: 0x%02X\n", version);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(50)); // Reduced test loop delay
+    }
+
+    if (communicationSuccess) {
+        printf("✅ MFRC522 initialized successfully!\n");
+        printf("   Chip Version: 0x%02X\n", version);
+
+        // Set status message
+        if (version == 0x91) {
+            nfcStatusMessage = "MFRC522 v1.0 Ready";
+        } else if (version == 0x92) {
+            nfcStatusMessage = "MFRC522 v2.0 Ready";
+        } else if (version == 0x88) {
+            nfcStatusMessage = "MFRC522 Clone Ready";
+        } else {
+            nfcStatusMessage = "MFRC522 Ready (v" + String(version, HEX) + ")";
+        }
+
+        nfcInitialized = true;
+
+        // Perform self-test
+        printf("🧪 Running MFRC522 self-test...\n");
+        bool selfTestResult = rfid->PCD_PerformSelfTest();
+        printf(selfTestResult ? "   Self-test: PASSED" : "   Self-test: FAILED");
+
+        // Re-initialize after self-test
+        rfid->PCD_Init();
+
+        printf("✅ MFRC522 ready for card reading!\n");
+
+    } else {
+        printf("❌ MFRC522 communication failed!\n");
+        printf("📋 Troubleshooting checklist:\n");
+        printf("   1. Check wiring connections:\n");
+        printf("      VCC → 3.3V (CRITICAL: NOT 5V!), GND → GND\n");
+        printf("      MOSI → GPIO%d, MISO → GPIO%d\n", RFID_MOSI, RFID_MISO);
+        printf("      SCK → GPIO%d, SS → GPIO%d\n", RFID_SCK, RFID_SS_PIN);
+        printf("      RSTO → GPIO%d", RFID_RST_PIN);
+        if (RFID_IRQ_PIN != -1) {
+            printf(", IRQ → GPIO%d (optional)", RFID_IRQ_PIN);
+        }
+        printf("\n");
+        printf("   2. ⚠️  CRITICAL: Ensure 3.3V power, NOT 5V (will damage module)\n");
+        printf("   3. Check power supply (3.3V, adequate current)\n");
+        printf("   4. Check SPI bus conflicts\n");
+        printf("   5. Hardware failure\n");
+
+        nfcStatusMessage = "MFRC522 Failed (0x" + String(version, HEX) + ")";
+        nfcInitialized = false;
+    }
+
+    printf("=== MFRC522 Initialization Complete ===\n");
+}
+
+void initializeHardware() {
+    printf("🔧 Configuring GPIO pins...\n");
+    fflush(stdout);
+
+    // Configure GPIO pins (now using safe GPIOs that don't conflict)
+    pinMode(LED_RED_PIN, OUTPUT);
+    pinMode(LED_GREEN_PIN, OUTPUT);
+    pinMode(LED_BLUE_PIN, OUTPUT);
+    pinMode(BUZZER_PIN, OUTPUT);
+
+    printf("✅ LED and buzzer pins configured\n");
+    fflush(stdout);
+
+    // Configure MFRC522 IRQ pin (SS and RST pins handled in SPI initialization)
+    printf("🔧 Configuring MFRC522 IRQ pin...\n");
+    fflush(stdout);
+
+    if (RFID_IRQ_PIN != -1) {
+        pinMode(RFID_IRQ_PIN, INPUT);
+        printf("✅ MFRC522 IRQ pin (GPIO%d) configured\n", RFID_IRQ_PIN);
+    } else {
+        printf("✅ MFRC522 IRQ pin not used (polling mode)\n");
+    }
+    fflush(stdout);
+
+    // Turn off all LEDs initially
+    printf("🔧 Initializing LEDs...\n");
+    fflush(stdout);
+    setStatusLED(0, 0, 0);
+
+    printf("✅ Hardware initialization complete\n");
+    fflush(stdout);
+}
+
+void handleCardReading() {
+    // Auto-recovery: Check MFRC522 connection every 60 seconds and reinitialize if needed
+    static unsigned long lastConnectionCheck = 0;
+    if (millis() - lastConnectionCheck > 60000) { // Every 60 seconds
+        printf("🔧 === MFRC522 CONNECTION CHECK ===\n");
+        byte version = rfid->PCD_ReadRegister(rfid->VersionReg);
+
+        if (version == 0x00 || version == 0xFF) {
+            printf("⚠️  MFRC522 connection lost! Attempting to recover...\n");
+            printf("   Read version: 0x%02X (should be 0x91, 0x92, or 0x88)\n", version);
+
+            // Mark as uninitialized and attempt reinit
+            nfcInitialized = false;
+            nfcStatusMessage = "Connection Lost - Recovering...";
+
+            // Attempt to reinitialize
+            vTaskDelay(pdMS_TO_TICKS(200)); // Reduced from 500ms
+            initializeMFRC522();
+
+            if (nfcInitialized) {
+                printf("✅ MFRC522 connection recovered successfully!\n");
+            } else {
+                printf("❌ MFRC522 recovery failed - check physical connections\n");
+            }
+        } else {
+            printf("✅ MFRC522 connection healthy (version: 0x%02X)\n", version);
+        }
+        lastConnectionCheck = millis();
+    }
+
+    // Debug card scanning status periodically
+    static unsigned long lastCardScanDebug = 0;
+    if (millis() - lastCardScanDebug > 20000) { // Every 20 seconds
+        printf("🎫 === CARD READING STATUS ===\n");
+        printf("   nfcInitialized: %s\n", nfcInitialized ? "true" : "false");
+        printf("   NFC Status: %s\n", nfcStatusMessage.c_str());
+        printf("   Card read count: %d\n", cardReadCount);
+        printf("   Last card UID: %s\n", lastCardUID.c_str());
+        printf("   Actively scanning for cards...\n");
+        lastCardScanDebug = millis();
+    }
+
+    if (!nfcInitialized) {
+        static unsigned long lastNfcWarning = 0;
+        if (millis() - lastNfcWarning > 30000) { // Every 30 seconds
+            printf("❌ Card reading blocked - NFC not initialized!\n");
+            printf("   nfcStatusMessage: %s\n", nfcStatusMessage.c_str());
+            printf("   💡 TIP: Check physical wire connections to MFRC522\n");
+            lastNfcWarning = millis();
+        }
+        return; // Don't try to read if NFC isn't working
+    }
+
+    // Look for new cards
+    if (!rfid->PICC_IsNewCardPresent()) {
+        return; // No new card
+    }
+
+    // Verify if the NUID has been read
+    if (!rfid->PICC_ReadCardSerial()) {
+        return; // Failed to read card
+    }
+
+    // Card detected - process it
+    handleCardDetected(rfid->uid.uidByte, rfid->uid.size, rfid->PICC_GetType(rfid->uid.sak));
+
+    // Halt PICC
+    rfid->PICC_HaltA();
+    // Stop encryption on PCD
+    rfid->PCD_StopCrypto1();
+}
+
+void handleCardDetected(uint8_t* uid, uint8_t uidLength, MFRC522::PICC_Type piccType) {
+    // Convert UID to hex string
+    String cardUID = "";
+    for (int i = 0; i < uidLength; i++) {
+        if (uid[i] < 0x10) cardUID += "0";
+        cardUID += String(uid[i], HEX);
+    }
+    cardUID.toUpperCase();
+
+    // Check for duplicate reads (debounce)
+    if (cardUID == lastCardUID && (millis() - lastCardRead) < 2000) {
+        return; // Same card within 2 seconds, ignore
+    }
+
+    lastCardUID = cardUID;
+    lastCardRead = millis();
+    cardReadCount++;
+
+    // Get card type name
+    String cardTypeName = rfid->PICC_GetTypeName(piccType);
+    String credentialKind = getCredentialKind(piccType);
+
+    printf("🎫 === CARD DETECTED ===\n");
+    printf("   Type: %s\n", cardTypeName.c_str());
+    printf("   UID: %s\n", cardUID.c_str());
+    printf("   Length: %d bytes\n", uidLength);
+    printf("   Credential Kind: %s\n", credentialKind.c_str());
+    printf("   Total cards read: %d\n", cardReadCount);
+
+    // Update display with card information
+    if (display_initialized && card_label) {
+        if (!lvgl_port_lock(5)) { // 5ms timeout - don't block card processing
+            return; // Skip display update if can't get lock quickly
+        }
+        String displayText = "Card: " + cardUID;
+        lv_label_set_text(card_label, displayText.c_str());
+        lv_obj_set_style_text_color(card_label, lv_color_hex(0x00FF00), 0); // Green for detected card
+        lvgl_port_unlock();
+    }
+
+    // Card detection output
+    printf("🎴 === CARD DETECTED ===\n");
+    printf("🔢 Card UID: %s\n", cardUID.c_str());
+    printf("📊 Total Cards Read: %d\n", cardReadCount);
+    printf("⏰ Detection Time: %lu ms\n", millis());
+    printf("========================\n");
+    fflush(stdout);
+
+    // Visual/audio feedback
+    setStatusLED(255, 255, 0); // Yellow flash
+    digitalWrite(BUZZER_PIN, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(50)); // Reduced from 100ms
+    digitalWrite(BUZZER_PIN, LOW);
+    setStatusLED(0, 255, 0); // Back to green
+
+    // Send to server if registered and connected
+    if (currentStatus == STATUS_APPROVED && WiFi.status() == WL_CONNECTED) {
+        sendPunchData(cardUID, credentialKind);
+    } else {
+        printf("⚠️  Card read but not sent - device not approved or no WiFi\n");
+    }
+}
+
+String getCredentialKind(MFRC522::PICC_Type piccType) {
+    // Map MFRC522 card types to credential kinds used by Laravel API
+    switch (piccType) {
+        case MFRC522::PICC_TYPE_MIFARE_MINI:
+        case MFRC522::PICC_TYPE_MIFARE_1K:
+        case MFRC522::PICC_TYPE_MIFARE_4K:
+            return "rfid";  // Classic RFID/Mifare cards
+
+        case MFRC522::PICC_TYPE_MIFARE_UL:
+            return "nfc";   // NFC cards (Ultralight)
+
+        case MFRC522::PICC_TYPE_MIFARE_PLUS:
+        case MFRC522::PICC_TYPE_MIFARE_DESFIRE:
+            return "nfc";   // Advanced NFC cards
+
+        case MFRC522::PICC_TYPE_TNP3XXX:
+            return "rfid";  // Topaz cards (treated as RFID)
+
+        case MFRC522::PICC_TYPE_ISO_14443_4:
+            return "nfc";   // ISO14443-4 compliant (typically NFC)
+
+        case MFRC522::PICC_TYPE_ISO_18092:
+            return "nfc";   // ISO18092 (NFC)
+
+        case MFRC522::PICC_TYPE_NOT_COMPLETE:
+        case MFRC522::PICC_TYPE_UNKNOWN:
+        default:
+            return "rfid";  // Default to RFID for unknown types
+    }
+}
+
+void sendPunchData(String cardUID, String credentialKind) {
+    printf("📤 Sending punch data to server...\n");
+
+    HTTPClient http;
+    http.begin(config.serverHost + ":" + String(config.serverPort) + "/api/devices/clock-event");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + config.apiToken);
+    http.setTimeout(3000); // 3 second timeout to prevent hanging
+
+    // Create punch data JSON - use static to avoid repeated allocations
+    static DynamicJsonDocument punchData(1024);
+    punchData["device_id"] = config.deviceId;
+    punchData["credential_kind"] = credentialKind;
+    punchData["credential_value"] = cardUID;
+    punchData["event_time"] = getISODateTime();
+    punchData["event_type"] = "unknown";  // Let server determine
+    punchData["confidence"] = 100;  // High confidence for MFRC522
+
+    // Send device timezone as numeric offset
+    int timezoneOffset = config.timezone.length() > 0 ? getTimezoneOffset(config.timezone) : -5;
+    punchData["timezone_offset"] = timezoneOffset;
+
+    String jsonString;
+    serializeJson(punchData, jsonString);
+
+    printf("📋 Punch Data: %s\n", jsonString.c_str());
+
+    int httpResponseCode = http.POST(jsonString);
+
+    if (httpResponseCode > 0) {
+        String response = http.getString();
+        printf("📥 Server Response (%d): %s\n", httpResponseCode, response.c_str());
+
+        if (httpResponseCode == 200 || httpResponseCode == 201) {
+            printf("✅ Punch data sent successfully!\n");
+            setStatusLED(0, 255, 0); // Green success
+        } else {
+            printf("⚠️  Punch data sent but server returned error\n");
+            setStatusLED(255, 165, 0); // Orange warning
+        }
+    } else {
+        printf("❌ Failed to send punch data: %d\n", httpResponseCode);
+        setStatusLED(255, 0, 0); // Red error
+    }
+
+    http.end();
+}
+
+// ... [Include all other necessary functions from the original firmware like:]
+// - WiFi connection functions
+// - Web server setup
+// - Configuration management
+// - Status functions
+// - Utility functions
+
+void setStatusLED(uint8_t red, uint8_t green, uint8_t blue) {
+    // Helper function to safely set LEDC duty
+    auto ledcWrite8 = [](ledc_channel_t channel, uint8_t value) {
+        esp_err_t ret = ledc_set_duty(LEDC_LOW_SPEED_MODE, channel, value);
+        if (ret == ESP_OK) {
+            ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
+        }
+    };
+
+    // Set RGB values using LEDC (not analogWrite to avoid conflicts)
+    ledcWrite8(LEDC_CH_R, red);
+    ledcWrite8(LEDC_CH_G, green);
+    ledcWrite8(LEDC_CH_B, blue);
+}
+
+String getStatusText() {
+    switch (currentStatus) {
+        case STATUS_NOT_CONFIGURED: return "Not Configured";
+        case STATUS_CONFIGURED: return "Configured";
+        case STATUS_REGISTERED: return "Registered";
+        case STATUS_APPROVED: return "Approved & Ready";
+        case STATUS_ERROR: return "Error: " + lastError;
+        default: return "Unknown";
+    }
+}
+
+String getISODateTime() {
+    if (WiFi.status() != WL_CONNECTED) {
+        return "1970-01-01T00:00:00";
+    }
+
+    timeClient->update();
+    time_t rawTime = timeClient->getEpochTime();
+    struct tm* timeInfo = localtime(&rawTime);
+
+    char isoBuffer[32];
+    snprintf(isoBuffer, sizeof(isoBuffer),
+             "%04d-%02d-%02dT%02d:%02d:%02d",
+             timeInfo->tm_year + 1900,
+             timeInfo->tm_mon + 1,
+             timeInfo->tm_mday,
+             timeInfo->tm_hour,
+             timeInfo->tm_min,
+             timeInfo->tm_sec);
+
+    return String(isoBuffer);
+}
+
+int getTimezoneOffset(String timezone) {
+    // Simple timezone offset mapping
+    if (timezone == "EST" || timezone == "America/New_York") return -5;
+    if (timezone == "CST" || timezone == "America/Chicago") return -6;
+    if (timezone == "MST" || timezone == "America/Denver") return -7;
+    if (timezone == "PST" || timezone == "America/Los_Angeles") return -8;
+    return -5; // Default EST
+}
+
+// Configuration Management
+void loadConfiguration() {
+    printf("=== Loading Configuration from NVS ===\n");
+
+    // Initialize with defaults
+    config.deviceName = "ESP32-P4 TimeClock";
+    config.deviceId = "";
+    config.macAddress = WiFi.macAddress();
+    config.wifiSSID = "";
+    config.wifiPassword = "";
+    config.serverHost = "192.168.1.100";
+    config.serverPort = 80;
+    config.apiToken = "";
+    config.ntpServer = "pool.ntp.org";
+    config.timezone = "EST";
+    config.isConfigured = false;
+    config.isRegistered = false;
+    config.lastSync = 0;
+    config.lastConfigVersion = 0;
+    config.backlightBrightness = 204; // 80%
+    config.lastValidTimezoneOffset = -5;
+    config.lastTimezoneUpdate = 0;
+    config.timezoneValidated = false;
+
+    // Try to load from NVS
+    if (preferences.begin("timeclock", true)) { // true = read-only
+        printf("📁 Reading configuration from NVS...\n");
+
+        config.deviceName = preferences.getString("deviceName", config.deviceName);
+        config.deviceId = preferences.getString("deviceId", config.deviceId);
+        config.wifiSSID = preferences.getString("wifiSSID", config.wifiSSID);
+        config.wifiPassword = preferences.getString("wifiPass", config.wifiPassword);
+        config.serverHost = preferences.getString("serverHost", config.serverHost);
+        config.serverPort = preferences.getInt("serverPort", config.serverPort);
+        config.apiToken = preferences.getString("apiToken", config.apiToken);
+        config.ntpServer = preferences.getString("ntpServer", config.ntpServer);
+        config.timezone = preferences.getString("timezone", config.timezone);
+        config.isConfigured = preferences.getBool("isConfigured", config.isConfigured);
+        config.isRegistered = preferences.getBool("isRegistered", config.isRegistered);
+        config.lastSync = preferences.getULong("lastSync", config.lastSync);
+        config.lastConfigVersion = preferences.getInt("configVer", config.lastConfigVersion);
+        config.backlightBrightness = preferences.getUChar("brightness", config.backlightBrightness);
+        config.lastValidTimezoneOffset = preferences.getInt("tzOffset", config.lastValidTimezoneOffset);
+        config.lastTimezoneUpdate = preferences.getULong("tzUpdate", config.lastTimezoneUpdate);
+        config.timezoneValidated = preferences.getBool("tzValid", config.timezoneValidated);
+
+        preferences.end();
+
+        if (config.deviceName != "ESP32-P4 TimeClock" || config.isConfigured) {
+            printf("✅ Configuration loaded from NVS\n");
+            printf("   Device: %s\n", config.deviceName.c_str());
+            printf("   WiFi: %s\n", config.wifiSSID.length() > 0 ? "Configured" : "Not configured");
+            printf("   Server: %s:%d\n", config.serverHost.c_str(), config.serverPort);
+            printf("   Registered: %s\n", config.isRegistered ? "Yes" : "No");
+        } else {
+            printf("📁 No saved configuration found, using defaults\n");
+        }
+    } else {
+        printf("❌ Failed to open NVS storage\n");
+    }
+
+    // Update current status based on configuration
+    if (!config.isConfigured) {
+        currentStatus = STATUS_NOT_CONFIGURED;
+    } else if (!config.isRegistered) {
+        currentStatus = STATUS_CONFIGURED;
+    } else {
+        currentStatus = STATUS_REGISTERED;
+    }
+}
+
+void saveConfiguration() {
+    printf("💾 Saving configuration to NVS...\n");
+
+    if (preferences.begin("timeclock", false)) { // false = read-write
+        preferences.putString("deviceName", config.deviceName);
+        preferences.putString("deviceId", config.deviceId);
+        preferences.putString("wifiSSID", config.wifiSSID);
+        preferences.putString("wifiPass", config.wifiPassword);
+        preferences.putString("serverHost", config.serverHost);
+        preferences.putInt("serverPort", config.serverPort);
+        preferences.putString("apiToken", config.apiToken);
+        preferences.putString("ntpServer", config.ntpServer);
+        preferences.putString("timezone", config.timezone);
+        preferences.putBool("isConfigured", config.isConfigured);
+        preferences.putBool("isRegistered", config.isRegistered);
+        preferences.putULong("lastSync", config.lastSync);
+        preferences.putInt("configVer", config.lastConfigVersion);
+        preferences.putUChar("brightness", config.backlightBrightness);
+        preferences.putInt("tzOffset", config.lastValidTimezoneOffset);
+        preferences.putULong("tzUpdate", config.lastTimezoneUpdate);
+        preferences.putBool("tzValid", config.timezoneValidated);
+
+        preferences.end();
+        printf("✅ Configuration saved to NVS successfully\n");
+    } else {
+        printf("❌ Failed to save configuration to NVS\n");
+    }
+}
+
+// WiFi Management
+void connectToWiFi() {
+    if (config.wifiSSID.length() == 0) {
+        printf("❌ No WiFi SSID configured\n");
+        return;
+    }
+
+    printf("🌐 Connecting to WiFi: %s\n", config.wifiSSID.c_str());
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(config.wifiSSID.c_str(), config.wifiPassword.c_str());
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Keep 1000ms for WiFi connection timing
+        attempts++;
+        printf(".\n");
+        if (attempts % 10 == 0) {
+            printf(" %d/30\n", attempts);
+        }
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        printf("\n");
+        printf("✅ WiFi connected!\n");
+        printf("   IP Address: %s\n", WiFi.localIP().toString().c_str());
+        printf("   Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+        printf("   DNS: %s\n", WiFi.dnsIP().toString().c_str());
+        printf("   RSSI: %d dBm\n", WiFi.RSSI());
+    } else {
+        printf("\n");
+        printf("❌ WiFi connection failed\n");
+        printf("   Starting Access Point for configuration...\n");
+        startAccessPoint();
+    }
+}
+
+void startAccessPoint() {
+    printf("📡 Starting WiFi Access Point...\n");
+
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+
+    printf("✅ Access Point started!\n");
+    printf("   SSID: %s\n", AP_SSID);
+    printf("   Password: %s\n", AP_PASSWORD);
+    printf("   IP Address: %s\n", WiFi.softAPIP().toString().c_str());
+    printf("   Connect and navigate to http://%s\n", WiFi.softAPIP().toString().c_str());
+}
+
+// Time Management
+void initializeNTP() {
+    printf("⏰ Initializing NTP client...\n");
+
+    timeClient->begin();
+    timeClient->setTimeOffset(getTimezoneOffset(config.timezone) * 3600); // Convert hours to seconds
+    timeClient->setUpdateInterval(300000); // Update every 5 minutes
+
+    printf("🕐 Syncing time with NTP server: %s\n", config.ntpServer.c_str());
+    if (timeClient->update()) {
+        printf("✅ NTP time synchronized\n");
+        printf("   Current time: %s\n", timeClient->getFormattedTime().c_str());
+        printf("   Epoch time: %lu\n", timeClient->getEpochTime());
+        config.lastSync = millis();
+    } else {
+        printf("❌ NTP sync failed, will retry later\n");
+    }
+}
+
+// Web Server Setup
+void initializeWebServer() {
+    printf("🌐 Setting up web server...\n");
+
+    // Configuration page
+    server->on("/", handleRoot);
+    server->on("/config", HTTP_POST, handleConfigSubmit);
+    server->on("/status", handleStatus);
+    server->on("/register", HTTP_POST, handleRegister);
+    server->on("/brightness", HTTP_POST, handleBrightness);
+    server->on("/restart", HTTP_POST, handleRestart);
+
+    // API endpoints
+    server->on("/api/status", handleAPIStatus);
+    server->on("/api/config", HTTP_GET, handleAPIGetConfig);
+    server->on("/api/config", HTTP_POST, handleAPISetConfig);
+    server->on("/test-api", HTTP_POST, handleTestAPI);
+
+    server->onNotFound(handleNotFound);
+
+    server->begin();
+    printf("✅ Web server started on port 80\n");
+
+    if (WiFi.getMode() == WIFI_AP) {
+        printf("   Access at: http://%s\n", WiFi.softAPIP().toString().c_str());
+    } else {
+        printf("   Access at: http://%s\n", WiFi.localIP().toString().c_str());
+    }
+}
+
+// Server Communication
+void pollConfigurationUpdates() {
+    if (!config.isRegistered || WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    printf("🔄 Polling server for configuration updates...\n");
+
+    HTTPClient http;
+    http.begin(config.serverHost + ":" + String(config.serverPort) + "/api/devices/config");
+    http.addHeader("Authorization", "Bearer " + config.apiToken);
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(5000); // 5 second timeout for config updates
+
+    // Send current config version - use static to avoid repeated allocations
+    static DynamicJsonDocument requestDoc(512);
+    requestDoc["device_id"] = config.deviceId;
+    requestDoc["current_version"] = config.lastConfigVersion;
+
+    String requestJson;
+    serializeJson(requestDoc, requestJson);
+
+    int httpResponseCode = http.POST(requestJson);
+
+    if (httpResponseCode == 200) {
+        String response = http.getString();
+        printf("📥 Server response: %s\n", response.c_str());
+
+        DynamicJsonDocument responseDoc(1024);
+        DeserializationError error = deserializeJson(responseDoc, response);
+
+        if (!error) {
+            bool hasUpdates = responseDoc["has_updates"] | false;
+            if (hasUpdates) {
+                printf("📋 Configuration updates available, applying...\n");
+
+                // Update configuration from server
+                if (responseDoc.containsKey("device_name")) {
+                    config.deviceName = responseDoc["device_name"].as<String>();
+                }
+                if (responseDoc.containsKey("ntp_server")) {
+                    config.ntpServer = responseDoc["ntp_server"].as<String>();
+                }
+                if (responseDoc.containsKey("timezone")) {
+                    config.timezone = responseDoc["timezone"].as<String>();
+                }
+                if (responseDoc.containsKey("backlight_brightness")) {
+                    config.backlightBrightness = responseDoc["backlight_brightness"] | config.backlightBrightness;
+                    setBacklightBrightness(config.backlightBrightness);
+                }
+
+                config.lastConfigVersion = responseDoc["version"] | config.lastConfigVersion;
+                saveConfiguration();
+
+                printf("✅ Configuration updated successfully\n");
+            } else {
+                printf("✅ Configuration is up to date\n");
+            }
+        }
+    } else if (httpResponseCode == 304) {
+        printf("✅ No configuration changes\n");
+    } else {
+        printf("❌ Failed to poll configuration: %d\n", httpResponseCode);
+    }
+
+    http.end();
+}
+
+void sendHeartbeat() {
+    if (!config.isRegistered || WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    printf("💓 Sending heartbeat to server...\n");
+
+    HTTPClient http;
+    http.begin(config.serverHost + ":" + String(config.serverPort) + "/api/devices/heartbeat");
+    http.addHeader("Authorization", "Bearer " + config.apiToken);
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(4000); // 4 second timeout for heartbeat
+
+    // Use static heartbeat document to avoid repeated allocations
+    static DynamicJsonDocument heartbeat(1024);
+    heartbeat["device_id"] = config.deviceId;
+    heartbeat["timestamp"] = getISODateTime();
+    heartbeat["status"] = getStatusText();
+    heartbeat["wifi_rssi"] = WiFi.RSSI();
+    heartbeat["free_heap"] = ESP.getFreeHeap();
+    heartbeat["uptime"] = millis();
+    heartbeat["nfc_status"] = nfcStatusMessage;
+    heartbeat["cards_read"] = cardReadCount;
+    heartbeat["last_card_time"] = lastCardRead;
+    heartbeat["backlight_brightness"] = config.backlightBrightness;
+
+    String jsonString;
+    serializeJson(heartbeat, jsonString);
+
+    int httpResponseCode = http.POST(jsonString);
+
+    if (httpResponseCode == 200) {
+        String response = http.getString();
+        printf("💓 Heartbeat sent successfully\n");
+
+        // Check if server sent any commands
+        DynamicJsonDocument responseDoc(512);
+        DeserializationError error = deserializeJson(responseDoc, response);
+        if (!error && responseDoc.containsKey("status")) {
+            String serverStatus = responseDoc["status"];
+            if (serverStatus == "approved") {
+                currentStatus = STATUS_APPROVED;
+                printf("✅ Device approved by server\n");
+            }
+        }
+    } else {
+        printf("❌ Heartbeat failed: %d\n", httpResponseCode);
+    }
+
+    http.end();
+}
+
+// Web Server Handlers
+void handleRoot() {
+    String wifiStatus = WiFi.status() == WL_CONNECTED ? "Connected (" + WiFi.localIP().toString() + ")" : "Disconnected";
+    String estSelected = config.timezone == "EST" ? " selected" : "";
+    String cstSelected = config.timezone == "CST" ? " selected" : "";
+    String mstSelected = config.timezone == "MST" ? " selected" : "";
+    String pstSelected = config.timezone == "PST" ? " selected" : "";
+
+    String html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
+    html += "<title>ESP32-P4 TimeClock Configuration</title>";
+    html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
+    html += "<style>body{font-family:Arial,sans-serif;margin:20px;background:#f5f5f5}";
+    html += ".container{max-width:600px;margin:0 auto;background:white;padding:20px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}";
+    html += "h1{color:#333;text-align:center}.status{background:#e3f2fd;padding:15px;border-radius:5px;margin:15px 0}";
+    html += ".form-group{margin:15px 0}label{display:block;margin-bottom:5px;font-weight:bold}";
+    html += "input,select{width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}";
+    html += "button{background:#4CAF50;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;margin:5px}";
+    html += "button:hover{background:#45a049}.brightness-control{display:flex;align-items:center;gap:10px}";
+    html += "#brightness-slider{flex:1}#brightness-value{min-width:60px;text-align:center;font-weight:bold}</style></head>";
+
+    html += "<body><div class=\"container\"><h1>🕐 ESP32-P4 TimeClock</h1>";
+    html += "<div class=\"status\"><h3>📊 Device Status</h3>";
+    html += "<p><strong>Device ID:</strong> " + config.deviceId + "</p>";
+    html += "<p><strong>Status:</strong> " + getStatusText() + "</p>";
+    html += "<p><strong>WiFi:</strong> " + wifiStatus + "</p>";
+    html += "<p><strong>NFC:</strong> " + nfcStatusMessage + "</p>";
+    html += "<p><strong>Cards Read:</strong> " + String(cardReadCount) + "</p>";
+    html += "<p><strong>Free Memory:</strong> " + String(ESP.getFreeHeap()) + " bytes</p></div>";
+
+    html += "<form action=\"/config\" method=\"POST\"><h3>⚙️ Configuration</h3>";
+    html += "<div class=\"form-group\"><label for=\"deviceName\">Device Name:</label>";
+    html += "<input type=\"text\" id=\"deviceName\" name=\"deviceName\" value=\"" + config.deviceName + "\" required></div>";
+    html += "<div class=\"form-group\"><label for=\"wifiSSID\">WiFi SSID:</label>";
+    html += "<input type=\"text\" id=\"wifiSSID\" name=\"wifiSSID\" value=\"" + config.wifiSSID + "\" required></div>";
+    html += "<div class=\"form-group\"><label for=\"wifiPassword\">WiFi Password:</label>";
+    html += "<input type=\"password\" id=\"wifiPassword\" name=\"wifiPassword\" value=\"" + config.wifiPassword + "\"></div>";
+    html += "<div class=\"form-group\"><label for=\"serverHost\">Server Host:</label>";
+    html += "<input type=\"text\" id=\"serverHost\" name=\"serverHost\" value=\"" + config.serverHost + "\" required></div>";
+    html += "<div class=\"form-group\"><label for=\"serverPort\">Server Port:</label>";
+    html += "<input type=\"number\" id=\"serverPort\" name=\"serverPort\" value=\"" + String(config.serverPort) + "\" required></div>";
+    html += "<div class=\"form-group\"><label for=\"timezone\">Timezone:</label><select id=\"timezone\" name=\"timezone\">";
+    html += "<option value=\"EST\"" + estSelected + ">Eastern (EST)</option>";
+    html += "<option value=\"CST\"" + cstSelected + ">Central (CST)</option>";
+    html += "<option value=\"MST\"" + mstSelected + ">Mountain (MST)</option>";
+    html += "<option value=\"PST\"" + pstSelected + ">Pacific (PST)</option></select></div>";
+    html += "<button type=\"submit\">💾 Save Configuration</button></form>";
+
+    html += "<h3>🔆 Backlight Control</h3><div class=\"brightness-control\">";
+    html += "<input type=\"range\" id=\"brightness-slider\" min=\"0\" max=\"255\" value=\"" + String(config.backlightBrightness) + "\" oninput=\"updateBrightness(this.value)\">";
+    html += "<span id=\"brightness-value\">" + String(config.backlightBrightness) + "</span></div>";
+
+    html += "<h3>🔗 Actions</h3>";
+    html += "<button onclick=\"testAPI()\">🧪 Test API Connection</button>";
+    html += "<button onclick=\"registerDevice()\">📝 Register with Server</button>";
+    html += "<button onclick=\"restart()\">🔄 Restart Device</button>";
+    html += "<button onclick=\"window.location.reload()\">🔄 Refresh Status</button></div>";
+
+    html += "<script>function updateBrightness(value){document.getElementById('brightness-value').textContent=value;";
+    html += "fetch('/brightness',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'brightness='+value});}";
+    html += "function testAPI(){if(confirm('Test API connection to the server?')){";
+    html += "fetch('/test-api',{method:'POST'}).then(response=>response.text()).then(data=>{alert(data);});}}";
+    html += "function registerDevice(){if(confirm('Register this device with the server?')){";
+    html += "fetch('/register',{method:'POST'}).then(response=>response.text()).then(data=>{alert(data);window.location.reload();});}}";
+    html += "function restart(){if(confirm('Restart the device? This will take about 30 seconds.')){";
+    html += "fetch('/restart',{method:'POST'});alert('Device restarting...');}}</script></body></html>";
+
+    server->send(200, "text/html; charset=UTF-8", html);
+}
+
+void handleTestAPI() {
+    printf("🧪 Testing API connection...\n");
+
+    if (config.serverHost.isEmpty()) {
+        server->send(400, "text/plain", "❌ No server configured. Please set Server Host first.");
+        return;
+    }
+
+    HTTPClient http;
+    String testUrl = config.serverHost + ":" + String(config.serverPort) + "/api/devices/config";
+    printf("Testing URL: %s\n", testUrl.c_str());
+
+    http.begin(testUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(5000); // 5 second timeout
+
+    int httpResponseCode = http.GET();
+    String response = "";
+
+    if (httpResponseCode > 0) {
+        response = "✅ API Connection Successful!\n";
+        response += "Response Code: " + String(httpResponseCode) + "\n";
+        response += "Server: " + config.serverHost + ":" + String(config.serverPort) + "\n";
+
+        if (httpResponseCode == 200) {
+            response += "✅ API endpoint is responding correctly";
+        } else if (httpResponseCode == 401) {
+            response += "⚠️ API requires authentication (expected)";
+        } else if (httpResponseCode == 404) {
+            response += "❌ API endpoint not found - check Laravel routes";
+        } else {
+            response += "⚠️ Unexpected response: " + String(httpResponseCode);
+        }
+
+        printf("✅ API test successful: %d\n", httpResponseCode);
+    } else {
+        response = "❌ API Connection Failed!\n";
+        response += "Error: " + String(httpResponseCode) + "\n";
+        response += "Check:\n";
+        response += "- Server Host: " + config.serverHost + "\n";
+        response += "- Server Port: " + String(config.serverPort) + "\n";
+        response += "- Network connectivity\n";
+        response += "- Laravel server is running";
+
+        printf("❌ API test failed: %d\n", httpResponseCode);
+    }
+
+    http.end();
+    server->send(200, "text/plain", response);
+}
+
+void handleConfigSubmit() {
+    printf("📝 Received configuration update\n");
+
+    config.deviceName = server->arg("deviceName");
+    config.wifiSSID = server->arg("wifiSSID");
+    config.wifiPassword = server->arg("wifiPassword");
+    config.serverHost = server->arg("serverHost");
+    config.serverPort = server->arg("serverPort").toInt();
+    config.timezone = server->arg("timezone");
+    config.isConfigured = true;
+
+    saveConfiguration();
+
+    server->send(200, "text/plain", "Configuration saved! Device will restart in 3 seconds...");
+
+    delay(3000);
+    ESP.restart();
+}
+
+void handleStatus() {
+    DynamicJsonDocument status(1024);
+    status["device_id"] = config.deviceId;
+    status["device_name"] = config.deviceName;
+    status["status"] = getStatusText();
+    status["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
+    status["wifi_ip"] = WiFi.localIP().toString();
+    status["wifi_rssi"] = WiFi.RSSI();
+    status["nfc_status"] = nfcStatusMessage;
+    status["nfc_initialized"] = nfcInitialized;
+    status["cards_read"] = cardReadCount;
+    status["last_card_uid"] = lastCardUID;
+    status["free_heap"] = ESP.getFreeHeap();
+    status["uptime"] = millis();
+    status["backlight_brightness"] = config.backlightBrightness;
+    status["is_configured"] = config.isConfigured;
+    status["is_registered"] = config.isRegistered;
+
+    String response;
+    serializeJson(status, response);
+    server->send(200, "application/json", response);
+}
+
+void handleRegister() {
+    printf("📝 Attempting device registration...\n");
+
+    if (!config.isConfigured) {
+        server->send(400, "text/plain", "Device not configured");
+        return;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        server->send(400, "text/plain", "No WiFi connection");
+        return;
+    }
+
+    HTTPClient http;
+    http.begin(config.serverHost + ":" + String(config.serverPort) + "/api/devices/register");
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(8000); // 8 second timeout for registration (longer process)
+
+    DynamicJsonDocument registration(512);
+    registration["device_id"] = config.deviceId;
+    registration["device_name"] = config.deviceName;
+    registration["mac_address"] = config.macAddress;
+    registration["device_type"] = "esp32_p4_timeclock";
+    registration["firmware_version"] = "1.0.0";
+    registration["capabilities"] = "nfc,rfid,display,audio";
+
+    String jsonString;
+    serializeJson(registration, jsonString);
+
+    int httpResponseCode = http.POST(jsonString);
+
+    if (httpResponseCode == 200 || httpResponseCode == 201) {
+        String response = http.getString();
+        DynamicJsonDocument responseDoc(512);
+        DeserializationError error = deserializeJson(responseDoc, response);
+
+        if (!error && responseDoc.containsKey("api_token")) {
+            config.apiToken = responseDoc["api_token"].as<String>();
+            config.isRegistered = true;
+            currentStatus = STATUS_REGISTERED;
+            saveConfiguration();
+
+            server->send(200, "text/plain", "✅ Registration successful!");
+            printf("✅ Device registered successfully\n");
+            printf("   API Token: %s...\n", config.apiToken.substring(0, 8).c_str());
+        } else {
+            server->send(500, "text/plain", "❌ Registration failed - invalid response");
+        }
+    } else {
+        server->send(500, "text/plain", "❌ Registration failed - server error: " + String(httpResponseCode));
+        printf("❌ Registration failed: %d\n", httpResponseCode);
+    }
+
+    http.end();
+}
+
+void handleBrightness() {
+    int brightness = server->arg("brightness").toInt();
+    brightness = constrain(brightness, 0, 255);
+
+    config.backlightBrightness = brightness;
+    setBacklightBrightness(brightness);
+    saveConfiguration();
+
+    server->send(200, "text/plain", "Brightness set to " + String(brightness));
+}
+
+void handleRestart() {
+    server->send(200, "text/plain", "Restarting device...");
+    delay(1000);
+    ESP.restart();
+}
+
+void handleAPIStatus() {
+    handleStatus(); // Same as /status endpoint
+}
+
+void handleAPIGetConfig() {
+    DynamicJsonDocument configJson(1024);
+    configJson["device_name"] = config.deviceName;
+    configJson["wifi_ssid"] = config.wifiSSID;
+    configJson["server_host"] = config.serverHost;
+    configJson["server_port"] = config.serverPort;
+    configJson["timezone"] = config.timezone;
+    configJson["ntp_server"] = config.ntpServer;
+    configJson["backlight_brightness"] = config.backlightBrightness;
+    configJson["is_configured"] = config.isConfigured;
+    configJson["is_registered"] = config.isRegistered;
+
+    String response;
+    serializeJson(configJson, response);
+    server->send(200, "application/json", response);
+}
+
+void handleAPISetConfig() {
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, server->arg("plain"));
+
+    if (error) {
+        server->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+
+    // Update configuration from JSON
+    if (doc.containsKey("device_name")) config.deviceName = doc["device_name"].as<String>();
+    if (doc.containsKey("wifi_ssid")) config.wifiSSID = doc["wifi_ssid"].as<String>();
+    if (doc.containsKey("wifi_password")) config.wifiPassword = doc["wifi_password"].as<String>();
+    if (doc.containsKey("server_host")) config.serverHost = doc["server_host"].as<String>();
+    if (doc.containsKey("server_port")) config.serverPort = doc["server_port"];
+    if (doc.containsKey("timezone")) config.timezone = doc["timezone"].as<String>();
+    if (doc.containsKey("ntp_server")) config.ntpServer = doc["ntp_server"].as<String>();
+    if (doc.containsKey("backlight_brightness")) {
+        config.backlightBrightness = doc["backlight_brightness"];
+        setBacklightBrightness(config.backlightBrightness);
+    }
+
+    saveConfiguration();
+    server->send(200, "application/json", "{\"success\":true}");
+}
+
+void handleNotFound() {
+    server->send(404, "text/plain", "404 - Page Not Found");
+}
