@@ -1,9 +1,9 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\TimeClockController;
 use App\Http\Controllers\Api\WebhookSyncController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
  * Maintains connection during long-running operations. No authentication required.
  *
  * @method POST
+ *
  * @url    /api/keep-alive
  *
  * @example curl -X POST http://attend.test/api/keep-alive \
@@ -52,7 +53,7 @@ Route::post('/keep-alive', function (Request $request) {
     return response()->json([
         'status' => 'alive',
         'timestamp' => now(),
-        'processing' => $request->input('processing', false)
+        'processing' => $request->input('processing', false),
     ]);
 })->name('api.keep-alive');
 
@@ -63,6 +64,7 @@ Route::post('/keep-alive', function (Request $request) {
  * Requires web middleware for session handling.
  *
  * @method POST
+ *
  * @url    /api/web-keep-alive
  *
  * @example curl -X POST http://attend.test/api/web-keep-alive \
@@ -82,7 +84,7 @@ Route::middleware('web')->post('/web-keep-alive', function (Request $request) {
         'status' => 'alive',
         'timestamp' => now(),
         'session_id' => session()->getId(),
-        'processing' => $request->input('processing', false)
+        'processing' => $request->input('processing', false),
     ]);
 })->name('web.keep-alive');
 
@@ -124,6 +126,7 @@ Route::prefix('v1/timeclock')->group(function () {
      * Used by devices to test connectivity before other operations.
      *
      * @method GET
+     *
      * @url    /api/v1/timeclock/health
      *
      * @example curl http://attend.test/api/v1/timeclock/health
@@ -138,12 +141,56 @@ Route::prefix('v1/timeclock')->group(function () {
         ->name('timeclock.health');
 
     /**
+     * Device Heartbeat
+     *
+     * Periodic status update from devices. Updates firmware version, IP, and uptime.
+     * Returns any pending commands (reboot, config sync).
+     *
+     * @method POST
+     *
+     * @url    /api/v1/timeclock/heartbeat
+     *
+     * @header Authorization: Bearer {api_token}
+     *
+     * @param  string  device_id         Device identifier
+     * @param  string  ip_address        (optional) Device's current IP
+     * @param  string  firmware_version  (optional) Current firmware version
+     * @param  int     uptime_seconds    (optional) Device uptime in seconds
+     *
+     * @example curl -X POST http://attend.test/api/v1/timeclock/heartbeat \
+     *              -H "Content-Type: application/json" \
+     *              -H "Authorization: Bearer 1|aBcDeFgHiJkLmNoPqRsTuVwXyZ" \
+     *              -d '{
+     *                  "device_id": "tc_abc123",
+     *                  "firmware_version": "1.0.0",
+     *                  "ip_address": "192.168.1.50",
+     *                  "uptime_seconds": 3600
+     *              }'
+     *
+     * @response {
+     *     "success": true,
+     *     "message": "Heartbeat received",
+     *     "server_time": "2026-01-30T12:00:00.000000Z",
+     *     "device": {
+     *         "device_id": "tc_abc123",
+     *         "registration_status": "approved",
+     *         "is_approved": true,
+     *         "reboot_requested": false,
+     *         "config_sync_needed": false
+     *     }
+     * }
+     */
+    Route::post('/heartbeat', [TimeClockController::class, 'heartbeat'])
+        ->name('timeclock.heartbeat');
+
+    /**
      * Time Synchronization
      *
      * Returns current server time for device clock synchronization.
      * Includes timezone information and optional NTP server recommendation.
      *
      * @method GET
+     *
      * @url    /api/v1/timeclock/time
      *
      * @example curl http://attend.test/api/v1/timeclock/time
@@ -169,6 +216,7 @@ Route::prefix('v1/timeclock')->group(function () {
      * Device must be approved by admin before it can record punches.
      *
      * @method POST
+     *
      * @url    /api/v1/timeclock/register
      *
      * @param  string  mac_address   Device MAC address (unique identifier)
@@ -204,7 +252,9 @@ Route::prefix('v1/timeclock')->group(function () {
      * Requires device authentication via API token.
      *
      * @method GET
+     *
      * @url    /api/v1/timeclock/status
+     *
      * @header Authorization: Bearer {api_token}
      *
      * @example curl http://attend.test/api/v1/timeclock/status \
@@ -232,6 +282,7 @@ Route::prefix('v1/timeclock')->group(function () {
      * after token expiration.
      *
      * @method POST
+     *
      * @url    /api/v1/timeclock/auth
      *
      * @param  string  device_id     Device identifier from registration
@@ -264,7 +315,9 @@ Route::prefix('v1/timeclock')->group(function () {
      * devices can submit punches recorded while offline with their original timestamps.
      *
      * @method POST
+     *
      * @url    /api/v1/timeclock/punch
+     *
      * @header Authorization: Bearer {api_token}
      *
      * @param  string  device_id         Device identifier
@@ -313,7 +366,9 @@ Route::prefix('v1/timeclock')->group(function () {
      * Includes display settings, network preferences, and operational parameters.
      *
      * @method GET
+     *
      * @url    /api/v1/timeclock/config
+     *
      * @header Authorization: Bearer {api_token}
      *
      * @example curl http://attend.test/api/v1/timeclock/config \
@@ -344,7 +399,9 @@ Route::prefix('v1/timeclock')->group(function () {
      * Only provided fields are updated; others remain unchanged.
      *
      * @method PUT
+     *
      * @url    /api/v1/timeclock/config/{deviceId}
+     *
      * @header Authorization: Bearer {api_token}
      *
      * @param  string  deviceId          Device identifier (URL parameter)
@@ -378,7 +435,9 @@ Route::prefix('v1/timeclock')->group(function () {
      * credential (card) value. Used to display employee info after card scan.
      *
      * @method GET
+     *
      * @url    /api/v1/timeclock/employee/{card_id}
+     *
      * @header Authorization: Bearer {api_token}
      *
      * @param  string  card_id   Card UID/credential value (URL parameter)

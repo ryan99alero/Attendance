@@ -2,10 +2,10 @@
 
 namespace App\Filament\Pages;
 
-use Exception;
 use App\Models\Employee;
 use App\Models\VacationTransaction;
 use Carbon\Carbon;
+use Exception;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -17,33 +17,43 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 
 class VacationProcessing extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Off Management';
+
     protected static ?string $navigationLabel = 'Vacation Processing';
+
     protected static ?int $navigationSort = 40;
+
+    protected static bool $isDiscovered = false;
+
     protected string $view = 'filament.pages.vacation-processing';
 
     public static function shouldRegisterNavigation(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('page_VacationProcessing') ?? false;
     }
 
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('page_VacationProcessing') ?? false;
     }
 
     public $processDate;
+
     public $selectedEmployee;
+
     public $dryRun = true;
+
     public $force = false;
 
     public function mount()
@@ -91,7 +101,7 @@ class VacationProcessing extends Page implements HasTable
                 ->label('View Processing Logs')
                 ->icon('heroicon-o-document-text')
                 ->color('gray')
-                ->url(route('filament.admin.pages.vacation-processing') . '?tab=logs'),
+                ->url(route('filament.admin.pages.vacation-processing').'?tab=logs'),
         ];
     }
 
@@ -101,11 +111,11 @@ class VacationProcessing extends Page implements HasTable
         $options = [];
 
         if ($data['processDate']) {
-            $options[] = '--date=' . Carbon::parse($data['processDate'])->toDateString();
+            $options[] = '--date='.Carbon::parse($data['processDate'])->toDateString();
         }
 
         if ($data['selectedEmployee']) {
-            $options[] = '--employee=' . $data['selectedEmployee'];
+            $options[] = '--employee='.$data['selectedEmployee'];
         }
 
         if ($data['dryRun']) {
@@ -116,7 +126,7 @@ class VacationProcessing extends Page implements HasTable
             $options[] = '--force';
         }
 
-        $fullCommand = $command . ' ' . implode(' ', $options);
+        $fullCommand = $command.' '.implode(' ', $options);
 
         try {
             $exitCode = Artisan::call($command, array_reduce($options, function ($carry, $option) {
@@ -129,6 +139,7 @@ class VacationProcessing extends Page implements HasTable
                 } elseif ($option === '--force') {
                     $carry['--force'] = true;
                 }
+
                 return $carry;
             }, []));
 
@@ -154,7 +165,7 @@ class VacationProcessing extends Page implements HasTable
         } catch (Exception $e) {
             Notification::make()
                 ->title('Processing Error')
-                ->body('Error: ' . $e->getMessage())
+                ->body('Error: '.$e->getMessage())
                 ->danger()
                 ->send();
         }
@@ -199,6 +210,7 @@ class VacationProcessing extends Page implements HasTable
                     ->limit(50)
                     ->tooltip(function (TextColumn $column): ?string {
                         $state = $column->getState();
+
                         return strlen($state) > 50 ? $state : null;
                     }),
 

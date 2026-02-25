@@ -106,6 +106,7 @@ class Employee extends Model
         'photograph',
         'termination_date',
         'is_active',
+        'portal_clockin',
         'full_time',
         'created_at',
         'updated_at',
@@ -126,6 +127,7 @@ class Employee extends Model
         'termination_date' => 'date',
         'birth_date' => 'date',
         'is_active' => 'boolean',
+        'portal_clockin' => 'boolean',
         'full_time' => 'boolean',
         // Employment field casts
         'date_of_hire' => 'date',
@@ -195,6 +197,14 @@ class Employee extends Model
     public function managedDepartments(): HasMany
     {
         return $this->hasMany(Department::class, 'manager_id');
+    }
+
+    /**
+     * Get vacation requests for this employee
+     */
+    public function vacationRequests(): HasMany
+    {
+        return $this->hasMany(VacationRequest::class);
     }
 
     /**

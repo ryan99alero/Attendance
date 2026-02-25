@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/CMakeFiles/bootloader
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/CMakeFiles/bootloader.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/CMakeFiles/bootloader-complete.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/Users/ryangoff/Herd/Attend/storage/app/firmware/Camera_SubModule_Firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

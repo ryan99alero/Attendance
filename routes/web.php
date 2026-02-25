@@ -5,9 +5,28 @@ use App\Http\Controllers\ReportsController;
 use App\Http\Livewire\Controllers\AttendanceController;
 use Illuminate\Support\Facades\Route;
 
-// Route for the homepage
+// Route for the homepage - redirect to appropriate panel
 Route::get('/', function () {
-    return view('welcome');
+    $user = auth()->user();
+
+    // Not logged in - show portal login (employee-focused)
+    if (! $user) {
+        return redirect('/portal/login');
+    }
+
+    // Logged in - redirect based on role
+    // Admin/Manager without employee_id -> Admin Panel
+    if (! $user->employee_id && $user->hasAnyRole(['super_admin', 'admin', 'manager'])) {
+        return redirect('/admin');
+    }
+
+    // Has employee_id (is an employee) -> Employee Portal
+    if ($user->employee_id) {
+        return redirect('/portal');
+    }
+
+    // Fallback to admin
+    return redirect('/admin');
 });
 
 // Route for the Attendance

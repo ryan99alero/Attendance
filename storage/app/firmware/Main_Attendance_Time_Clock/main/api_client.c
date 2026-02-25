@@ -8,6 +8,7 @@
 #include "esp_mac.h"
 #include "nvs_flash.h"
 #include "cJSON.h"
+#include "firmware_info.h"
 #include <string.h>
 
 static const char *TAG = "API_CLIENT";
@@ -235,6 +236,7 @@ esp_err_t api_register_device(const char *mac_address, const char *device_name) 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "mac_address", mac_address);
     cJSON_AddStringToObject(root, "device_name", device_name);
+    cJSON_AddStringToObject(root, "firmware_version", FIRMWARE_VERSION);
 
     char *json_data = cJSON_PrintUnformatted(root);
     ESP_LOGI(TAG, "POST %s", url);
@@ -580,6 +582,10 @@ esp_err_t api_send_punch(const punch_data_t *punch_data) {
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_post_field(client, json_data, strlen(json_data));
 
+    // Clear response buffer before request
+    response_buffer_len = 0;
+    response_buffer[0] = '\0';
+
     // Perform request
     esp_err_t err = esp_http_client_perform(client);
     esp_err_t ret = ESP_FAIL;
@@ -592,9 +598,55 @@ esp_err_t api_send_punch(const punch_data_t *punch_data) {
         ESP_LOGI(TAG, "✅ Punch recorded successfully!");
         ret = ESP_OK;
     } else if (status_code == 404) {
-        // Device not found on server - was deleted
-        ESP_LOGW(TAG, "❌ Device not found (404) - clock was deleted from server");
-        ret = ESP_ERR_NOT_FOUND;
+        // 404 can mean:
+        // - Device not found (error_code: DEVICE_NOT_FOUND) -> clear registration
+        // - Credential not recognized (unmatched card) -> event was still recorded!
+        bool is_device_deleted = false;
+        bool event_recorded = false;
+
+        if (response_buffer_len > 0) {
+            cJSON *response_json = cJSON_Parse(response_buffer);
+            if (response_json) {
+                cJSON *error_code = cJSON_GetObjectItem(response_json, "error_code");
+                if (error_code && cJSON_IsString(error_code)) {
+                    if (strcmp(error_code->valuestring, "DEVICE_NOT_FOUND") == 0) {
+                        is_device_deleted = true;
+                        ESP_LOGW(TAG, "❌ Device not found (404) - clock was deleted from server");
+                    }
+                }
+
+                // Check if event was still recorded (unmatched credential case)
+                cJSON *data = cJSON_GetObjectItem(response_json, "data");
+                if (data) {
+                    cJSON *clock_event_id = cJSON_GetObjectItem(data, "clock_event_id");
+                    if (clock_event_id && cJSON_IsNumber(clock_event_id)) {
+                        event_recorded = true;
+                        ESP_LOGI(TAG, "Event recorded as unmatched (clock_event_id: %d)",
+                                 (int)clock_event_id->valuedouble);
+                    }
+                }
+
+                // Log the actual message for debugging
+                cJSON *message = cJSON_GetObjectItem(response_json, "message");
+                if (message && cJSON_IsString(message)) {
+                    ESP_LOGW(TAG, "Server message: %s", message->valuestring);
+                }
+
+                cJSON_Delete(response_json);
+            }
+        }
+
+        if (is_device_deleted) {
+            ret = ESP_ERR_NOT_FOUND;  // Will trigger registration clearing
+        } else if (event_recorded) {
+            // Credential not recognized, but server recorded the event for audit
+            ESP_LOGI(TAG, "✅ Punch recorded (unmatched credential)");
+            ret = ESP_OK;  // Event was recorded, consider it synced
+        } else {
+            // Unknown 404 - treat as temporary failure
+            ESP_LOGW(TAG, "❌ Unknown 404 error");
+            ret = ESP_FAIL;
+        }
     } else if (status_code == 403) {
         // Device not authorized (pending, rejected, or suspended)
         ESP_LOGW(TAG, "❌ Device not authorized (403) - clock not approved");
@@ -1127,8 +1179,8 @@ esp_err_t api_send_heartbeat(const char *ip_address) {
         cJSON_AddStringToObject(root, "ip_address", ip_address);
     }
 
-    // Add firmware version if available
-    cJSON_AddStringToObject(root, "firmware_version", "1.0.0");
+    // Add firmware version
+    cJSON_AddStringToObject(root, "firmware_version", FIRMWARE_VERSION);
 
     // Add uptime
     cJSON_AddNumberToObject(root, "uptime_seconds", (double)(xTaskGetTickCount() / configTICK_RATE_HZ));

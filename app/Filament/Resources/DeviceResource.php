@@ -22,7 +22,7 @@ class DeviceResource extends Resource
     protected static ?string $model = Device::class;
 
     // Navigation Configuration
-    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+    protected static string|\UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $navigationLabel = 'Devices';
 

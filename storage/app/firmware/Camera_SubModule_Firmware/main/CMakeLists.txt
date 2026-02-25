@@ -1,0 +1,14 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "spi_slave_handler.c"
+        "camera_capture.c"
+        "led_status.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        driver
+        esp_timer
+        spi_flash
+        nvs_flash
+)

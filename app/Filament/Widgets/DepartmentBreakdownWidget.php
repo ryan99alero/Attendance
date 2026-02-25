@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 class DepartmentBreakdownWidget extends ChartWidget
 {
-    protected ?string $heading = 'Today\'s Attendance by Department';
+    protected ?string $heading = 'Attendance by Department';
 
-    protected int | string | array $columnSpan = 'full';
+    protected static ?int $sort = 4;
+
+    protected int|string|array $columnSpan = 1;
 
     protected function getData(): array
     {
@@ -87,9 +89,9 @@ class DepartmentBreakdownWidget extends ChartWidget
                 ],
                 'tooltip' => [
                     'callbacks' => [
-                        'label' => 'function(context) { return context.label + ": " + context.parsed + " punches"; }'
-                    ]
-                ]
+                        'label' => 'function(context) { return context.label + ": " + context.parsed + " punches"; }',
+                    ],
+                ],
             ],
             'maintainAspectRatio' => false,
         ];

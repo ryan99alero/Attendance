@@ -26,7 +26,7 @@ class SystemLogResource extends Resource
 
     protected static ?string $navigationLabel = 'System Logs';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+    protected static string|\UnitEnum|null $navigationGroup = 'Settings';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 

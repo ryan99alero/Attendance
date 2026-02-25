@@ -485,6 +485,14 @@ static void sync_task(void *pvParameters) {
         uint32_t failed = 0;
 
         while (punch_queue_get_next_pending(&punch) == ESP_OK && punch != NULL) {
+            // Skip punches with no device_id (captured when device was unregistered)
+            if (punch->device_id[0] == '\0') {
+                ESP_LOGW(TAG, "Discarding punch ID=%lu - no device_id (captured while unregistered)",
+                         (unsigned long)punch->id);
+                punch_queue_mark_synced(punch->id);  // Mark as synced to remove from queue
+                continue;
+            }
+
             // Build punch data for API
             punch_data_t punch_data = {0};
             strncpy(punch_data.device_id, punch->device_id, sizeof(punch_data.device_id) - 1);

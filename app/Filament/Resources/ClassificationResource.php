@@ -23,7 +23,7 @@ class ClassificationResource extends Resource
 
     protected static ?string $navigationLabel = 'Classifications';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+    protected static string|\UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?int $navigationSort = 10;
 

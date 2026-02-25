@@ -1,0 +1,10 @@
+## IDF Component Manager configuration
+## https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/tools/idf-component-manager.html
+
+dependencies:
+  # ESP32 Camera driver
+  espressif/esp32-camera: "^2.0.0"
+
+  # Required IDF components
+  idf:
+    version: ">=5.0.0"

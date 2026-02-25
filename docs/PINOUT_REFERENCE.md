@@ -1,24 +1,25 @@
 # ESP32-P4 Function EV Board - Complete Pinout Reference
 
-This document provides a comprehensive pinout reference for the ESP32-P4-Function-EV-Board v1.5.2 and all connected peripherals including the PN532 NFC Module V3 and 7" MIPI-DSI display.
+This document provides a comprehensive pinout reference for the ESP32-P4-Function-EV-Board v1.5.2 and all connected peripherals including the RYRR30D NFC Reader, ESP32-S3 Camera SubModule, and 7" MIPI-DSI display.
 
 ---
 
 ## Table of Contents
 
 1. [Board Overview](#board-overview)
-2. [PN532 NFC/RFID Module V3 (SPI)](#pn532-nfcrfid-module-v3-spi)
-3. [Display Interface (MIPI-DSI)](#display-interface-mipi-dsi)
-4. [Touch Controller (GT911 I2C)](#touch-controller-gt911-i2c)
-5. [Ethernet PHY (IP101GR)](#ethernet-phy-ip101gr)
-6. [SD Card Interface](#sd-card-interface)
-7. [Audio Interface (ES8311)](#audio-interface-es8311)
-8. [USB Interface](#usb-interface)
-9. [I2C Bus](#i2c-bus)
-10. [Status LEDs and Buzzer](#status-leds-and-buzzer)
-11. [WiFi/BT Companion Chip (ESP32-C6)](#wifibt-companion-chip-esp32-c6)
-12. [GPIO Summary Table](#gpio-summary-table)
-13. [Important Notes](#important-notes)
+2. [RYRR30D NFC Reader (UART)](#ryrr30d-nfc-reader-uart)
+3. [Camera SubModule - ESP32-S3 Sense (SPI)](#camera-submodule---esp32-s3-sense-spi)
+4. [Display Interface (MIPI-DSI)](#display-interface-mipi-dsi)
+5. [Touch Controller (GT911 I2C)](#touch-controller-gt911-i2c)
+6. [Ethernet PHY (IP101GR)](#ethernet-phy-ip101gr)
+7. [SD Card Interface](#sd-card-interface)
+8. [Audio Interface (ES8311)](#audio-interface-es8311)
+9. [USB Interface](#usb-interface)
+10. [I2C Bus](#i2c-bus)
+11. [Status LEDs and Buzzer](#status-leds-and-buzzer)
+12. [WiFi/BT Companion Chip (ESP32-C6)](#wifibt-companion-chip-esp32-c6)
+13. [GPIO Summary Table](#gpio-summary-table)
+14. [Important Notes](#important-notes)
 
 ---
 
@@ -26,61 +27,166 @@ This document provides a comprehensive pinout reference for the ESP32-P4-Functio
 
 | Specification | Value |
 |---------------|-------|
-| **Main SoC** | ESP32-P4 (RISC-V dual-core) |
+| **Main SoC** | ESP32-P4 (RISC-V dual-core, 400MHz) |
 | **Board Version** | v1.5.2 |
 | **Flash** | 16MB |
+| **PSRAM** | 32MB |
 | **Display** | 7" MIPI DSI (1024x600) |
-| **WiFi/BT** | ESP32-C6 companion chip (SDIO) |
-| **Ethernet** | IP101GR PHY (RMII) |
+| **WiFi/BT** | ESP32-C6 companion chip (SDIO) - Built-in |
+| **Ethernet** | IP101GR PHY (RMII) - Built-in |
 | **Audio Codec** | ES8311 |
 | **Total GPIOs** | 55 (GPIO 0-54) |
 
 ---
 
-## PN532 NFC/RFID Module V3 (SPI)
+## RYRR30D NFC Reader (UART)
+
+The REYAX RYRR30D is a multi-protocol NFC reader supporting Apple VAS (Value Added Services), Google SmartTap, ISO14443A/B, ISO15693, and FeliCa.
+
+### Supported Protocols
+
+| Protocol | Description |
+|----------|-------------|
+| **Apple VAS** | Apple Wallet passes (employee badges, access cards) |
+| **Google SmartTap** | Google Wallet passes |
+| **ISO14443A** | MIFARE Classic, MIFARE Ultralight, NTAG |
+| **ISO14443B** | Various NFC-B cards |
+| **ISO15693** | HF RFID tags (vicinity cards) |
+| **FeliCa** | Sony FeliCa cards (transit, payment) |
 
 ### Wiring Connections
 
-| PN532 Pin | ESP32-P4 GPIO | Description |
-|-----------|---------------|-------------|
+| RYRR30D Pin | ESP32-P4 GPIO | Description |
+|-------------|---------------|-------------|
 | VCC | 3.3V | Power supply (3.3V only!) |
 | GND | GND | Ground |
-| SCK | GPIO 20 | SPI Clock |
-| MISO | GPIO 21 | SPI Master In Slave Out |
-| MOSI | GPIO 22 | SPI Master Out Slave In |
-| SS (CS) | GPIO 23 | SPI Chip Select |
-| RST | GPIO 32 | Reset (active low) |
-| IRQ | Not connected | Interrupt (optional) |
+| TX | GPIO 21 | Reader TX → P4 RX |
+| RX | GPIO 22 | P4 TX → Reader RX |
+| RST | GPIO 32 | Reset (active low, optional) |
+
+### UART Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| **UART Port** | UART_NUM_1 |
+| **Baud Rate** | 115200 |
+| **Data Bits** | 8 |
+| **Parity** | None |
+| **Stop Bits** | 1 |
+
+### AT Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `AT+APPLE=1,<hash>,<key>` | Enable Apple VAS with Pass Type ID hash and private key |
+| `AT+GOOGLE=1,<id>,<key>` | Enable Google SmartTap with Collector ID and private key |
+| `AT+MODE=2` | Set USB mode |
+| `AT+POLL` | Poll for cards |
+
+### Response Format
+
+| Response | Description |
+|----------|-------------|
+| `+APPLE=1,<data>` | Apple Wallet pass data |
+| `+GOOGLE=1,<data>` | Google SmartTap pass data |
+| `+UID=<hex>` | Card UID for standard NFC cards |
+
+### Source File
+
+Pin definitions: `main/main.c`
+
+```c
+#define NFC_UART_TX_PIN  GPIO_NUM_22  // P4 TX → Reader RX
+#define NFC_UART_RX_PIN  GPIO_NUM_21  // Reader TX → P4 RX
+#define NFC_RST_PIN      GPIO_NUM_32  // Reset (optional)
+```
+
+---
+
+## Camera SubModule - ESP32-S3 Sense (SPI)
+
+The XIAO ESP32-S3 Sense with OV5640 camera operates as an SPI slave, providing image capture for facial recognition.
+
+### SubModule Specifications
+
+| Specification | Value |
+|---------------|-------|
+| **SoC** | ESP32-S3 (Xtensa dual-core, 240MHz) |
+| **Camera Sensor** | OV5640 (5MP) |
+| **Flash** | 8MB |
+| **PSRAM** | 8MB |
+| **Interface** | SPI Slave to ESP32-P4 Master |
+| **Output** | JPEG compressed images |
+
+### Wiring Connections
+
+| S3 GPIO | S3 Pin | Function | P4 GPIO | Description |
+|---------|--------|----------|---------|-------------|
+| 3 | D2 | SPI MOSI | GPIO 24 | P4 → S3 data |
+| 4 | D3 | SPI MISO | GPIO 28 | S3 → P4 data |
+| 5 | D4 | SPI SCLK | GPIO 29 | Clock from P4 |
+| 6 | D5 | SPI CS | GPIO 30 | Chip select |
+| 7 | D8 | READY | GPIO 33 | Image ready signal |
+| - | 3V3 | VCC | 3.3V | Power |
+| - | GND | GND | GND | Ground |
+
+### Wiring Diagram
+
+```
+XIAO ESP32-S3 Sense          ESP32-P4-Function-EV-Board
+─────────────────────────────────────────────────────────
+D2 (GPIO 3)  MOSI    ←────    GPIO 24  (P4 MOSI)
+D3 (GPIO 4)  MISO    ────→    GPIO 28  (P4 MISO)
+D4 (GPIO 5)  SCLK    ←────    GPIO 29  (P4 SCLK)
+D5 (GPIO 6)  CS      ←────    GPIO 30  (P4 CS)
+D8 (GPIO 7)  READY   ────→    GPIO 33  (P4 Interrupt)
+3V3          VCC     ←────    3.3V
+GND          GND     ─────    GND
+```
 
 ### SPI Configuration
 
 | Parameter | Value |
 |-----------|-------|
 | **SPI Host** | SPI3_HOST |
-| **SPI Speed** | 5 MHz (5,000,000 Hz) |
-| **Mode** | SPI Mode 0 |
+| **SPI Speed** | 10 MHz |
+| **Mode** | SPI Mode 0 (CPOL=0, CPHA=0) |
+| **Chunk Size** | 4096 bytes max per transaction |
 
-### DIP Switch Settings (CRITICAL)
+### READY Pin Behavior
 
-| Switch | Position | Mode |
-|--------|----------|------|
-| SEL0 | 1 (ON) | SPI |
-| SEL1 | 0 (OFF) | SPI |
+| State | Meaning |
+|-------|---------|
+| LOW | Module busy or no image |
+| HIGH | Image captured and ready for transfer |
 
-> **WARNING:** The printed labels on the PN532 V3 board are INCORRECT. Use the settings above regardless of what the board silk screen says.
+> **Note:** Configure P4 GPIO 33 as interrupt (rising edge) for optimal performance.
+
+### Resolution Options
+
+| Resolution | Size | Use Case |
+|------------|------|----------|
+| RES_QQVGA | 160x120 | Quick detection |
+| RES_QVGA | 320x240 | Fast preview |
+| RES_VGA | 640x480 | **Default** - Face recognition |
+| RES_SVGA | 800x600 | Higher detail |
+| RES_XGA | 1024x768 | High quality |
+| RES_SXGA | 1280x1024 | Very high quality |
+| RES_UXGA | 1600x1200 | Full sensor |
+| RES_5MP | 2592x1944 | Maximum resolution |
 
 ### Source File
 
-Pin definitions: `main/main.c:59-68`
+Pin definitions: `main/camera_interface.h`
 
 ```c
-#define NFC_SCK_PIN  GPIO_NUM_20
-#define NFC_MISO_PIN GPIO_NUM_21
-#define NFC_MOSI_PIN GPIO_NUM_22
-#define NFC_CS_PIN   GPIO_NUM_23
-#define NFC_RST_PIN  GPIO_NUM_32
-#define NFC_IRQ_PIN  -1
-#define NFC_SPI_HOST SPI3_HOST
+#define CAM_SPI_MOSI_PIN    24   // Master Out Slave In
+#define CAM_SPI_MISO_PIN    28   // Master In Slave Out
+#define CAM_SPI_SCLK_PIN    29   // Serial Clock
+#define CAM_SPI_CS_PIN      30   // Chip Select
+#define CAM_READY_PIN       33   // Input from S3 READY pin
+#define CAM_SPI_HOST        SPI3_HOST
+#define CAM_SPI_CLOCK_HZ    10000000  // 10 MHz
 ```
 
 ---
@@ -172,6 +278,8 @@ Pin definitions: `managed_components/espressif__esp32_p4_function_ev_board/inclu
 
 ## Ethernet PHY (IP101GR)
 
+The IP101GR Ethernet PHY is built into the ESP32-P4-Function-EV-Board and uses the RMII interface.
+
 ### RMII Interface Pins
 
 | Function | GPIO | Description |
@@ -190,7 +298,7 @@ Pin definitions: `managed_components/espressif__esp32_p4_function_ev_board/inclu
 | **Interface** | RMII |
 | **Auto-negotiation** | Enabled |
 
-> **IMPORTANT:** GPIO 50 is reserved by hardware for RMII_CLK. Previous documentation incorrectly showed GPIO 50 for MDC. The correct MDC pin is GPIO 31 (verified in v1.5.2 board revision).
+> **IMPORTANT:** GPIO 50 is reserved by hardware for RMII_CLK. Do NOT use for any other purpose.
 
 ### Source File
 
@@ -198,7 +306,7 @@ Pin definitions: `main/ethernet_manager.c:20-24`
 
 ```c
 #define ETH_PHY_ADDR     1
-#define ETH_MDC_GPIO     31   // Management Data Clock (corrected from 50)
+#define ETH_MDC_GPIO     31   // Management Data Clock
 #define ETH_MDIO_GPIO    52   // Management Data I/O
 #define ETH_PHY_RST_GPIO 51   // PHY Reset
 ```
@@ -303,8 +411,6 @@ Pin definitions: `managed_components/espressif__esp32_p4_function_ev_board/inclu
 | USB+ | GPIO 20 | USB Data Positive |
 | USB- | GPIO 19 | USB Data Negative |
 
-> **Note:** GPIO 20 is shared with NFC SPI SCK. When using USB, NFC must use a different SPI configuration or be disabled.
-
 ### Source File
 
 Pin definitions: `managed_components/espressif__esp32_p4_function_ev_board/include/bsp/esp32_p4_function_ev_board.h:124-125`
@@ -354,21 +460,27 @@ The I2C bus is shared between multiple devices.
 
 ### Source File
 
-Pin definitions: `README.md:45-48`
+Pin definitions: `main/main.c`
 
 ---
 
 ## WiFi/BT Companion Chip (ESP32-C6)
 
-The ESP32-C6 companion chip provides WiFi and Bluetooth connectivity via SDIO interface.
+The ESP32-C6 companion chip is built into the ESP32-P4-Function-EV-Board and provides WiFi 6 and Bluetooth 5.0 LE connectivity via SDIO interface.
 
 ### SDIO Interface
 
-The ESP32-C6 uses GPIO 14-19 and GPIO 54 for SDIO communication. These pins are reserved for the companion chip and should not be used for other purposes.
+| Function | GPIO | Description |
+|----------|------|-------------|
+| SDIO D0 | GPIO 14 | Data Line 0 |
+| SDIO D1 | GPIO 15 | Data Line 1 |
+| SDIO D2 | GPIO 16 | Data Line 2 |
+| SDIO D3 | GPIO 17 | Data Line 3 |
+| SDIO CLK | GPIO 18 | Clock |
+| SDIO CMD | GPIO 19 | Command |
+| C6 Reset | GPIO 54 | ESP32-C6 reset control |
 
-| Function | GPIO Range |
-|----------|------------|
-| SDIO Data/Clock | GPIO 14-19, 54 |
+> **IMPORTANT:** GPIO 14-19 and GPIO 54 are reserved for the ESP32-C6 companion chip and should NOT be used for other purposes.
 
 ---
 
@@ -385,17 +497,24 @@ The ESP32-C6 uses GPIO 14-19 and GPIO 54 for SDIO communication. These pins are 
 | 11 | I2S DSIN | - | Audio microphone input |
 | 12 | I2S SCLK | - | Audio bit clock |
 | 13 | I2S MCLK | - | Audio master clock |
-| 14-19 | ESP32-C6 SDIO | - | WiFi/BT companion |
-| 19 | USB- | ESP32-C6 | Shared |
-| 20 | NFC SPI SCK | USB+ | Shared - choose one |
-| 21 | NFC SPI MISO | - | NFC reader |
-| 22 | NFC SPI MOSI | - | NFC reader |
-| 23 | NFC SPI CS | LCD Backlight (1280x800) | Config dependent |
+| 14-19 | ESP32-C6 SDIO | - | WiFi/BT companion (Built-in) |
+| 20 | USB+ | - | USB interface |
+| 21 | **NFC UART RX** | - | RYRR30D TX → P4 |
+| 22 | **NFC UART TX** | - | P4 → RYRR30D RX |
+| 23 | LCD Backlight | - | 1024x600 config |
+| 24 | **Camera SPI MOSI** | - | P4 → S3 data |
 | 25 | Buzzer | - | Audio feedback |
 | 26 | LCD Backlight | - | 1024x600 config |
 | 27 | LCD Reset | - | 1024x600 config |
+| 28 | **Camera SPI MISO** | - | S3 → P4 data |
+| 29 | **Camera SPI SCLK** | - | SPI clock |
+| 30 | **Camera SPI CS** | - | Chip select |
 | 31 | Ethernet MDC | - | PHY management clock |
-| 32 | NFC RST | - | NFC reader reset |
+| 32 | **NFC RST** | - | RYRR30D reset (optional) |
+| 33 | **Camera READY** | - | S3 ready signal (interrupt) |
+| 34 | (Available) | - | Reserved for future use |
+| 35-36 | (AVOID) | - | Bootloader mode pins |
+| 37-38 | (AVOID) | - | Console UART |
 | 39 | SD D0 / SPI MISO | - | SD card |
 | 40 | SD D1 | - | SD card (MMC only) |
 | 41 | SD D2 | - | SD card (MMC only) |
@@ -409,32 +528,33 @@ The ESP32-C6 uses GPIO 14-19 and GPIO 54 for SDIO communication. These pins are 
 | 51 | Ethernet PHY RST | - | PHY reset |
 | 52 | Ethernet MDIO | - | PHY management data |
 | 53 | Power Amp Enable | - | Audio amplifier |
-| 54 | ESP32-C6 SDIO | - | WiFi/BT companion |
+| 54 | ESP32-C6 Reset | - | WiFi/BT companion (Built-in) |
 
 ---
 
 ## Important Notes
 
-### Pin Conflicts
+### Pins to Avoid
 
-1. **GPIO 20**: Shared between NFC SPI SCK and USB+. Cannot use both simultaneously.
-
-2. **GPIO 23**: Used for NFC SPI CS (1024x600 config) or LCD Backlight (1280x800 config). Choose based on display configuration.
-
-3. **GPIO 50**: Hardware reserved for RMII reference clock. Do NOT use for any other purpose.
+| GPIO | Reason |
+|------|--------|
+| 35-36 | Bootloader mode strapping pins |
+| 37-38 | Console UART (debugging) |
+| 50 | Hardware reserved for RMII CLK |
 
 ### SPI Bus Allocation
 
 | SPI Host | Used By | Notes |
 |----------|---------|-------|
-| SPI2_HOST | WiFi Transport | Reserved for ESP32-C6 |
-| SPI3_HOST | PN532 NFC | Available for user peripherals |
+| SPI2_HOST | (Available) | Can be used for additional peripherals |
+| SPI3_HOST | Camera SubModule | ESP32-S3 SPI slave interface |
 
 ### Power Requirements
 
 | Module | Voltage | Notes |
 |--------|---------|-------|
-| PN532 NFC | 3.3V | Do NOT use 5V - will damage module |
+| RYRR30D NFC | 3.3V | Do NOT use 5V - will damage module |
+| Camera S3 | 3.3V | Power from P4 board |
 | ESP32-P4 | 3.3V | Core voltage |
 | Display | 3.3V logic | Backlight may require higher voltage |
 
@@ -442,7 +562,8 @@ The ESP32-C6 uses GPIO 14-19 and GPIO 54 for SDIO communication. These pins are 
 
 This pinout has been verified working with:
 - ESP32-P4-Function-EV-Board v1.5.2
-- Elechouse PN532 NFC Module V3
+- REYAX RYRR30D NFC Reader
+- XIAO ESP32-S3 Sense Camera Module
 - 7" MIPI-DSI Display (1024x600)
 - ESP-IDF v5.5.1
 
@@ -452,6 +573,7 @@ This pinout has been verified working with:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-18 | 2.0 | Replaced PN532 with RYRR30D NFC reader, added Camera SubModule |
 | 2026-01-26 | 1.0 | Initial document |
 
 ---

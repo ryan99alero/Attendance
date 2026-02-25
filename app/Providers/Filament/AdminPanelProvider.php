@@ -2,30 +2,30 @@
 
 namespace App\Providers\Filament;
 
-use Filament\Pages\Dashboard;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
-use App\Filament\Widgets\AttendanceStatsWidget;
-use App\Filament\Widgets\AttendanceChartWidget;
+use App\Filament\Widgets\AttendanceStatsOverview;
+use App\Filament\Widgets\AttendanceTrendsChart;
 use App\Filament\Widgets\DepartmentBreakdownWidget;
-use App\Filament\Widgets\KoolReportWidget;
-use Filament\Http\Middleware\Authenticate;
+use App\Filament\Widgets\PayrollSummaryWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
+use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages;
+use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets;
-use Filament\Navigation\NavigationGroup;
-use Filament\Navigation\NavigationItem;
+use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -39,6 +39,14 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->colors([
                 'primary' => Color::Amber,
+            ])
+            ->darkMode(true)
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('Employee Portal')
+                    ->icon('heroicon-o-user')
+                    ->url('/portal')
+                    ->visible(fn (): bool => Auth::user()?->employee_id !== null),
             ])
             ->navigationGroups([
                 NavigationGroup::make()
@@ -61,11 +69,11 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsible()
                     ->collapsed(),
                 NavigationGroup::make()
-                    ->label('System & Hardware')
+                    ->label('Reports & Analytics')
                     ->collapsible()
                     ->collapsed(),
                 NavigationGroup::make()
-                    ->label('Reports & Analytics')
+                    ->label('Settings')
                     ->collapsible()
                     ->collapsed(),
             ])
@@ -95,11 +103,10 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 AccountWidget::class,
-                FilamentInfoWidget::class,
-                AttendanceStatsWidget::class,
-                AttendanceChartWidget::class,
+                AttendanceStatsOverview::class,
+                AttendanceTrendsChart::class,
+                PayrollSummaryWidget::class,
                 DepartmentBreakdownWidget::class,
-                KoolReportWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

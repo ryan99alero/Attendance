@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers\Api;
 
-use Exception;
-use Illuminate\Routing\Controller;
 use App\Models\Attendance;
-use App\Models\Employee;
-use App\Models\Device;
-use App\Models\PayPeriod;
-use App\Models\Credential;
 use App\Models\ClockEvent;
-use App\Models\PunchType;
-use Illuminate\Support\Str;
+use App\Models\Credential;
+use App\Models\Device;
+use App\Models\Employee;
+use App\Models\PayPeriod;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class TimeClockController extends Controller
 {
@@ -24,14 +23,14 @@ class TimeClockController extends Controller
      * Must match exactly what's in the TimeClock UI dropdown
      */
     private const TIMEZONE_DISPLAY_NAMES = [
-        'America/New_York'    => 'Eastern Time (EST/EDT)',
-        'America/Chicago'     => 'Central Time (CST/CDT)',
-        'America/Denver'      => 'Mountain Time (MST/MDT)',
+        'America/New_York' => 'Eastern Time (EST/EDT)',
+        'America/Chicago' => 'Central Time (CST/CDT)',
+        'America/Denver' => 'Mountain Time (MST/MDT)',
         'America/Los_Angeles' => 'Pacific Time (PST/PDT)',
-        'America/Anchorage'   => 'Alaska Time (AKST/AKDT)',
-        'Pacific/Honolulu'    => 'Hawaii Time (HST)',
-        'America/Phoenix'     => 'Arizona Time (MST)',
-        'UTC'                 => 'UTC',
+        'America/Anchorage' => 'Alaska Time (AKST/AKDT)',
+        'Pacific/Honolulu' => 'Hawaii Time (HST)',
+        'America/Phoenix' => 'Arizona Time (MST)',
+        'UTC' => 'UTC',
     ];
 
     /**
@@ -60,24 +59,24 @@ class TimeClockController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid device data',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
         try {
             // Generate device_id from MAC address if not provided
-            $deviceId = $request->device_id ?? 'ESP32_' . strtoupper(str_replace([':', '-'], '', $request->mac_address));
+            $deviceId = $request->device_id ?? 'ESP32_'.strtoupper(str_replace([':', '-'], '', $request->mac_address));
 
             // Find existing device or prepare to create new one
             $device = Device::where('mac_address', $request->mac_address)->first();
-            $isNewDevice = !$device;
+            $isNewDevice = ! $device;
 
             if ($device) {
                 // Update existing device - preserve admin-set registration_status
                 $device->update([
                     'device_id' => $deviceId,
                     'device_name' => $request->device_name ?? $device->device_name ?? $deviceId,
-                    'display_name' => $device->display_name ?? $request->device_name ?? 'TimeClock (' . substr($request->mac_address, -5) . ')',
+                    'display_name' => $device->display_name ?? $request->device_name ?? 'TimeClock ('.substr($request->mac_address, -5).')',
                     'ip_address' => $request->ip_address ?? $request->ip(),
                     'last_seen_at' => now(),
                     'last_ip' => $request->ip(),
@@ -93,7 +92,7 @@ class TimeClockController extends Controller
                     'mac_address' => $request->mac_address,
                     'device_id' => $deviceId,
                     'device_name' => $request->device_name ?? $deviceId,
-                    'display_name' => $request->device_name ?? 'TimeClock (' . substr($request->mac_address, -5) . ')',
+                    'display_name' => $request->device_name ?? 'TimeClock ('.substr($request->mac_address, -5).')',
                     'ip_address' => $request->ip_address ?? $request->ip(),
                     'last_seen_at' => now(),
                     'last_ip' => $request->ip(),
@@ -107,9 +106,9 @@ class TimeClockController extends Controller
                 ]);
             }
 
-            Log::info("[TimeClockAPI] Device authenticated", [
+            Log::info('[TimeClockAPI] Device authenticated', [
                 'device_id' => $request->device_id,
-                'ip' => $request->ip_address
+                'ip' => $request->ip_address,
             ]);
 
             return response()->json([
@@ -125,20 +124,20 @@ class TimeClockController extends Controller
                     'api_version' => '1.0',
 
                     // Device timezone configuration with automatic DST
-                    'device_timezone' => $this->getDeviceTimezoneConfig($device)
-                ]
+                    'device_timezone' => $this->getDeviceTimezoneConfig($device),
+                ],
             ]);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Authentication failed", [
+            Log::error('[TimeClockAPI] Authentication failed', [
                 'device_id' => $request->device_id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -165,7 +164,7 @@ class TimeClockController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid punch data',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -173,8 +172,8 @@ class TimeClockController extends Controller
             // 1. Find device - do NOT auto-create (deleted devices should stay deleted)
             $device = Device::where('device_id', $request->device_id)->first();
 
-            if (!$device) {
-                Log::warning("[TimeClockAPI] Punch from unknown device", [
+            if (! $device) {
+                Log::warning('[TimeClockAPI] Punch from unknown device', [
                     'device_id' => $request->device_id,
                     'ip' => $request->ip(),
                 ]);
@@ -183,13 +182,13 @@ class TimeClockController extends Controller
                     'success' => false,
                     'message' => 'Device not registered',
                     'display_message' => 'Clock not registered. Contact Admin.',
-                    'error_code' => 'DEVICE_NOT_FOUND'
+                    'error_code' => 'DEVICE_NOT_FOUND',
                 ], 404);
             }
 
             // Check if device is approved
             if ($device->registration_status !== 'approved') {
-                Log::warning("[TimeClockAPI] Punch from unapproved device", [
+                Log::warning('[TimeClockAPI] Punch from unapproved device', [
                     'device_id' => $request->device_id,
                     'status' => $device->registration_status,
                 ]);
@@ -199,7 +198,7 @@ class TimeClockController extends Controller
                     'message' => 'Device not authorized',
                     'display_message' => 'Clock not authorized. Contact Manager.',
                     'error_code' => 'DEVICE_NOT_APPROVED',
-                    'registration_status' => $device->registration_status
+                    'registration_status' => $device->registration_status,
                 ], 403);
             }
 
@@ -214,7 +213,7 @@ class TimeClockController extends Controller
             $normalizedValue = Credential::normalizeIdentifier($request->credential_value);
             $credentialHash = hash('sha256', $normalizedValue);
 
-            Log::info("[TimeClockAPI] Credential lookup debug", [
+            Log::info('[TimeClockAPI] Credential lookup debug', [
                 'raw_value' => $request->credential_value,
                 'normalized_value' => $normalizedValue,
                 'credential_hash' => $credentialHash,
@@ -223,20 +222,20 @@ class TimeClockController extends Controller
 
             // 3. Find credential and employee - try exact kind match first, then any NFC-type
             $credential = Credential::where('kind', $request->credential_kind)
-                                  ->where('identifier_hash', $credentialHash)
-                                  ->active()
-                                  ->first();
+                ->where('identifier_hash', $credentialHash)
+                ->active()
+                ->first();
 
             // If not found, try with normalized kind names (nfc, rfid, mifare)
-            if (!$credential) {
+            if (! $credential) {
                 $nfcKinds = ['nfc', 'rfid', 'mifare', 'mifare_classic', 'mifare_ultralight', 'MIFARE Ultralight', 'MIFARE Classic'];
                 $credential = Credential::whereIn('kind', $nfcKinds)
-                                      ->where('identifier_hash', $credentialHash)
-                                      ->active()
-                                      ->first();
+                    ->where('identifier_hash', $credentialHash)
+                    ->active()
+                    ->first();
 
                 if ($credential) {
-                    Log::info("[TimeClockAPI] Found credential with alternate kind", [
+                    Log::info('[TimeClockAPI] Found credential with alternate kind', [
                         'matched_kind' => $credential->kind,
                         'device_sent_kind' => $request->credential_kind,
                     ]);
@@ -244,27 +243,27 @@ class TimeClockController extends Controller
             }
 
             // Fallback: try matching by normalized identifier directly (not hash)
-            if (!$credential) {
+            if (! $credential) {
                 $credential = Credential::where('identifier', $normalizedValue)
-                                      ->active()
-                                      ->first();
+                    ->active()
+                    ->first();
 
                 if ($credential) {
-                    Log::info("[TimeClockAPI] Found by direct identifier match (hash mismatch - needs re-hash)", [
+                    Log::info('[TimeClockAPI] Found by direct identifier match (hash mismatch - needs re-hash)', [
                         'identifier' => $normalizedValue,
                     ]);
                 }
             }
 
             // Debug: show what credentials exist
-            if (!$credential) {
+            if (! $credential) {
                 // Get all credentials to show what's in the DB
                 $allCredentials = Credential::select('id', 'kind', 'identifier', 'employee_id')->get();
 
-                Log::warning("[TimeClockAPI] Credential NOT found - showing all credentials for debug", [
+                Log::warning('[TimeClockAPI] Credential NOT found - showing all credentials for debug', [
                     'searched_normalized' => $normalizedValue,
                     'searched_hash' => $credentialHash,
-                    'all_credentials' => $allCredentials->map(function($c) {
+                    'all_credentials' => $allCredentials->map(function ($c) {
                         return [
                             'id' => $c->id,
                             'kind' => $c->kind,
@@ -310,7 +309,7 @@ class TimeClockController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Duplicate event ignored',
-                    'display_message' => 'Already recorded.'
+                    'display_message' => 'Already recorded.',
                 ], 200);
             }
 
@@ -329,19 +328,19 @@ class TimeClockController extends Controller
                     $request->meta ?? [],
                     [
                         'original_device_time' => $request->event_time, // Store original device local time
-                        'device_timezone_offset' => $request->device_timezone ?? '0'
+                        'device_timezone_offset' => $request->device_timezone ?? '0',
                     ]
                 ),
             ]);
 
-            Log::info("[TimeClockAPI] Clock event recorded", [
+            Log::info('[TimeClockAPI] Clock event recorded', [
                 'clock_event_id' => $clockEvent->id,
                 'employee_id' => $employee?->id,
                 'employee_name' => $employee?->full_names,
                 'device_id' => $request->device_id,
                 'credential_kind' => $request->credential_kind,
                 'event_time' => $eventTime->toISOString(),
-                'status' => $status
+                'status' => $status,
             ]);
 
             // 6. Return appropriate response
@@ -354,9 +353,9 @@ class TimeClockController extends Controller
                         'employee_id' => $employee->id,
                         'employee_name' => $employee->full_names,
                         'event_time' => $eventTime->format('Y-m-d H:i:s'),
-                        'status' => $status
+                        'status' => $status,
                     ],
-                    'display_message' => "Hello {$employee->full_names}! Time recorded at " . $eventTime->format('g:i A')
+                    'display_message' => "Hello {$employee->full_names}! Time recorded at ".$eventTime->format('g:i A'),
                 ]);
             }
 
@@ -364,7 +363,7 @@ class TimeClockController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Employee is inactive',
-                    'display_message' => 'Access denied. Please contact HR.'
+                    'display_message' => 'Access denied. Please contact HR.',
                 ], 403);
             }
 
@@ -374,23 +373,23 @@ class TimeClockController extends Controller
                 'message' => 'Credential not recognized',
                 'data' => [
                     'clock_event_id' => $clockEvent->id,
-                    'status' => 'unmatched'
+                    'status' => 'unmatched',
                 ],
-                'display_message' => 'Credential not recognized. Please contact HR.'
+                'display_message' => 'Credential not recognized. Please contact HR.',
             ], 404);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Clock event recording failed", [
+            Log::error('[TimeClockAPI] Clock event recording failed', [
                 'device_id' => $request->device_id,
                 'credential_kind' => $request->credential_kind,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to record event',
-                'display_message' => 'System error. Please try again.'
+                'display_message' => 'System error. Please try again.',
             ], 500);
         }
     }
@@ -408,7 +407,7 @@ class TimeClockController extends Controller
             $normalizedValue = Credential::normalizeIdentifier($credentialValue);
             $credentialHash = hash('sha256', $normalizedValue);
 
-            Log::info("[TimeClockAPI] Employee lookup debug", [
+            Log::info('[TimeClockAPI] Employee lookup debug', [
                 'raw_value' => $credentialValue,
                 'normalized_value' => $normalizedValue,
                 'credential_hash' => $credentialHash,
@@ -417,51 +416,51 @@ class TimeClockController extends Controller
 
             // Find employee by credential - try exact kind first
             $credential = Credential::where('kind', $credentialKind)
-                                  ->where('identifier_hash', $credentialHash)
-                                  ->active()
-                                  ->first();
+                ->where('identifier_hash', $credentialHash)
+                ->active()
+                ->first();
 
             // If not found, try with any NFC-type kind
-            if (!$credential) {
+            if (! $credential) {
                 $nfcKinds = ['nfc', 'rfid', 'mifare', 'mifare_classic', 'mifare_ultralight', 'MIFARE Ultralight', 'MIFARE Classic'];
                 $credential = Credential::whereIn('kind', $nfcKinds)
-                                      ->where('identifier_hash', $credentialHash)
-                                      ->active()
-                                      ->first();
+                    ->where('identifier_hash', $credentialHash)
+                    ->active()
+                    ->first();
             }
 
             // Still not found? Try matching by hash alone (ignore kind)
-            if (!$credential) {
+            if (! $credential) {
                 $credential = Credential::where('identifier_hash', $credentialHash)
-                                      ->active()
-                                      ->first();
+                    ->active()
+                    ->first();
 
                 if ($credential) {
-                    Log::info("[TimeClockAPI] Found credential ignoring kind", [
+                    Log::info('[TimeClockAPI] Found credential ignoring kind', [
                         'db_kind' => $credential->kind,
                         'request_kind' => $credentialKind,
                     ]);
                 }
             }
 
-            if (!$credential || !$credential->employee) {
-                Log::warning("[TimeClockAPI] Employee NOT found", [
+            if (! $credential || ! $credential->employee) {
+                Log::warning('[TimeClockAPI] Employee NOT found', [
                     'normalized_value' => $normalizedValue,
                     'hash' => $credentialHash,
                 ]);
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Employee not found'
+                    'message' => 'Employee not found',
                 ], 404);
             }
 
             $employee = $credential->employee;
 
-            if (!$employee->is_active) {
+            if (! $employee->is_active) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Employee is inactive'
+                    'message' => 'Employee is inactive',
                 ], 403);
             }
 
@@ -478,7 +477,7 @@ class TimeClockController extends Controller
                 'month' => $this->calculateHours($employee->id, $monthStart, $today),
                 'pay_period' => $currentPayPeriod ?
                     $this->calculateHours($employee->id, $currentPayPeriod->start_date, $currentPayPeriod->end_date) :
-                    ['regular' => 0, 'overtime' => 0, 'total' => 0]
+                    ['regular' => 0, 'overtime' => 0, 'total' => 0],
             ];
 
             return response()->json([
@@ -489,29 +488,29 @@ class TimeClockController extends Controller
                         'name' => $employee->full_names,
                         'external_id' => $employee->external_id,
                         'department' => $employee->department?->name,
-                        'is_active' => $employee->is_active
+                        'is_active' => $employee->is_active,
                     ],
                     'hours' => $hoursData,
                     'current_pay_period' => $currentPayPeriod ? [
                         'id' => $currentPayPeriod->id,
                         'start_date' => $currentPayPeriod->start_date->toDateString(),
-                        'end_date' => $currentPayPeriod->end_date->toDateString()
+                        'end_date' => $currentPayPeriod->end_date->toDateString(),
                     ] : null,
-                    'server_time' => now()->toISOString()
-                ]
+                    'server_time' => now()->toISOString(),
+                ],
             ]);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Employee info fetch failed", [
+            Log::error('[TimeClockAPI] Employee info fetch failed', [
                 'credential_value' => $credentialValue,
                 'credential_kind' => $credentialKind ?? 'unknown',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch employee information',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -525,7 +524,7 @@ class TimeClockController extends Controller
         $attendances = Attendance::where('employee_id', $employeeId)
             ->whereBetween('punch_time', [
                 Carbon::parse($startDate)->startOfDay(),
-                Carbon::parse($endDate)->endOfDay()
+                Carbon::parse($endDate)->endOfDay(),
             ])
             ->where('status', 'Posted') // Only count finalized records
             ->get();
@@ -560,7 +559,7 @@ class TimeClockController extends Controller
         return [
             'regular' => $regularHours,
             'overtime' => $overtimeHours,
-            'total' => $totalHours
+            'total' => $totalHours,
         ];
     }
 
@@ -577,7 +576,7 @@ class TimeClockController extends Controller
             'success' => true,
             'message' => 'Time Clock API is healthy',
             'server_time' => now()->toISOString(),
-            'api_version' => '1.0'
+            'api_version' => '1.0',
         ];
 
         // Try to identify and update the device if credentials provided
@@ -593,10 +592,10 @@ class TimeClockController extends Controller
         }
 
         // Fallback lookup: MAC address (handles device_id mismatch after power loss)
-        if (!$device && $macAddress) {
+        if (! $device && $macAddress) {
             $device = Device::where('mac_address', $macAddress)->first();
             if ($device) {
-                Log::info("[TimeClockAPI] Health check: device found by MAC fallback", [
+                Log::info('[TimeClockAPI] Health check: device found by MAC fallback', [
                     'mac_address' => $macAddress,
                     'sent_device_id' => $deviceId,
                     'actual_device_id' => $device->device_id,
@@ -623,7 +622,7 @@ class TimeClockController extends Controller
                 // Clear reboot flag after it's been sent
                 if ($device->reboot_requested) {
                     $device->update(['reboot_requested' => false]);
-                    Log::info("[TimeClockAPI] Reboot command sent to device", [
+                    Log::info('[TimeClockAPI] Reboot command sent to device', [
                         'device_id' => $device->device_id,
                     ]);
                 }
@@ -638,12 +637,111 @@ class TimeClockController extends Controller
                     'needs_reauth' => true, // Signal to device to call /auth endpoint
                 ];
 
-                Log::info("[TimeClockAPI] Health check: token invalid/expired, needs reauth", [
+                Log::info('[TimeClockAPI] Health check: token invalid/expired, needs reauth', [
                     'device_id' => $device->device_id,
                     'mac_address' => $device->mac_address,
                     'token_expires_at' => $device->token_expires_at,
                 ]);
             }
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * Heartbeat endpoint for time clock devices
+     * POST /api/v1/timeclock/heartbeat
+     *
+     * Updates device status including firmware version, IP address, and uptime.
+     * Returns any pending commands (reboot, config sync, etc.)
+     */
+    public function heartbeat(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'device_id' => 'required|string|max:100',
+            'ip_address' => 'nullable|ip',
+            'firmware_version' => 'nullable|string|max:50',
+            'uptime_seconds' => 'nullable|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Try to find device by device_id
+        $device = Device::where('device_id', $request->device_id)->first();
+
+        if (! $device) {
+            // Fallback: try Authorization header
+            $authHeader = $request->header('Authorization');
+            if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
+                $token = substr($authHeader, 7);
+                $device = Device::whereNotNull('api_token')
+                    ->get()
+                    ->first(fn ($d) => $d->isTokenValid($token));
+            }
+        }
+
+        if (! $device) {
+            Log::warning('[TimeClockAPI] Heartbeat from unknown device', [
+                'device_id' => $request->device_id,
+                'ip_address' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Device not found',
+                'error_code' => 'DEVICE_NOT_FOUND',
+            ], 404);
+        }
+
+        // Update device information
+        $updateData = [
+            'last_seen_at' => now(),
+            'last_ip' => $request->ip(),
+        ];
+
+        if ($request->filled('ip_address')) {
+            $updateData['ip_address'] = $request->ip_address;
+        }
+
+        if ($request->filled('firmware_version')) {
+            $updateData['firmware_version'] = $request->firmware_version;
+        }
+
+        $device->update($updateData);
+
+        Log::debug('[TimeClockAPI] Heartbeat received', [
+            'device_id' => $device->device_id,
+            'firmware_version' => $request->firmware_version,
+            'ip_address' => $request->ip_address ?? $request->ip(),
+            'uptime_seconds' => $request->uptime_seconds,
+        ]);
+
+        // Build response with any pending commands
+        $response = [
+            'success' => true,
+            'message' => 'Heartbeat received',
+            'server_time' => now()->toISOString(),
+            'device' => [
+                'device_id' => $device->device_id,
+                'registration_status' => $device->registration_status ?? 'pending',
+                'is_approved' => ($device->registration_status === 'approved'),
+                'reboot_requested' => (bool) $device->reboot_requested,
+                'config_sync_needed' => $device->config_synced_at < $device->updated_at,
+            ],
+        ];
+
+        // Clear reboot flag after sending
+        if ($device->reboot_requested) {
+            $device->update(['reboot_requested' => false]);
+            Log::info('[TimeClockAPI] Reboot command sent via heartbeat', [
+                'device_id' => $device->device_id,
+            ]);
         }
 
         return response()->json($response);
@@ -668,7 +766,7 @@ class TimeClockController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid request',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -677,7 +775,7 @@ class TimeClockController extends Controller
             $device = null;
 
             // Log incoming request parameters for debugging
-            Log::info("[TimeClockAPI] getTime request", [
+            Log::info('[TimeClockAPI] getTime request', [
                 'device_id' => $request->device_id ?? 'not provided',
                 'mac_address' => $request->mac_address ?? 'not provided',
                 'all_params' => $request->all(),
@@ -687,24 +785,24 @@ class TimeClockController extends Controller
             // Use filled() to ensure non-empty values
             if ($request->filled('device_id')) {
                 $device = Device::where('device_id', $request->device_id)->first();
-                Log::info("[TimeClockAPI] device_id lookup", [
+                Log::info('[TimeClockAPI] device_id lookup', [
                     'device_id' => $request->device_id,
                     'found' => $device ? true : false,
                 ]);
             }
 
-            if (!$device && $request->filled('mac_address')) {
+            if (! $device && $request->filled('mac_address')) {
                 $device = Device::where('mac_address', $request->mac_address)->first();
-                Log::info("[TimeClockAPI] mac_address lookup", [
+                Log::info('[TimeClockAPI] mac_address lookup', [
                     'mac_address' => $request->mac_address,
                     'found' => $device ? true : false,
                 ]);
             }
 
             // ESP32 firmware sends 'mac' param, not 'mac_address'
-            if (!$device && $request->filled('mac')) {
+            if (! $device && $request->filled('mac')) {
                 $device = Device::where('mac_address', $request->mac)->first();
-                Log::info("[TimeClockAPI] mac (short param) lookup", [
+                Log::info('[TimeClockAPI] mac (short param) lookup', [
                     'mac' => $request->mac,
                     'found' => $device ? true : false,
                 ]);
@@ -713,14 +811,14 @@ class TimeClockController extends Controller
             // Update last seen timestamp for registered devices
             if ($device) {
                 $device->update(['last_seen_at' => $now]);
-                Log::info("[TimeClockAPI] Device found", [
+                Log::info('[TimeClockAPI] Device found', [
                     'db_device_id' => $device->device_id,
                     'db_mac_address' => $device->mac_address,
                     'ntp_server' => $device->ntp_server,
                     'timezone' => $device->timezone,
                 ]);
             } else {
-                Log::warning("[TimeClockAPI] Device NOT found in database");
+                Log::warning('[TimeClockAPI] Device NOT found in database');
             }
 
             // Determine timezone to use (device's timezone if registered, otherwise app default)
@@ -754,7 +852,7 @@ class TimeClockController extends Controller
                 $responseData['device_timezone'] = [
                     'timezone_name' => $defaultTimezone,
                     'timezone_display' => $this->getTimezoneDisplayName($defaultTimezone),
-                    'current_offset' => (int)$offsetHours,
+                    'current_offset' => (int) $offsetHours,
                     'is_dst' => $defaultTime->format('I') == '1',
                     'timezone_abbr' => $defaultTime->format('T'),
                     'device_time' => $defaultTime->format('Y-m-d H:i:s'),
@@ -765,15 +863,15 @@ class TimeClockController extends Controller
             return response()->json($responseData);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Time sync failed", [
+            Log::error('[TimeClockAPI] Time sync failed', [
                 'mac_address' => $request->mac_address ?? 'none',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Time synchronization failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -799,7 +897,7 @@ class TimeClockController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid device registration data',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -809,11 +907,11 @@ class TimeClockController extends Controller
 
             if ($existingDevice) {
                 // Handle re-registration of existing device
-                Log::info("[TimeClockAPI] Re-registering existing device", [
+                Log::info('[TimeClockAPI] Re-registering existing device', [
                     'device_id' => $existingDevice->device_id,
                     'mac_address' => $request->mac_address,
                     'previous_name' => $existingDevice->device_name,
-                    'new_name' => $request->device_name
+                    'new_name' => $request->device_name,
                 ]);
 
                 // Update existing device with new information
@@ -846,11 +944,11 @@ class TimeClockController extends Controller
 
             } else {
                 // Create new device
-                $deviceId = 'ESP32_' . strtoupper(Str::random(8));
+                $deviceId = 'ESP32_'.strtoupper(Str::random(8));
 
                 // Ensure device_id is unique
                 while (Device::where('device_id', $deviceId)->exists()) {
-                    $deviceId = 'ESP32_' . strtoupper(Str::random(8));
+                    $deviceId = 'ESP32_'.strtoupper(Str::random(8));
                 }
 
                 // Create device with default config
@@ -886,13 +984,13 @@ class TimeClockController extends Controller
                 $apiToken = $device->generateApiToken();
             }
 
-            Log::info("[TimeClockAPI] Device " . ($isNewDevice ? 'registered' : 're-registered'), [
+            Log::info('[TimeClockAPI] Device '.($isNewDevice ? 'registered' : 're-registered'), [
                 'device_id' => $device->device_id,
                 'device_name' => $device->device_name,
                 'mac_address' => $device->mac_address,
                 'ip_address' => $request->ip(),
                 'registration_status' => $device->registration_status,
-                'is_new_device' => $isNewDevice
+                'is_new_device' => $isNewDevice,
             ]);
 
             return response()->json([
@@ -906,28 +1004,28 @@ class TimeClockController extends Controller
                     'registration_status' => $device->registration_status,
                     'device_config' => $device->device_config,
                     'server_time' => now()->toISOString(),
-                    'api_version' => '1.0'
+                    'api_version' => '1.0',
                 ],
                 'instructions' => [
                     'Store the api_token securely on your device',
                     'Include Authorization: Bearer {api_token} in future API calls',
                     'Device registration is pending admin approval',
-                    'Check registration status with GET /api/v1/timeclock/status'
-                ]
+                    'Check registration status with GET /api/v1/timeclock/status',
+                ],
             ], 201);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Device registration failed", [
+            Log::error('[TimeClockAPI] Device registration failed', [
                 'device_name' => $request->device_name,
                 'mac_address' => $request->mac_address,
                 'error' => $e->getMessage(),
-                'ip_address' => $request->ip()
+                'ip_address' => $request->ip(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Device registration failed',
-                'error' => 'Internal server error'
+                'error' => 'Internal server error',
             ], 500);
         }
     }
@@ -941,26 +1039,26 @@ class TimeClockController extends Controller
         $deviceId = $request->header('X-Device-ID');
         $apiToken = $request->bearerToken();
 
-        if (!$deviceId || !$apiToken) {
+        if (! $deviceId || ! $apiToken) {
             return response()->json([
                 'success' => false,
-                'message' => 'Missing device ID or API token'
+                'message' => 'Missing device ID or API token',
             ], 400);
         }
 
         $device = Device::where('device_id', $deviceId)->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'success' => false,
-                'message' => 'Device not found'
+                'message' => 'Device not found',
             ], 404);
         }
 
-        if (!$device->isTokenValid($apiToken)) {
+        if (! $device->isTokenValid($apiToken)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid or expired API token'
+                'message' => 'Invalid or expired API token',
             ], 401);
         }
 
@@ -978,8 +1076,8 @@ class TimeClockController extends Controller
                 'device_config' => $device->device_config,
                 'last_seen_at' => $device->last_seen_at->toISOString(),
                 'server_time' => now()->toISOString(),
-                'token_expires_at' => $device->token_expires_at->toISOString()
-            ]
+                'token_expires_at' => $device->token_expires_at->toISOString(),
+            ],
         ]);
     }
 
@@ -991,15 +1089,15 @@ class TimeClockController extends Controller
      * These MUST match exactly what's in the Filament admin panel dropdown
      */
     private const DISPLAY_TO_IANA = [
-        'Alaska Time (AKST/AKDT)'        => 'America/Anchorage',
-        'Atlantic Time (AST)'            => 'America/Puerto_Rico',
-        'Central Time (CST/CDT)'         => 'America/Chicago',
-        'Chamorro Time (ChST)'           => 'Pacific/Guam',
-        'Eastern Time (EST/EDT)'         => 'America/New_York',
+        'Alaska Time (AKST/AKDT)' => 'America/Anchorage',
+        'Atlantic Time (AST)' => 'America/Puerto_Rico',
+        'Central Time (CST/CDT)' => 'America/Chicago',
+        'Chamorro Time (ChST)' => 'Pacific/Guam',
+        'Eastern Time (EST/EDT)' => 'America/New_York',
         'Hawaii-Aleutian Time (HST/HDT)' => 'America/Adak',
-        'Mountain Time (MST/MDT)'        => 'America/Denver',
-        'Pacific Time (PST/PDT)'         => 'America/Los_Angeles',
-        'Samoa Time (SST)'               => 'Pacific/Pago_Pago',
+        'Mountain Time (MST/MDT)' => 'America/Denver',
+        'Pacific Time (PST/PDT)' => 'America/Los_Angeles',
+        'Samoa Time (SST)' => 'Pacific/Pago_Pago',
     ];
 
     /**
@@ -1028,7 +1126,7 @@ class TimeClockController extends Controller
                 // Send display name - ESP32 matches against this
                 'timezone_name' => $displayName,
                 'timezone_display' => $displayName,
-                'current_offset' => (int)$offsetHours,
+                'current_offset' => (int) $offsetHours,
                 'is_dst' => $deviceTime->format('I') == '1', // 1 if DST, 0 if not
                 'timezone_abbr' => $deviceTime->format('T'), // e.g., "CDT", "CST"
                 'device_time' => $deviceTime->format('Y-m-d H:i:s'),
@@ -1037,10 +1135,11 @@ class TimeClockController extends Controller
             // Fallback to Central Time if timezone parsing fails - calculate dynamically
             $fallbackTime = now()->setTimezone('America/Chicago');
             $offsetHours = $fallbackTime->getOffset() / 3600;
+
             return [
                 'timezone_name' => 'Central Time (CST/CDT)',
                 'timezone_display' => 'Central Time (CST/CDT)',
-                'current_offset' => (int)$offsetHours,
+                'current_offset' => (int) $offsetHours,
                 'is_dst' => $fallbackTime->format('I') == '1',
                 'timezone_abbr' => $fallbackTime->format('T'),
                 'device_time' => $fallbackTime->format('Y-m-d H:i:s'),
@@ -1063,7 +1162,7 @@ class TimeClockController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid request',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -1071,7 +1170,7 @@ class TimeClockController extends Controller
             // Find device by MAC address
             $device = Device::where('mac_address', $request->mac_address)->first();
 
-            if (!$device) {
+            if (! $device) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Device not found',
@@ -1105,19 +1204,19 @@ class TimeClockController extends Controller
                     'registration_status' => $device->registration_status,
                     'config_updated_at' => $device->config_updated_at?->toISOString(),
                     'device_timezone' => $this->getDeviceTimezoneConfig($device),
-                ]
+                ],
             ]);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Config fetch failed", [
+            Log::error('[TimeClockAPI] Config fetch failed', [
                 'mac_address' => $request->mac_address,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Configuration fetch failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1138,7 +1237,7 @@ class TimeClockController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid configuration data',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 400);
         }
 
@@ -1157,7 +1256,7 @@ class TimeClockController extends Controller
                 $updates['registration_status'] = $request->registration_status;
             }
 
-            if (!empty($updates)) {
+            if (! empty($updates)) {
                 $updates['config_updated_at'] = now();
                 $updates['config_version'] = ($device->config_version ?? 1) + 1;
                 $device->update($updates);
@@ -1170,15 +1269,15 @@ class TimeClockController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error("[TimeClockAPI] Config update failed", [
+            Log::error('[TimeClockAPI] Config update failed', [
                 'device_id' => $deviceId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Configuration update failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

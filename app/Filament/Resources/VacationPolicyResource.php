@@ -2,75 +2,77 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\VacationPolicyResource\Pages\ListVacationPolicies;
 use App\Filament\Resources\VacationPolicyResource\Pages\CreateVacationPolicy;
 use App\Filament\Resources\VacationPolicyResource\Pages\EditVacationPolicy;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\VacationPolicyResource\Pages;
-use App\Filament\Resources\VacationPolicyResource\RelationManagers;
+use App\Filament\Resources\VacationPolicyResource\Pages\ListVacationPolicies;
 use App\Models\VacationPolicy;
-use Filament\Forms;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class VacationPolicyResource extends Resource
 {
     protected static ?string $model = VacationPolicy::class;
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Off Management';
+
     protected static ?string $navigationLabel = 'Vacation Policies';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
+
     protected static ?int $navigationSort = 30;
+
+    protected static bool $isDiscovered = false;
 
     public static function shouldRegisterNavigation(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('view_any_vacation::policy') ?? false;
     }
 
     public static function canViewAny(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('view_any_vacation::policy') ?? false;
     }
 
     public static function canView($record): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('view_vacation::policy') ?? false;
     }
 
     public static function canCreate(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('create_vacation::policy') ?? false;
     }
 
     public static function canEdit($record): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('update_vacation::policy') ?? false;
     }
 
     public static function canDelete($record): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('delete_vacation::policy') ?? false;
     }
 

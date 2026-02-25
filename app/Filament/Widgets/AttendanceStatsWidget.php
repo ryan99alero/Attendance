@@ -2,16 +2,21 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\StatsOverviewWidget as BaseWidget;
-use Filament\Widgets\StatsOverviewWidget\Stat;
-use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\Department;
+use App\Models\Employee;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Filament\Widgets\StatsOverviewWidget as BaseWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 
+/**
+ * @deprecated Use AttendanceStatsOverview instead
+ */
 class AttendanceStatsWidget extends BaseWidget
 {
+    // Disabled - replaced by AttendanceStatsOverview
+    protected static bool $isDiscovered = false;
+
     protected function getStats(): array
     {
         // Get current date for calculations
@@ -82,7 +87,7 @@ class AttendanceStatsWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-building-office')
                 ->color('info'),
 
-            Stat::make('Attendance Rate', $averageDailyAttendance . '%')
+            Stat::make('Attendance Rate', $averageDailyAttendance.'%')
                 ->description('Estimated daily attendance')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color($averageDailyAttendance >= 80 ? 'success' : ($averageDailyAttendance >= 60 ? 'warning' : 'danger')),

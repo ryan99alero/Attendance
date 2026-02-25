@@ -2,73 +2,79 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DatePicker;
-use Filament\Schemas\Components\Grid;
-use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use App\Filament\Resources\VacationCalendarResource\Pages\ListVacationCalendars;
 use App\Filament\Resources\VacationCalendarResource\Pages\CreateVacationCalendar;
 use App\Filament\Resources\VacationCalendarResource\Pages\EditVacationCalendar;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\VacationCalendarResource\Pages;
-use App\Models\VacationCalendar;
-use App\Models\Employee;
+use App\Filament\Resources\VacationCalendarResource\Pages\ListVacationCalendars;
 use App\Models\Department;
-use Illuminate\Database\Eloquent\Builder;
-use Filament\Forms;
+use App\Models\Employee;
+use App\Models\VacationCalendar;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class VacationCalendarResource extends Resource
 {
     protected static ?string $model = VacationCalendar::class;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar';
+
     protected static ?string $navigationLabel = 'Vacation Calendars';
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Off Management';
+
     protected static ?int $navigationSort = 10;
+
+    protected static bool $isDiscovered = false;
 
     public static function shouldRegisterNavigation(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('view_any_vacation::calendar') ?? false;
     }
 
     public static function canViewAny(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('view_any_vacation::calendar') ?? false;
     }
 
     public static function canView($record): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('view_vacation::calendar') ?? false;
     }
 
     public static function canCreate(): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('create_vacation::calendar') ?? false;
     }
 
     public static function canEdit($record): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('update_vacation::calendar') ?? false;
     }
 
     public static function canDelete($record): bool
     {
         $user = auth()->user();
+
         return $user?->hasRole('super_admin') || $user?->can('delete_vacation::calendar') ?? false;
     }
 
@@ -207,25 +213,25 @@ class VacationCalendarResource extends Resource
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
         ])
-        ->defaultSort('vacation_date', 'desc')
-        ->filters([
-            SelectFilter::make('employee_id')
-                ->relationship('employee', 'first_name')
-                ->searchable()
-                ->preload(),
+            ->defaultSort('vacation_date', 'desc')
+            ->filters([
+                SelectFilter::make('employee_id')
+                    ->relationship('employee', 'first_name')
+                    ->searchable()
+                    ->preload(),
 
-            TernaryFilter::make('is_half_day')
-                ->label('Half Day')
-                ->placeholder('All entries')
-                ->trueLabel('Half days only')
-                ->falseLabel('Full days only'),
+                TernaryFilter::make('is_half_day')
+                    ->label('Half Day')
+                    ->placeholder('All entries')
+                    ->trueLabel('Half days only')
+                    ->falseLabel('Full days only'),
 
-            TernaryFilter::make('is_active')
-                ->label('Active Status')
-                ->placeholder('All entries')
-                ->trueLabel('Active only')
-                ->falseLabel('Inactive only'),
-        ]);
+                TernaryFilter::make('is_active')
+                    ->label('Active Status')
+                    ->placeholder('All entries')
+                    ->trueLabel('Active only')
+                    ->falseLabel('Inactive only'),
+            ]);
     }
 
     public static function getPages(): array

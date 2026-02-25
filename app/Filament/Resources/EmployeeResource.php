@@ -183,8 +183,12 @@ class EmployeeResource extends Resource
                                         ->label('Full Time')
                                         ->default(false)
                                         ->helperText('Full-time vs part-time classification'),
+                                    Toggle::make('portal_clockin')
+                                        ->label('Portal Clock-In')
+                                        ->default(false)
+                                        ->helperText('Allow employee to clock in/out via web portal'),
                                 ])
-                                ->columns(2),
+                                ->columns(3),
                         ]),
 
                     // =====================================================

@@ -41,7 +41,7 @@ class IntegrationConnectionResource extends Resource
 
     protected static ?string $navigationLabel = 'Integrations';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+    protected static string|\UnitEnum|null $navigationGroup = 'Settings';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 

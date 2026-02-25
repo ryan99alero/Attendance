@@ -2,33 +2,33 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Columns\TextColumn;
-use App\Filament\Resources\VacationBalanceResource\Pages\ListVacationBalances;
 use App\Filament\Resources\VacationBalanceResource\Pages\CreateVacationBalance;
 use App\Filament\Resources\VacationBalanceResource\Pages\EditVacationBalance;
-use UnitEnum;
-use BackedEnum;
-
-use App\Filament\Resources\VacationBalanceResource\Pages;
-use App\Models\VacationBalance;
+use App\Filament\Resources\VacationBalanceResource\Pages\ListVacationBalances;
 use App\Models\CompanySetup;
-use Filament\Forms;
+use App\Models\VacationBalance;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class VacationBalanceResource extends Resource
 {
     protected static ?string $model = VacationBalance::class;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
+
     protected static ?string $navigationLabel = 'Vacation Balances';
-    protected static string | \UnitEnum | null $navigationGroup = 'Time Off Management';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Time Off Management';
+
     protected static ?int $navigationSort = 20;
+
+    protected static bool $isDiscovered = false;
 
     public static function form(Schema $schema): Schema
     {

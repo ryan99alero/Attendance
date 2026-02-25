@@ -28,7 +28,7 @@ class SystemTaskResource extends Resource
 
     protected static ?string $pluralModelLabel = 'System Tasks';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'System & Hardware';
+    protected static string|\UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?int $navigationSort = 60;
 

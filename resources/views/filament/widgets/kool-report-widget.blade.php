@@ -1,7 +1,12 @@
 <x-filament-widgets::widget>
     <x-filament::section>
         <x-slot name="heading">
-            Weekly Payroll Summary (KoolReport Integration)
+            <div class="flex items-center justify-between">
+                <span>Weekly Payroll Summary</span>
+                <span class="text-xs font-normal text-gray-500 dark:text-gray-400">
+                    {{ \Carbon\Carbon::now()->startOfWeek()->format('M j') }} - {{ \Carbon\Carbon::now()->endOfWeek()->format('M j, Y') }}
+                </span>
+            </div>
         </x-slot>
 
         @php
@@ -9,119 +14,128 @@
             $payrollData = $this->getPayrollSummaryData();
         @endphp
 
-        <!-- Summary Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+        {{-- Overview Statistics - SmartHR Style --}}
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {{-- Total Hours --}}
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Hours</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ $weeklyTotals['total_hours'] }}</p>
+                        <p class="mt-1 flex items-center gap-1 text-sm">
+                            <span class="text-emerald-600 dark:text-emerald-400">This week</span>
+                        </p>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-100">{{ $weeklyTotals['total_hours'] }}</h3>
-                        <p class="text-sm text-blue-700 dark:text-blue-300">Total Hours</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                        <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-semibold text-green-900 dark:text-green-100">${{ $weeklyTotals['total_gross_pay'] }}</h3>
-                        <p class="text-sm text-green-700 dark:text-green-300">Gross Pay</p>
+                    <div class="flex items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/20 p-3">
+                        <x-filament::icon icon="heroicon-o-clock" class="text-primary-600 dark:text-primary-400" style="width: 24px; height: 24px;" />
                     </div>
                 </div>
             </div>
 
-            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                        <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z"></path>
-                        </svg>
+            {{-- Gross Pay --}}
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Gross Pay</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">${{ $weeklyTotals['total_gross_pay'] }}</p>
+                        <p class="mt-1 flex items-center gap-1 text-sm">
+                            <span class="text-emerald-600 dark:text-emerald-400">Estimated</span>
+                        </p>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-semibold text-yellow-900 dark:text-yellow-100">{{ $weeklyTotals['avg_hours_per_employee'] }}</h3>
-                        <p class="text-sm text-yellow-700 dark:text-yellow-300">Avg Hours/Employee</p>
+                    <div class="flex items-center justify-center rounded-full bg-success-100 dark:bg-success-500/20 p-3">
+                        <x-filament::icon icon="heroicon-o-currency-dollar" class="text-success-600 dark:text-success-400" style="width: 24px; height: 24px;" />
                     </div>
                 </div>
             </div>
 
-            <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                        <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                        </svg>
+            {{-- Avg Hours/Employee --}}
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Hours/Employee</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ $weeklyTotals['avg_hours_per_employee'] }}</p>
+                        <p class="mt-1 flex items-center gap-1 text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">Per person</span>
+                        </p>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-semibold text-purple-900 dark:text-purple-100">{{ $weeklyTotals['employee_count'] }}</h3>
-                        <p class="text-sm text-purple-700 dark:text-purple-300">Active Employees</p>
+                    <div class="flex items-center justify-center rounded-full bg-warning-100 dark:bg-warning-500/20 p-3">
+                        <x-filament::icon icon="heroicon-o-chart-bar" class="text-warning-600 dark:text-warning-400" style="width: 24px; height: 24px;" />
+                    </div>
+                </div>
+            </div>
+
+            {{-- Active Employees --}}
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Active Employees</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{{ $weeklyTotals['employee_count'] }}</p>
+                        <p class="mt-1 flex items-center gap-1 text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">With time entries</span>
+                        </p>
+                    </div>
+                    <div class="flex items-center justify-center rounded-full bg-info-100 dark:bg-info-500/20 p-3">
+                        <x-filament::icon icon="heroicon-o-users" class="text-info-600 dark:text-info-400" style="width: 24px; height: 24px;" />
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Detailed Table -->
+        {{-- Detailed Table --}}
         @if(count($payrollData) > 0)
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                    <tr>
-                        <th scope="col" class="px-6 py-3">Employee</th>
-                        <th scope="col" class="px-6 py-3">Department</th>
-                        <th scope="col" class="px-6 py-3">Shift Date</th>
-                        <th scope="col" class="px-6 py-3">Total Hours</th>
-                        <th scope="col" class="px-6 py-3">Regular Hours</th>
-                        <th scope="col" class="px-6 py-3">OT Hours</th>
-                        <th scope="col" class="px-6 py-3">Gross Pay</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($payrollData as $row)
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                            {{ $row['employee_name'] ?? $row['first_name'] . ' ' . $row['last_name'] }}
-                        </td>
-                        <td class="px-6 py-4">{{ $row['department_name'] ?? 'N/A' }}</td>
-                        <td class="px-6 py-4">{{ \Carbon\Carbon::parse($row['shift_date'])->format('M j, Y') }}</td>
-                        <td class="px-6 py-4">{{ round($row['total_hours'], 1) }}</td>
-                        <td class="px-6 py-4">{{ round($row['regular_hours'], 1) }}</td>
-                        <td class="px-6 py-4 {{ $row['overtime_hours'] > 0 ? 'text-orange-600 dark:text-orange-400 font-semibold' : '' }}">
-                            {{ round($row['overtime_hours'], 1) }}
-                        </td>
-                        <td class="px-6 py-4 font-semibold text-green-600 dark:text-green-400">
-                            ${{ number_format($row['gross_pay'], 2) }}
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
+            <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Employee</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Department</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Total</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Regular</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">OT</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Gross Pay</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @foreach($payrollData as $row)
+                            <tr class="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/20 text-sm font-medium text-primary-700 dark:text-primary-300">
+                                            {{ substr($row['first_name'] ?? '', 0, 1) }}{{ substr($row['last_name'] ?? '', 0, 1) }}
+                                        </div>
+                                        <span class="font-medium text-gray-900 dark:text-white">
+                                            {{ $row['employee_name'] ?? $row['first_name'] . ' ' . $row['last_name'] }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $row['department_name'] ?? 'N/A' }}</td>
+                                <td class="px-4 py-3 text-right font-mono font-medium text-gray-900 dark:text-white">{{ round($row['total_hours'], 1) }}</td>
+                                <td class="px-4 py-3 text-right font-mono text-gray-600 dark:text-gray-400">{{ round($row['regular_hours'], 1) }}</td>
+                                <td class="px-4 py-3 text-right font-mono">
+                                    @if($row['overtime_hours'] > 0)
+                                        <span class="inline-flex items-center rounded-full bg-warning-100 dark:bg-warning-500/20 px-2 py-0.5 text-xs font-semibold text-warning-700 dark:text-warning-300">
+                                            {{ round($row['overtime_hours'], 1) }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400">0</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-right font-mono font-semibold text-success-600 dark:text-success-400">
+                                    ${{ number_format($row['gross_pay'], 2) }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         @else
-        <div class="text-center py-8">
-            <div class="text-gray-400 dark:text-gray-500">
-                <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <p class="text-lg">No payroll data available for this week</p>
-                <p class="text-sm mt-2">Data is processed via KoolReport integration</p>
+            <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 dark:border-gray-700 py-12">
+                <div class="rounded-full bg-gray-100 dark:bg-gray-800 p-4">
+                    <x-filament::icon icon="heroicon-o-document-text" class="text-gray-400 dark:text-gray-500" style="width: 32px; height: 32px;" />
+                </div>
+                <p class="mt-4 text-sm font-medium text-gray-900 dark:text-white">No payroll data available</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Time entries will appear here once recorded</p>
             </div>
-        </div>
         @endif
-
-        <!-- Footer Info -->
-        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                <span>Data processed via KoolReport • Week of {{ \Carbon\Carbon::now()->startOfWeek()->format('M j') }} - {{ \Carbon\Carbon::now()->endOfWeek()->format('M j, Y') }}</span>
-                <span>Last updated: {{ \Carbon\Carbon::now()->format('g:i A') }}</span>
-            </div>
-        </div>
     </x-filament::section>
 </x-filament-widgets::widget>

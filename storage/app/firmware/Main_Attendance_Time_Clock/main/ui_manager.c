@@ -2035,11 +2035,12 @@ static void device_info_update_content(void) {
             "  Ethernet: %s\n\n"
 
             "PERIPHERALS\n"
-            "  Display: 7\" 1024x600 MIPI-DSI (GPIO 26,27)\n"
+            "  Display: 7\" 1024x600 MIPI-DSI (GPIO 23,26,27)\n"
             "  Touch: GT911 I2C (GPIO 7,8)\n"
-            "  NFC: PN532 SPI (GPIO TBD)\n"
+            "  NFC: RYRR30D UART (GPIO 21,22,32)\n"
+            "  Camera: ESP32-S3 SPI (GPIO 24,28,29,30,33)\n"
             "  WiFi/BT: ESP32-C6 SDIO (GPIO 14-19,54)\n"
-            "  Ethernet: W5500 SPI (GPIO 0,1,2,3,4)\n\n"
+            "  Ethernet: IP101GR RMII (GPIO 31,50,51,52)\n\n"
 
             "STORAGE\n"
             "  NVS: Factory partition\n"

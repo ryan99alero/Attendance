@@ -2,13 +2,19 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\ChartWidget;
 use App\Models\Attendance;
 use Carbon\Carbon;
+use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @deprecated Use AttendanceTrendsChart instead
+ */
 class AttendanceChartWidget extends ChartWidget
 {
+    // Disabled - replaced by AttendanceTrendsChart
+    protected static bool $isDiscovered = false;
+
     protected ?string $heading = 'Daily Attendance Trends';
 
     protected static ?int $sort = 2;
@@ -22,11 +28,11 @@ class AttendanceChartWidget extends ChartWidget
             DB::raw('DATE(punch_time) as date'),
             DB::raw('COUNT(*) as punch_count')
         )
-        ->where('punch_time', '>=', $thirtyDaysAgo)
-        ->where('status', '!=', 'deleted')
-        ->groupBy(DB::raw('DATE(punch_time)'))
-        ->orderBy('date')
-        ->get();
+            ->where('punch_time', '>=', $thirtyDaysAgo)
+            ->where('status', '!=', 'deleted')
+            ->groupBy(DB::raw('DATE(punch_time)'))
+            ->orderBy('date')
+            ->get();
 
         // Create arrays for labels and data
         $labels = [];
@@ -75,15 +81,15 @@ class AttendanceChartWidget extends ChartWidget
                     'beginAtZero' => true,
                     'title' => [
                         'display' => true,
-                        'text' => 'Number of Punches'
-                    ]
+                        'text' => 'Number of Punches',
+                    ],
                 ],
                 'x' => [
                     'title' => [
                         'display' => true,
-                        'text' => 'Date'
-                    ]
-                ]
+                        'text' => 'Date',
+                    ],
+                ],
             ],
         ];
     }

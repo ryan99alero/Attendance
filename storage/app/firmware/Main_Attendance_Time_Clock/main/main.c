@@ -33,9 +33,9 @@
 #include "ui_events.h"  // Event handlers with punch display helpers
 #endif
 
-// NFC driver - PN532 abstraction layer
+// NFC driver - RYRR30D (Apple VAS / Google SmartTap / ISO14443)
 #if NFC_ENABLED
-#include "nfc_reader.h"
+#include "ryrr30d.h"
 #endif
 
 // Network manager (abstracts WiFi, Ethernet, Bluetooth)
@@ -62,21 +62,16 @@
 #define API_DEVICE_NAME "ESP32-P4-NFC-Clock-01"
 #endif
 
-// Pin definitions for PN532 NFC Module V3 (SPI mode)
-#define NFC_SCK_PIN  GPIO_NUM_20
-#define NFC_MISO_PIN GPIO_NUM_21
-#define NFC_MOSI_PIN GPIO_NUM_22
-#define NFC_CS_PIN   GPIO_NUM_23
-#define NFC_RST_PIN  GPIO_NUM_32
-#define NFC_IRQ_PIN  -1  // Not using IRQ
-
-#define NFC_SPI_HOST SPI3_HOST  // Changed from SPI2_HOST to avoid conflict with WiFi transport
+// Pin definitions for RYRR30D NFC Module (UART mode)
+// RYRR30D uses UART 115200 8N1 - supports Apple VAS, Google SmartTap, ISO14443A/B
+#define NFC_UART_TX_PIN  GPIO_NUM_22  // P4 TX → Reader RX
+#define NFC_UART_RX_PIN  GPIO_NUM_21  // Reader TX → P4 RX
+#define NFC_RST_PIN      GPIO_NUM_32  // Optional reset pin (-1 if not used)
 
 static const char *TAG = "NFC_TIMECLOCK";
 
 // NFC global variables
 #if NFC_ENABLED
-static nfc_reader_handle_t nfc_reader = NULL;
 static uint32_t card_count = 0;
 static char last_card_uid[32] = {0};
 static uint64_t last_card_time = 0;
@@ -354,8 +349,18 @@ void app_main(void) {
 #if DISPLAY_ENABLED
 	// Initialize display FIRST to claim frame buffer memory before WiFi/NFC
 	ESP_EARLY_LOGI("MAIN", "About to call bsp_display_start()...");
-	bsp_display_start();
-	ESP_EARLY_LOGI("MAIN", "bsp_display_start() returned");
+
+	// DEBUG: Check GPIO 26 state before display init
+	ESP_EARLY_LOGI("MAIN", "Checking GPIO 26 state before display init...");
+	gpio_reset_pin(GPIO_NUM_26);
+	ESP_EARLY_LOGI("MAIN", "GPIO 26 reset, now calling bsp_display_start()...");
+
+	lv_display_t *disp = bsp_display_start();
+	ESP_EARLY_LOGI("MAIN", "bsp_display_start() returned: %p", disp);
+
+	if (disp == NULL) {
+		ESP_EARLY_LOGE("MAIN", "Display init FAILED - disp is NULL!");
+	}
 
 	ESP_EARLY_LOGI("MAIN", "About to call bsp_display_backlight_on()...");
 	bsp_display_backlight_on();
@@ -539,35 +544,29 @@ void app_main(void) {
 #endif
 
 #if NFC_ENABLED
-	printf("Initializing PN532 NFC Module V3...\n");
-	printf("DIP Switches: SEL0=1, SEL1=0 (SPI mode)\n\n");
+	printf("Initializing RYRR30D NFC Module...\n");
+	printf("Supports: Apple VAS, Google SmartTap, ISO14443A/B, ISO15693, FeliCa\n\n");
 
-	// Configure PN532
-	nfc_reader_config_t nfc_config = {
-		.type = NFC_READER_PN532,
-		.spi_host = NFC_SPI_HOST,
-		.miso_pin = NFC_MISO_PIN,
-		.mosi_pin = NFC_MOSI_PIN,
-		.sck_pin = NFC_SCK_PIN,
-		.cs_pin = NFC_CS_PIN,
+	// Configure RYRR30D
+	ryrr30d_config_t nfc_config = {
+		.uart_num = UART_NUM_1,
+		.tx_pin = NFC_UART_TX_PIN,
+		.rx_pin = NFC_UART_RX_PIN,
 		.rst_pin = NFC_RST_PIN,
-		.irq_pin = NFC_IRQ_PIN,
-		.spi_speed_hz = 5000000,  // 5 MHz
+		.apple_enabled = false,     // Configure later with keys
+		.google_enabled = false,    // Configure later with keys
 	};
 
-	// Initialize PN532
-	ret = nfc_reader_init(&nfc_config, &nfc_reader);
+	// Initialize RYRR30D
+	ret = ryrr30d_init(&nfc_config);
 	if (ret != ESP_OK) {
-		printf("❌ PN532 initialization FAILED: %s\n", esp_err_to_name(ret));
+		printf("❌ RYRR30D initialization FAILED: %s\n", esp_err_to_name(ret));
 		printf("\nCheck wiring:\n");
 		printf("  VCC  → 3.3V\n");
 		printf("  GND  → GND\n");
-		printf("  MOSI → GPIO%d\n", NFC_MOSI_PIN);
-		printf("  MISO → GPIO%d\n", NFC_MISO_PIN);
-		printf("  SCK  → GPIO%d\n", NFC_SCK_PIN);
-		printf("  SS   → GPIO%d\n", NFC_CS_PIN);
-		printf("  RST  → GPIO%d\n", NFC_RST_PIN);
-		printf("  DIP: SEL0=1, SEL1=0\n");
+		printf("  TX   → GPIO%d (Reader TX → P4 RX)\n", NFC_UART_RX_PIN);
+		printf("  RX   → GPIO%d (P4 TX → Reader RX)\n", NFC_UART_TX_PIN);
+		printf("  RST  → GPIO%d (optional)\n", NFC_RST_PIN);
 
 		// Continue with heartbeat even if NFC fails
 		printf("\nContinuing with heartbeat only...\n\n");
@@ -579,16 +578,33 @@ void app_main(void) {
 	}
 
 	// Get firmware version
-	uint32_t version;
-	if (nfc_reader_get_firmware_version(nfc_reader, &version) == ESP_OK) {
-		printf("✅ PN532 initialized successfully!\n");
-		printf("   Firmware: PN5%02lX v%ld.%ld\n\n",
-		       (unsigned long)((version >> 24) & 0xFF),
-		       (unsigned long)((version >> 16) & 0xFF),
-		       (unsigned long)((version >> 8) & 0xFF));
+	char version[64];
+	if (ryrr30d_get_version(version, sizeof(version)) == ESP_OK) {
+		printf("✅ RYRR30D initialized successfully!\n");
+		printf("   Firmware: %s\n\n", version);
+	} else {
+		printf("✅ RYRR30D initialized (version unknown)\n\n");
 	}
 
-	printf("Ready to read cards. Place a card near the reader...\n\n");
+	// Configure card types to scan
+	ryrr30d_configure_card_types(true, true, true, true);  // ISO14443A, B, 15693, FeliCa
+	printf("Card types enabled: ISO14443A, ISO14443B, ISO15693, FeliCa\n");
+
+	// Start continuous polling mode
+	ret = ryrr30d_start_polling();
+	if (ret == ESP_OK) {
+		printf("✅ Reader polling started\n");
+	} else {
+		printf("⚠️  Could not start polling (reader may auto-poll): %s\n", esp_err_to_name(ret));
+	}
+
+	// TODO: Configure Apple VAS when credentials are available
+	// ryrr30d_configure_apple("pass_type_id_hash", "private_key_hex");
+
+	// TODO: Configure Google SmartTap when credentials are available
+	// ryrr30d_configure_google("collector_id_hex", "private_key_hex");
+
+	printf("Ready to read cards/passes. Present card or phone...\n\n");
 
 #if DISPLAY_ENABLED
 	// TODO: Update UI - NFC is ready (Phase 6)
@@ -602,18 +618,28 @@ void app_main(void) {
 #endif
 
 #if NFC_ENABLED
-	// Main loop - scan for cards
-	nfc_card_uid_t uid;
+	// Main loop - scan for cards/passes
+	ryrr30d_card_info_t card_info;
 	char uid_str[32];
 	int heartbeat_counter = 0;
 
 	while (1) {
-		// Try to read card
-		ret = nfc_reader_read_card_uid(nfc_reader, &uid);
+		// Try to read card/pass (non-blocking poll)
+		ret = ryrr30d_poll_card(&card_info);
 
 		if (ret == ESP_OK) {
-			// Convert UID to string
-			nfc_reader_uid_to_string(&uid, uid_str, sizeof(uid_str));
+			// Convert UID/pass data to string for identification
+			if (card_info.type == RYRR30D_CARD_APPLE_VAS ||
+			    card_info.type == RYRR30D_CARD_GOOGLE_SMARTTAP) {
+				// For wallet passes, use the pass data as identifier
+				strncpy(uid_str, card_info.pass_data,
+				        (card_info.pass_data_len < sizeof(uid_str) - 1) ?
+				        card_info.pass_data_len : sizeof(uid_str) - 1);
+				uid_str[sizeof(uid_str) - 1] = '\0';
+			} else {
+				// For physical cards, use UID
+				ryrr30d_uid_to_string(&card_info, uid_str, sizeof(uid_str));
+			}
 
 			// Get current time
 			uint64_t current_time = esp_timer_get_time() / 1000;
@@ -627,16 +653,19 @@ void app_main(void) {
 				last_card_time = current_time;
 				card_count++;
 
-				// Get card type
-				nfc_card_type_t card_type = nfc_reader_get_card_type(&uid);
-				const char *type_name = nfc_reader_get_card_type_name(card_type);
+				// Get card/pass type name
+				const char *type_name = ryrr30d_card_type_to_string(card_info.type);
 
-				// Print card info to console
-				printf("\n🎫 === CARD DETECTED #%lu ===\n", (unsigned long)card_count);
-				printf("   UID:  %s\n", uid_str);
+				// Print card/pass info to console
+				printf("\n🎫 === CARD/PASS DETECTED #%lu ===\n", (unsigned long)card_count);
+				printf("   ID:   %s\n", uid_str);
 				printf("   Type: %s\n", type_name);
-				printf("   SAK:  0x%02X\n", uid.sak);
-				printf("   Size: %d bytes\n", uid.size);
+				if (card_info.type == RYRR30D_CARD_APPLE_VAS ||
+				    card_info.type == RYRR30D_CARD_GOOGLE_SMARTTAP) {
+					printf("   Pass Data Len: %d bytes\n", card_info.pass_data_len);
+				} else {
+					printf("   UID Len: %d bytes\n", card_info.uid_len);
+				}
 				printf("   Time: %llu ms\n\n", current_time);
 
 				// Generate timestamp from device clock (shared by API and Display)
@@ -755,15 +784,15 @@ void app_main(void) {
 				ui_show_punch_info(punch_date, punch_time);
 #endif
 			}
-
-			// Halt the card
-			nfc_reader_halt_card(nfc_reader);
+			// Note: RYRR30D handles card state internally, no explicit halt needed
 		}
 
 		// Heartbeat every 10 seconds
 		if (heartbeat_counter++ % 100 == 0) {
-			printf("💓 Heartbeat - Cards read: %lu, Heap: %lu bytes\n",
+			const ryrr30d_state_t *nfc_state = ryrr30d_get_state();
+			printf("💓 Heartbeat - Cards/Passes: %lu, Errors: %lu, Heap: %lu bytes\n",
 			       (unsigned long)card_count,
+			       (unsigned long)(nfc_state ? nfc_state->errors : 0),
 			       (unsigned long)esp_get_free_heap_size());
 		}
 
