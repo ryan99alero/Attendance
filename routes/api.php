@@ -477,4 +477,159 @@ Route::prefix('v1/timeclock')->group(function () {
      */
     Route::get('/employee/{card_id}', [TimeClockController::class, 'getEmployeeInfo'])
         ->name('timeclock.employee.info');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Announcement Endpoints
+    |--------------------------------------------------------------------------
+    |
+    | Endpoints for fetching and interacting with announcements on time clocks.
+    | Announcements are displayed to employees during clock-in with optional
+    | audio alerts (buzz, TTS, read aloud) and acknowledgment requirements.
+    |
+    */
+
+    /**
+     * Get Announcements for Employee
+     *
+     * Retrieves active announcements that should be displayed to an employee
+     * at the time clock. Includes audio type for device alert handling.
+     *
+     * @method GET
+     *
+     * @url    /api/v1/timeclock/announcements/{credential_value}?kind={credential_kind}
+     *
+     * @header Authorization: Bearer {api_token}
+     *
+     * @param  string  credential_value  Card UID/credential value (URL parameter)
+     * @param  string  kind              (optional) Credential type (default: rfid)
+     *
+     * @example curl http://attend.test/api/v1/timeclock/announcements/04A3B2C1D4E5F6?kind=rfid \
+     *              -H "Authorization: Bearer 1|aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+     *
+     * @response {
+     *     "success": true,
+     *     "data": {
+     *         "employee_id": 42,
+     *         "employee_name": "John Smith",
+     *         "announcements": [
+     *             {
+     *                 "id": 1,
+     *                 "title": "Company Meeting Tomorrow",
+     *                 "body": "All hands meeting at 2pm...",
+     *                 "priority": "high",
+     *                 "audio_type": "tts",
+     *                 "require_acknowledgment": true,
+     *                 "is_read": false,
+     *                 "is_acknowledged": false,
+     *                 "created_at": "2026-01-30T10:00:00.000000Z"
+     *             }
+     *         ],
+     *         "unread_count": 3,
+     *         "server_time": "2026-01-30T12:00:00.000000Z"
+     *     }
+     * }
+     */
+    Route::get('/announcements/{credential_value}', [TimeClockController::class, 'getAnnouncements'])
+        ->name('timeclock.announcements.get');
+
+    /**
+     * Mark Announcement as Read
+     *
+     * Records that an employee has viewed an announcement at the time clock.
+     *
+     * @method POST
+     *
+     * @url    /api/v1/timeclock/announcements/{announcement_id}/read
+     *
+     * @header Authorization: Bearer {api_token}
+     *
+     * @param  int     announcement_id   Announcement ID (URL parameter)
+     * @param  string  credential_value  Card UID to identify employee
+     * @param  string  credential_kind   (optional) Credential type (default: rfid)
+     *
+     * @example curl -X POST http://attend.test/api/v1/timeclock/announcements/1/read \
+     *              -H "Content-Type: application/json" \
+     *              -H "Authorization: Bearer 1|aBcDeFgHiJkLmNoPqRsTuVwXyZ" \
+     *              -d '{
+     *                  "credential_value": "04A3B2C1D4E5F6",
+     *                  "credential_kind": "rfid"
+     *              }'
+     *
+     * @response {
+     *     "success": true,
+     *     "message": "Announcement marked as read",
+     *     "data": {
+     *         "announcement_id": 1,
+     *         "employee_id": 42,
+     *         "read_at": "2026-01-30T12:00:00.000000Z"
+     *     }
+     * }
+     */
+    Route::post('/announcements/{announcement_id}/read', [TimeClockController::class, 'markAnnouncementRead'])
+        ->name('timeclock.announcements.read');
+
+    /**
+     * Acknowledge Announcement
+     *
+     * Records that an employee has acknowledged an announcement that requires it.
+     * Only applicable to announcements with require_acknowledgment=true.
+     *
+     * @method POST
+     *
+     * @url    /api/v1/timeclock/announcements/{announcement_id}/acknowledge
+     *
+     * @header Authorization: Bearer {api_token}
+     *
+     * @param  int     announcement_id   Announcement ID (URL parameter)
+     * @param  string  credential_value  Card UID to identify employee
+     * @param  string  credential_kind   (optional) Credential type (default: rfid)
+     *
+     * @example curl -X POST http://attend.test/api/v1/timeclock/announcements/1/acknowledge \
+     *              -H "Content-Type: application/json" \
+     *              -H "Authorization: Bearer 1|aBcDeFgHiJkLmNoPqRsTuVwXyZ" \
+     *              -d '{
+     *                  "credential_value": "04A3B2C1D4E5F6",
+     *                  "credential_kind": "rfid"
+     *              }'
+     *
+     * @response {
+     *     "success": true,
+     *     "message": "Announcement acknowledged",
+     *     "data": {
+     *         "announcement_id": 1,
+     *         "employee_id": 42,
+     *         "acknowledged_at": "2026-01-30T12:00:00.000000Z"
+     *     }
+     * }
+     */
+    Route::post('/announcements/{announcement_id}/acknowledge', [TimeClockController::class, 'acknowledgeAnnouncement'])
+        ->name('timeclock.announcements.acknowledge');
+
+    /**
+     * Dismiss Announcement Without Acknowledging
+     *
+     * Dismiss an announcement without acknowledging it. If the announcement
+     * required acknowledgment, the creator will be notified.
+     *
+     * @method POST
+     *
+     * @url    /api/v1/timeclock/announcements/{announcement_id}/dismiss
+     *
+     * @param  string  credential_value  Card UID to identify employee
+     * @param  string  credential_kind   (optional) Credential type (default: rfid)
+     *
+     * @response 200 {
+     *     "success": true,
+     *     "message": "Announcement dismissed",
+     *     "data": {
+     *         "announcement_id": 1,
+     *         "employee_id": 123,
+     *         "dismissed_at": "2026-02-25T12:00:00.000000Z",
+     *         "creator_notified": true
+     *     }
+     * }
+     */
+    Route::post('/announcements/{announcement_id}/dismiss', [TimeClockController::class, 'dismissAnnouncement'])
+        ->name('timeclock.announcements.dismiss');
 });

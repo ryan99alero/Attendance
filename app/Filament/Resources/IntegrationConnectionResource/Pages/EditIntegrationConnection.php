@@ -25,6 +25,7 @@ class EditIntegrationConnection extends EditRecord
                 ->label('Test Connection')
                 ->icon('heroicon-o-signal')
                 ->color('info')
+                ->visible(fn () => ! $this->record->isFlatFileMethod())
                 ->action(function () {
                     $driver = $this->record->driver;
 
@@ -71,6 +72,20 @@ class EditIntegrationConnection extends EditRecord
                             ->persistent()
                             ->send();
                     }
+                }),
+
+            Action::make('test_download')
+                ->label('Test Download')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('info')
+                ->visible(fn () => $this->record->isFlatFileMethod())
+                ->action(function () {
+                    Notification::make()
+                        ->title('File Export Ready')
+                        ->body('This integration is configured for file export. To test, go to Pay Periods and export a pay period using this provider.')
+                        ->info()
+                        ->duration(10000)
+                        ->send();
                 }),
 
             Action::make('discover_objects')
@@ -141,15 +156,16 @@ class EditIntegrationConnection extends EditRecord
                 ->modalDescription('This will invalidate the current webhook URL and generate a new one. Any external systems using the old URL will stop working. Continue?')
                 ->action(function () {
                     $this->record->generateWebhookToken();
+                    $webhookUrl = $this->record->getWebhookUrl();
 
                     Notification::make()
                         ->title('Webhook Token Regenerated')
-                        ->body('A new webhook token has been generated. Update any external systems with the new URL.')
+                        ->body("New webhook URL:\n{$webhookUrl}")
                         ->success()
-                        ->duration(10000)
+                        ->persistent()
                         ->send();
                 })
-                ->visible(fn () => $this->record->isPushMode()),
+                ->visible(fn () => $this->record->isPushMode() && ! $this->record->isFlatFileMethod()),
 
             Action::make('force_sync')
                 ->label('Force Sync')

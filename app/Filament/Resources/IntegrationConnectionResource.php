@@ -619,6 +619,7 @@ class IntegrationConnectionResource extends Resource
                     ->label('Test')
                     ->icon('heroicon-o-signal')
                     ->color('info')
+                    ->visible(fn (IntegrationConnection $record): bool => ! $record->isFlatFileMethod())
                     ->action(function (IntegrationConnection $record) {
                         if ($record->driver === 'pace') {
                             $client = new PaceApiClient($record);

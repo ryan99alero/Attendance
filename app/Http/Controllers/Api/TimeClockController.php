@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Announcement;
 use App\Models\Attendance;
 use App\Models\ClockEvent;
 use App\Models\Credential;
 use App\Models\Device;
 use App\Models\Employee;
 use App\Models\PayPeriod;
+use App\Services\AnnouncementService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -1280,5 +1282,357 @@ class TimeClockController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Get announcements for an employee
+     * GET /api/v1/timeclock/announcements/{credential_value}?kind={credential_kind}
+     *
+     * Returns active announcements that should be displayed on the time clock
+     * for the employee identified by their credential.
+     */
+    public function getAnnouncements(Request $request, string $credentialValue)
+    {
+        try {
+            $credentialKind = $request->query('kind', 'rfid');
+
+            // Find employee by credential
+            $employee = $this->findEmployeeByCredential($credentialValue, $credentialKind);
+
+            if (! $employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found',
+                ], 404);
+            }
+
+            if (! $employee->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee is inactive',
+                ], 403);
+            }
+
+            // Get announcements for time clock display
+            $service = app(AnnouncementService::class);
+            $announcements = $service->getTimeClockAnnouncements($employee);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'employee_id' => $employee->id,
+                    'employee_name' => $employee->full_names,
+                    'announcements' => $announcements->map(fn (Announcement $a) => [
+                        'id' => $a->id,
+                        'title' => $a->title,
+                        'body' => $a->body,
+                        'priority' => $a->priority,
+                        'audio_type' => $a->audio_type,
+                        'require_acknowledgment' => $a->require_acknowledgment,
+                        'is_read' => $a->isReadBy($employee),
+                        'is_acknowledged' => $a->isAcknowledgedBy($employee),
+                        'created_at' => $a->created_at->toISOString(),
+                        'created_by' => $a->creator ? [
+                            'id' => $a->creator->id,
+                            'name' => $a->creator->name,
+                        ] : null,
+                    ])->values(),
+                    'unread_count' => $service->getUnreadCount($employee),
+                    'server_time' => now()->toISOString(),
+                ],
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('[TimeClockAPI] Get announcements failed', [
+                'credential_value' => $credentialValue,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch announcements',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark an announcement as read from time clock
+     * POST /api/v1/timeclock/announcements/{announcement_id}/read
+     */
+    public function markAnnouncementRead(Request $request, int $announcementId)
+    {
+        $validator = Validator::make($request->all(), [
+            'credential_value' => 'required|string',
+            'credential_kind' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid request data',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        try {
+            $credentialKind = $request->input('credential_kind', 'rfid');
+
+            // Find employee
+            $employee = $this->findEmployeeByCredential(
+                $request->input('credential_value'),
+                $credentialKind
+            );
+
+            if (! $employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found',
+                ], 404);
+            }
+
+            // Find announcement
+            $announcement = Announcement::find($announcementId);
+
+            if (! $announcement) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Announcement not found',
+                ], 404);
+            }
+
+            // Mark as read via time clock
+            $service = app(AnnouncementService::class);
+            $service->markAsRead($announcement, $employee, 'timeclock');
+
+            Log::info('[TimeClockAPI] Announcement marked as read', [
+                'announcement_id' => $announcementId,
+                'employee_id' => $employee->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Announcement marked as read',
+                'data' => [
+                    'announcement_id' => $announcementId,
+                    'employee_id' => $employee->id,
+                    'read_at' => now()->toISOString(),
+                ],
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('[TimeClockAPI] Mark announcement read failed', [
+                'announcement_id' => $announcementId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to mark announcement as read',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Acknowledge an announcement from time clock
+     * POST /api/v1/timeclock/announcements/{announcement_id}/acknowledge
+     */
+    public function acknowledgeAnnouncement(Request $request, int $announcementId)
+    {
+        $validator = Validator::make($request->all(), [
+            'credential_value' => 'required|string',
+            'credential_kind' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid request data',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        try {
+            $credentialKind = $request->input('credential_kind', 'rfid');
+
+            // Find employee
+            $employee = $this->findEmployeeByCredential(
+                $request->input('credential_value'),
+                $credentialKind
+            );
+
+            if (! $employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found',
+                ], 404);
+            }
+
+            // Find announcement
+            $announcement = Announcement::find($announcementId);
+
+            if (! $announcement) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Announcement not found',
+                ], 404);
+            }
+
+            if (! $announcement->require_acknowledgment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Announcement does not require acknowledgment',
+                ], 400);
+            }
+
+            // Acknowledge via time clock
+            $service = app(AnnouncementService::class);
+            $service->acknowledge($announcement, $employee, 'timeclock');
+
+            Log::info('[TimeClockAPI] Announcement acknowledged', [
+                'announcement_id' => $announcementId,
+                'employee_id' => $employee->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Announcement acknowledged',
+                'data' => [
+                    'announcement_id' => $announcementId,
+                    'employee_id' => $employee->id,
+                    'acknowledged_at' => now()->toISOString(),
+                ],
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('[TimeClockAPI] Acknowledge announcement failed', [
+                'announcement_id' => $announcementId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to acknowledge announcement',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Dismiss an announcement without acknowledging from time clock
+     * POST /api/v1/timeclock/announcements/{announcement_id}/dismiss
+     *
+     * This records that the recipient dismissed the announcement without
+     * acknowledging it. If the announcement required acknowledgment,
+     * the creator will be notified.
+     */
+    public function dismissAnnouncement(Request $request, int $announcementId)
+    {
+        $validator = Validator::make($request->all(), [
+            'credential_value' => 'required|string',
+            'credential_kind' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid request data',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        try {
+            $credentialKind = $request->input('credential_kind', 'rfid');
+
+            // Find employee
+            $employee = $this->findEmployeeByCredential(
+                $request->input('credential_value'),
+                $credentialKind
+            );
+
+            if (! $employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found',
+                ], 404);
+            }
+
+            // Find announcement
+            $announcement = Announcement::find($announcementId);
+
+            if (! $announcement) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Announcement not found',
+                ], 404);
+            }
+
+            // Dismiss the announcement (this will notify creator if required acknowledgment)
+            $announcement->dismissBy($employee, 'timeclock');
+
+            Log::info('[TimeClockAPI] Announcement dismissed', [
+                'announcement_id' => $announcementId,
+                'employee_id' => $employee->id,
+                'required_acknowledgment' => $announcement->require_acknowledgment,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Announcement dismissed',
+                'data' => [
+                    'announcement_id' => $announcementId,
+                    'employee_id' => $employee->id,
+                    'dismissed_at' => now()->toISOString(),
+                    'creator_notified' => $announcement->require_acknowledgment,
+                ],
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('[TimeClockAPI] Dismiss announcement failed', [
+                'announcement_id' => $announcementId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to dismiss announcement',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to find employee by credential
+     */
+    private function findEmployeeByCredential(string $credentialValue, string $credentialKind): ?Employee
+    {
+        // Normalize and hash the credential
+        $normalizedValue = Credential::normalizeIdentifier($credentialValue);
+        $credentialHash = hash('sha256', $normalizedValue);
+
+        // Find credential - try exact kind first
+        $credential = Credential::where('kind', $credentialKind)
+            ->where('identifier_hash', $credentialHash)
+            ->active()
+            ->first();
+
+        // If not found, try with any NFC-type kind
+        if (! $credential) {
+            $nfcKinds = ['nfc', 'rfid', 'mifare', 'mifare_classic', 'mifare_ultralight', 'MIFARE Ultralight', 'MIFARE Classic'];
+            $credential = Credential::whereIn('kind', $nfcKinds)
+                ->where('identifier_hash', $credentialHash)
+                ->active()
+                ->first();
+        }
+
+        // Still not found? Try matching by hash alone
+        if (! $credential) {
+            $credential = Credential::where('identifier_hash', $credentialHash)
+                ->active()
+                ->first();
+        }
+
+        return $credential?->employee;
     }
 }

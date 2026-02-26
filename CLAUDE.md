@@ -49,6 +49,17 @@ This project has domain-specific skills available. You MUST activate the relevan
 
 - If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
 
+## Queue Workers (CRITICAL)
+
+- **ALWAYS notify the user to restart queue workers** when modifying any of the following:
+  - Notification classes (especially those implementing `ShouldQueue`)
+  - Job classes in `app/Jobs/`
+  - Mail classes that are queued
+  - Event listeners that are queued
+  - Any class that implements `ShouldQueue`
+- Tell them: "**Restart queue workers:** `php artisan queue:restart`"
+- Queue workers cache the code at startup; changes won't take effect until restart.
+
 ## Documentation Files
 
 - You must only create documentation files if explicitly requested by the user.
@@ -147,6 +158,17 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 - Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
 - Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+
+## Database Protection (CRITICAL)
+
+- **NEVER enable `RefreshDatabase` trait without explicit user approval.** This trait WIPES the entire database.
+- Before running tests that require `RefreshDatabase`:
+  1. WARN the user that this will wipe the database
+  2. Back up the database: `mysqldump -u root TimeAttendance > database/backup_before_tests.sql`
+  3. Run the tests
+  4. Restore the database: `mysql -u root TimeAttendance < database/backup_before_tests.sql`
+- The `tests/Pest.php` file has `RefreshDatabase` commented out by default - DO NOT uncomment it without following the above steps.
+- Prefer writing tests that don't require database refresh when possible (use factories that create isolated test data).
 
 === laravel/core rules ===
 
